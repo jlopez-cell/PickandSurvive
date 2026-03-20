@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "playwright": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-playwright"] },
+    "filesystem": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."] },
+    "docker": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-docker"] }
+  }
+}

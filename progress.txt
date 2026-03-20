@@ -1,0 +1,27 @@
+[OBJETIVO ACTUAL]: TASK-009 - Frontend Picks & Standings Pages
+
+[ESTADO]:
+  - TASK-001: Setup monorepo COMPLETADO
+  - TASK-002: Schema DB y migraciones COMPLETADO
+  - TASK-003: Backend Auth Module COMPLETADO
+  - TASK-004: Frontend Auth Pages COMPLETADO
+  - TASK-005: Backend Championships Module COMPLETADO
+  - TASK-006: Frontend Championship Pages COMPLETADO
+  - TASK-007: Backend Editions Cron COMPLETADO
+  - TASK-008: Backend Football Data Module COMPLETADO
+    - FootballDataModule: HttpService + Cron 3AM (syncUpcomingFixtures) + Cron 5min (processFinishedMatches)
+    - AdminModule: AdminController + AdminService (getLeagues, createLeague, updateLeague, syncLeague, getSystemStatus)
+    - Builds OK (0 errors)
+
+[OBSTÁCULOS]:
+  - pnpm no disponible en PATH de herramientas (se usa npm desde apps/api).
+  - prisma migrate dev requiere TTY interactivo: workaround = prisma db push.
+
+[PRÓXIMO PASO]: Ejecutar TASK-009 - Frontend Picks & Standings Pages
+  - /edition/[id]/pick: formulario para seleccionar equipo de la jornada actual
+    - GET /picks/:editionId/available-teams?matchday=N → lista equipos (con flag "used")
+    - POST /picks/:editionId → submit pick
+  - /edition/[id]/history: historial de picks de la edición (tabla por jornada)
+  - /edition/[id]/standings: tabla de clasificación (modo LEAGUE) o supervivientes (TOURNAMENT)
+    - GET /standings/:editionId
+  - Integrar con proxy API existente en apps/web/src/lib/api-proxy.ts

@@ -1,0 +1,320 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  SUPERADMIN
+}
+
+enum ChampionshipMode {
+  TOURNAMENT
+  LEAGUE
+}
+
+enum EditionStatus {
+  DRAFT
+  OPEN
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  ELIMINATED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum JoinRequestSource {
+  LINK
+  EMAIL
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+enum MatchdayStatus {
+  SCHEDULED
+  ONGOING
+  FINISHED
+}
+
+enum PickStatus {
+  PENDING
+  SURVIVED
+  DRAW_ELIMINATED
+  LOSS_ELIMINATED
+  NO_PICK_ELIMINATED
+  POSTPONED_PENDING
+}
+
+enum PotLedgerType {
+  ENTRY_FEE
+  PRIZE_PAYOUT
+  ACCUMULATED_IN
+  ACCUMULATED_OUT
+}
+
+enum NotificationType {
+  INVITATION
+  JOIN_APPROVED
+  JOIN_REJECTED
+  PICK_REMINDER
+  EDITION_FINISHED
+  NEW_JOIN_REQUEST
+}
+
+enum PickHalf {
+  FIRST
+  SECOND
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String
+  alias          String    @unique
+  emailVerified              Boolean   @default(false)
+  role                       UserRole  @default(USER)
+  verificationToken          String?   @unique
+  verificationTokenExpiresAt DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  championshipsCreated Championship[]  @relation("Creator")
+  championshipsAdmined Championship[]  @relation("Admin")
+  participants         Participant[]
+  joinRequests         JoinRequest[]
+  notifications        Notification[]
+  notificationPrefs    UserNotificationPrefs?
+  potLedgerEntries     PotLedger[]
+}
+
+model Championship {
+  id                    String           @id @default(uuid())
+  name                  String
+  creatorId             String
+  adminId               String
+  footballLeagueId      String
+  mode                  ChampionshipMode
+  pickResetAtMidseason  Boolean          @default(false)
+  createdAt             DateTime         @default(now())
+
+  creator        User           @relation("Creator", fields: [creatorId], references: [id])
+  admin          User           @relation("Admin", fields: [adminId], references: [id])
+  footballLeague FootballLeague @relation(fields: [footballLeagueId], references: [id])
+  editions       Edition[]
+  joinRequests   JoinRequest[]
+  invitationLinks InvitationLink[]
+}
+
+model Edition {
+  id                  String        @id @default(uuid())
+  championshipId      String
+  startMatchday       Int
+  endMatchday         Int?
+  potAmountCents      Int           @default(0)
+  accumulatedPotCents Int           @default(0)
+  status              EditionStatus @default(DRAFT)
+  createdAt           DateTime      @default(now())
+  finishedAt          DateTime?
+
+  championship Championship  @relation(fields: [championshipId], references: [id])
+  participants Participant[]
+  potLedger    PotLedger[]
+}
+
+model Participant {
+  id                   String            @id @default(uuid())
+  userId               String
+  editionId            String
+  status               ParticipantStatus @default(ACTIVE)
+  eliminatedAtMatchday Int?
+  totalPoints          Int               @default(0)
+  joinedAt             DateTime          @default(now())
+
+  user      User        @relation(fields: [userId], references: [id])
+  edition   Edition     @relation(fields: [editionId], references: [id])
+  picks     Pick[]
+  teamUsages TeamUsage[]
+
+  @@unique([userId, editionId])
+  @@index([editionId, totalPoints])
+  @@index([editionId, eliminatedAtMatchday])
+}
+
+model JoinRequest {
+  id             String            @id @default(uuid())
+  championshipId String
+  userId         String
+  status         JoinRequestStatus @default(PENDING)
+  source         JoinRequestSource
+  createdAt      DateTime          @default(now())
+
+  championship Championship @relation(fields: [championshipId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([championshipId, userId])
+}
+
+model InvitationLink {
+  id             String   @id @default(uuid())
+  championshipId String
+  token          String   @unique @default(uuid())
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  championship Championship @relation(fields: [championshipId], references: [id])
+}
+
+model FootballLeague {
+  id                      String  @id @default(uuid())
+  name                    String
+  country                 String
+  apiFootballId           Int     @unique
+  totalMatchdaysPerSeason Int
+  currentSeason           Int
+
+  teams         FootballTeam[]
+  matchdays     Matchday[]
+  championships Championship[]
+}
+
+model FootballTeam {
+  id            String @id @default(uuid())
+  leagueId      String
+  name          String
+  logoUrl       String
+  apiFootballId Int    @unique
+
+  league     FootballLeague @relation(fields: [leagueId], references: [id])
+  homeMatches Match[]      @relation("HomeTeam")
+  awayMatches Match[]      @relation("AwayTeam")
+  wonMatches  Match[]      @relation("WinnerTeam")
+  picks       Pick[]
+  teamUsages  TeamUsage[]
+}
+
+model Matchday {
+  id            String         @id @default(uuid())
+  leagueId      String
+  season        Int
+  number        Int
+  status        MatchdayStatus @default(SCHEDULED)
+  firstKickoff  DateTime?
+
+  league   FootballLeague @relation(fields: [leagueId], references: [id])
+  matches  Match[]
+  picks    Pick[]
+
+  @@unique([leagueId, season, number])
+}
+
+model Match {
+  id                   String      @id @default(uuid())
+  matchdayId           String
+  homeTeamId           String
+  awayTeamId           String
+  winnerTeamId         String?
+  kickoffTime          DateTime
+  homeScore            Int?
+  awayScore            Int?
+  status               MatchStatus @default(SCHEDULED)
+  apiFootballFixtureId Int         @unique
+
+  matchday   Matchday     @relation(fields: [matchdayId], references: [id])
+  homeTeam   FootballTeam @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   FootballTeam @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  winnerTeam FootballTeam? @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
+}
+
+model Pick {
+  id            String     @id @default(uuid())
+  participantId String
+  matchdayId    String
+  teamId        String
+  status        PickStatus @default(PENDING)
+  pointsAwarded Int?
+  createdAt     DateTime   @default(now())
+
+  participant Participant  @relation(fields: [participantId], references: [id])
+  matchday    Matchday     @relation(fields: [matchdayId], references: [id])
+  team        FootballTeam @relation(fields: [teamId], references: [id])
+
+  @@unique([participantId, matchdayId])
+  @@index([matchdayId, status])
+}
+
+model TeamUsage {
+  id            String   @id @default(uuid())
+  participantId String
+  teamId        String
+  editionId     String
+  half          PickHalf @default(FIRST)
+
+  participant Participant  @relation(fields: [participantId], references: [id])
+  team        FootballTeam @relation(fields: [teamId], references: [id])
+
+  @@unique([participantId, teamId, editionId, half])
+  @@index([participantId, editionId])
+}
+
+model PotLedger {
+  id          String        @id @default(uuid())
+  editionId   String
+  userId      String?
+  type        PotLedgerType
+  amountCents Int
+  description String
+  createdAt   DateTime      @default(now())
+
+  edition Edition @relation(fields: [editionId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([editionId])
+  @@index([type])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  payload   Json
+  read      Boolean          @default(false)
+  sentEmail Boolean          @default(false)
+  sentPush  Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([read])
+}
+
+model UserNotificationPrefs {
+  id                   String  @id @default(uuid())
+  userId               String  @unique
+  emailEnabled         Boolean @default(true)
+  pushEnabled          Boolean @default(false)
+  pushSubscriptionJson String?
+
+  user User @relation(fields: [userId], references: [id])
+}

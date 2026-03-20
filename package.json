@@ -1,0 +1,36 @@
+{
+  "name": "pickandsurvive",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @pickandsurvive/api run start:dev & pnpm --filter @pickandsurvive/web run dev",
+    "build": "pnpm --filter @pickandsurvive/api run build && pnpm --filter @pickandsurvive/web run build",
+    "build:api": "pnpm --filter @pickandsurvive/api run build",
+    "build:web": "pnpm --filter @pickandsurvive/web run build",
+    "start:api": "pnpm --filter @pickandsurvive/api run start:dev",
+    "start:web": "pnpm --filter @pickandsurvive/web run dev",
+    "test": "pnpm --filter @pickandsurvive/api run test",
+    "lint": "pnpm -r run lint",
+    "db:generate": "pnpm --filter @pickandsurvive/api run db:generate",
+    "db:migrate": "pnpm --filter @pickandsurvive/api run db:migrate",
+    "db:studio": "pnpm --filter @pickandsurvive/api run db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "bcrypt",
+      "prisma",
+      "sharp"
+    ]
+  }
+}

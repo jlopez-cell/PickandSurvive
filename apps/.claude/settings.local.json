@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /home/fernando-reina-galvez/Documentos/04_Personal/pickandsurvive/apps/web && pnpm add tailwindcss@^3 postcss autoprefixer clsx tailwind-merge class-variance-authority lucide-react @radix-ui/react-slot @radix-ui/react-checkbox @radix-ui/react-select @radix-ui/react-label 2>&1 | tail -5)",
+      "Bash(pnpm type-check:*)",
+      "Bash(pnpm build:*)",
+      "Bash(chmod +x /home/fernando-reina-galvez/Documentos/04_Personal/pickandsurvive/start.sh)",
+      "Bash(find /home/fernando-reina-galvez/Documentos/04_Personal/pickandsurvive/node_modules/.pnpm -name \"bin.js\" -path \"*/ts-node/dist/bin.js\" 2>/dev/null | head -3)",
+      "Bash(cd /home/fernando-reina-galvez/Documentos/04_Personal/pickandsurvive/apps/api && pnpm add -D ts-node 2>&1 | tail -3)",
+      "Bash(which tsx:*)",
+      "Bash(cd /home/fernando-reina-galvez/Documentos/04_Personal/pickandsurvive && ./start.sh 2>&1)",
+      "Bash(curl -sf http://localhost:3001/leagues && echo \"OK\" || echo \"FAIL\"; curl -s http://localhost:3001/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"email\":\"admin@pickandsurvive.com\",\"password\":\"Admin1234!\"}' | head -c 200)"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+.env
+.env.*
+apps/api/.env
+
+.next/
+dist/
+build/
+coverage/
+.turbo/
+
+node_modules/
+
+*.log
+*.tsbuildinfo
+
+.DS_Store
+
