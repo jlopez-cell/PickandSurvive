@@ -363,30 +363,13 @@ export class PicksService {
 
     if (!matchday) throw new NotFoundException('Jornada no encontrada');
 
-    // Privacy: don't reveal "used picks" before the matchday officially starts (deadline = first kickoff).
-    let firstKickoff = matchday.firstKickoff ?? null;
-    if (matchday && !firstKickoff) {
-      const firstMatch = await this.prisma.match.findFirst({
-        where: { matchdayId: matchday.id },
-        orderBy: { kickoffTime: 'asc' },
-        select: { kickoffTime: true },
-      });
-      firstKickoff = firstMatch?.kickoffTime ?? null;
-    }
-
-    const canRevealPicks =
-      firstKickoff !== null && !Number.isNaN(new Date(firstKickoff).getTime())
-        ? new Date(firstKickoff).getTime() <= Date.now()
-        : true;
-
-    const usedTeamIds = new Set<string>();
-    if (canRevealPicks) {
-      const usedUsages = await this.prisma.teamUsage.findMany({
-        where: { participantId: participant.id, editionId, half },
-        select: { teamId: true },
-      });
-      usedUsages.forEach((u) => usedTeamIds.add(u.teamId));
-    }
+    // Equipos ya usados por ESTE participante en la mitad actual (TeamUsage es por usuario).
+    // Siempre lo enviamos: antes del pitido inicial el jugador debe ver qué no puede volver a elegir.
+    const usedUsages = await this.prisma.teamUsage.findMany({
+      where: { participantId: participant.id, editionId, half },
+      select: { teamId: true },
+    });
+    const usedTeamIds = new Set(usedUsages.map((u) => u.teamId));
 
     const matches = await this.prisma.match.findMany({
       where: { matchdayId: matchday.id },
@@ -405,9 +388,8 @@ export class PicksService {
       awayScore: m.awayScore,
       homeTeam: m.homeTeam,
       awayTeam: m.awayTeam,
-      // Before start, hide pick usage markers (prevents inferring other players picks).
-      homeUsed: canRevealPicks ? usedTeamIds.has(m.homeTeamId) : false,
-      awayUsed: canRevealPicks ? usedTeamIds.has(m.awayTeamId) : false,
+      homeUsed: usedTeamIds.has(m.homeTeamId),
+      awayUsed: usedTeamIds.has(m.awayTeamId),
     }));
   }
 

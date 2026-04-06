@@ -335,17 +335,23 @@ export default function EditionPage() {
                 >
                   <div
                     className={cn(
-                      'flex flex-1 items-center justify-center flex-col rounded-lg transition-colors',
-                      homeLocked && 'bg-muted/40 border border-dashed border-border/60',
+                      'flex flex-1 items-center justify-center flex-col rounded-lg px-1 py-1 transition-colors',
+                      homeLocked &&
+                        'bg-muted/50 ring-1 ring-border/80 ring-inset opacity-[0.88]',
                     )}
                   >
+                    {homeLocked ? (
+                      <span className="mb-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Ya usado
+                      </span>
+                    ) : null}
                     {match.homeTeam.logoUrl && (
                       <img
                         src={match.homeTeam.logoUrl}
                         alt={match.homeTeam.name}
                         className={cn(
                           'w-10 h-10 object-contain',
-                          homeLocked && 'grayscale brightness-[0.92] contrast-[1.08]',
+                          homeLocked && 'grayscale contrast-[1.12] opacity-90',
                         )}
                       />
                     )}
@@ -360,7 +366,7 @@ export default function EditionPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="mt-2 w-full"
+                      className={cn('mt-2 w-full', homeLocked && 'opacity-60')}
                       disabled={
                         submitting ||
                         participantEliminated ||
@@ -388,17 +394,23 @@ export default function EditionPage() {
 
                   <div
                     className={cn(
-                      'flex flex-1 items-center justify-center flex-col rounded-lg transition-colors',
-                      awayLocked && 'bg-muted/40 border border-dashed border-border/60',
+                      'flex flex-1 items-center justify-center flex-col rounded-lg px-1 py-1 transition-colors',
+                      awayLocked &&
+                        'bg-muted/50 ring-1 ring-border/80 ring-inset opacity-[0.88]',
                     )}
                   >
+                    {awayLocked ? (
+                      <span className="mb-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Ya usado
+                      </span>
+                    ) : null}
                     {match.awayTeam.logoUrl && (
                       <img
                         src={match.awayTeam.logoUrl}
                         alt={match.awayTeam.name}
                         className={cn(
                           'w-10 h-10 object-contain',
-                          awayLocked && 'grayscale brightness-[0.92] contrast-[1.08]',
+                          awayLocked && 'grayscale contrast-[1.12] opacity-90',
                         )}
                       />
                     )}
@@ -413,7 +425,7 @@ export default function EditionPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="mt-2 w-full"
+                      className={cn('mt-2 w-full', awayLocked && 'opacity-60')}
                       disabled={
                         submitting ||
                         participantEliminated ||
