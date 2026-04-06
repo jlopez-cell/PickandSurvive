@@ -18,7 +18,8 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:prod": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "sh node_modules/.bin/tsx prisma/seed.ts"
+    "db:seed": "sh node_modules/.bin/tsx prisma/seed.ts",
+    "db:sync:hypermotion": "node --env-file=.env ./node_modules/.bin/tsx prisma/sync-hypermotion-teams.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

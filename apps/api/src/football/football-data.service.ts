@@ -14,6 +14,9 @@ const FOOTBALL_DATA_BASE = 'https://api.football-data.org/v4';
 // derivamos el ID por (competicion, club) para evitar colisiones entre ligas.
 const FOOTBALL_DATA_TEAM_ID_FACTOR = 1000000;
 
+/** Solo Primera División (nombre en seed). Evita 429 consultando todas las competiciones. */
+const SYNC_FIXTURES_LEAGUE_NAME = 'LaLiga';
+
 // Mapping from API-Football status codes to our MatchStatus enum
 const MATCH_STATUS_MAP: Record<string, MatchStatus> = {
   NS: MatchStatus.SCHEDULED,
@@ -218,7 +221,16 @@ export class FootballDataService {
   async syncUpcomingFixtures() {
     this.logger.log('Syncing upcoming fixtures...');
 
-    const leagues = await this.prisma.footballLeague.findMany();
+    const leagues = await this.prisma.footballLeague.findMany({
+      where: { name: SYNC_FIXTURES_LEAGUE_NAME },
+    });
+
+    if (leagues.length === 0) {
+      this.logger.warn(
+        `No hay liga "${SYNC_FIXTURES_LEAGUE_NAME}" en BD; syncUpcomingFixtures omitido.`,
+      );
+      return;
+    }
 
     for (const league of leagues) {
       // ── Provider: football-data.org (si está configurado) ────────────────
@@ -387,7 +399,16 @@ export class FootballDataService {
   async processFinishedMatches() {
     const today = new Date().toISOString().split('T')[0];
 
-    const leagues = await this.prisma.footballLeague.findMany();
+    const leagues = await this.prisma.footballLeague.findMany({
+      where: { name: SYNC_FIXTURES_LEAGUE_NAME },
+    });
+
+    if (leagues.length === 0) {
+      this.logger.warn(
+        `No hay liga "${SYNC_FIXTURES_LEAGUE_NAME}" en BD; processFinishedMatches omitido.`,
+      );
+      return;
+    }
 
     for (const league of leagues) {
       // ── Provider: football-data.org ─────────────────────────────────────────

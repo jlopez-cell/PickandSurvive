@@ -2,6 +2,9 @@
 .env.*
 apps/api/.env
 
+# Credenciales / datos de servidor solo locales (nunca subir)
+INFORMACION_SERVIDOR_VPS.local.md
+
 .next/
 dist/
 build/

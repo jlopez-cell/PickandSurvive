@@ -1,0 +1,56 @@
+#!/usr/bin/expect -f
+# Uso: EXPECT_PASS='tu_contraseña' ./scripts/deploy-vps-expect.exp
+# No subir este script con contraseñas; usa solo variable de entorno.
+
+set timeout -1
+if {![info exists env(EXPECT_PASS)] || $env(EXPECT_PASS) eq ""} {
+  puts stderr "Define EXPECT_PASS con la contraseña SSH de root."
+  exit 2
+}
+set pass $env(EXPECT_PASS)
+
+set scriptdir [file dirname [info script]]
+set repo [file normalize [file join $scriptdir ..]]
+set remote root@76.13.48.187
+set rpath /opt/pickandsurvive
+
+cd $repo
+
+proc handle_password {} {
+  global pass
+  expect {
+    -re "(?i)password:" { send -- "$pass\r"; exp_continue }
+    eof
+  }
+}
+
+spawn rsync -avz --human-readable --progress --delete \
+  --filter {P apps/web/.env.production} \
+  --filter {P apps/api/.env} \
+  --exclude node_modules \
+  --exclude .git \
+  --exclude .next \
+  --exclude apps/web/.next \
+  --exclude apps/api/dist \
+  --exclude .env \
+  --exclude apps/api/.env \
+  --exclude apps/web/.env.production \
+  --exclude apps/web/.env.local \
+  --exclude apps/web/.env.production.local \
+  --exclude "*.log" \
+  --exclude .turbo \
+  --exclude venv \
+  --exclude INFORMACION_SERVIDOR_VPS.local.md \
+  --exclude "*.local.md" \
+  -e {ssh -o StrictHostKeyChecking=accept-new} \
+  ./ ${remote}:${rpath}/
+
+handle_password
+catch wait rsync_wait
+set code [lindex $rsync_wait 3]
+if {$code ne 0} { exit $code }
+
+spawn ssh -o StrictHostKeyChecking=accept-new $remote bash $rpath/scripts/remote-post-deploy.sh
+handle_password
+catch wait ssh_wait
+exit [lindex $ssh_wait 3]

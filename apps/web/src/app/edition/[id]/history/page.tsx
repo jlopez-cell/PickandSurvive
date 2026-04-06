@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 type PickRecord = {
   id: string;
@@ -61,7 +62,7 @@ export default function HistoryPage() {
   const matchdayNumbers = Object.keys(grouped).map(Number).sort((a, b) => b - a);
 
   return (
-    <main className="min-h-screen bg-background p-6">
+    <main className="min-h-screen bg-background p-4 sm:p-6 pb-24">
       <div className="max-w-3xl mx-auto">
         <Button variant="ghost" size="sm" className="-ml-2 mb-6 text-muted-foreground" onClick={() => router.back()}>
           ← Volver
@@ -103,6 +104,7 @@ export default function HistoryPage() {
           ))
         )}
       </div>
+      <MobileBottomNav />
     </main>
   );
 }

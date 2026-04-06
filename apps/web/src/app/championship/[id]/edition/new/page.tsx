@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,23 @@ export default function NewEditionPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [form, setForm] = useState({ startMatchday: '', endMatchday: '', potAmountCents: '' });
+  const [leagueCurrentMatchday, setLeagueCurrentMatchday] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/championships/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const current = Number(data?.leagueCurrentMatchday);
+        if (Number.isFinite(current) && current > 0) {
+          setLeagueCurrentMatchday(current);
+        } else {
+          setLeagueCurrentMatchday(null);
+        }
+      })
+      .catch(() => setLeagueCurrentMatchday(null));
+  }, [id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +36,18 @@ export default function NewEditionPage() {
       setError('La jornada de inicio es obligatoria.');
       return;
     }
+
+    const start = parseInt(form.startMatchday, 10);
+    if (leagueCurrentMatchday !== null && start < leagueCurrentMatchday) {
+      setError(`La jornada de inicio no puede ser menor que la jornada actual (J${leagueCurrentMatchday}).`);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     const body: Record<string, number> = {
-      startMatchday: parseInt(form.startMatchday, 10),
+      startMatchday: start,
     };
     if (form.endMatchday) body.endMatchday = parseInt(form.endMatchday, 10);
     if (form.potAmountCents) body.potAmountCents = Math.round(parseFloat(form.potAmountCents) * 100);
@@ -66,11 +88,17 @@ export default function NewEditionPage() {
               <Input
                 id="start"
                 type="number"
-                min={1}
+                min={leagueCurrentMatchday ?? 1}
                 value={form.startMatchday}
                 onChange={(e) => setForm({ ...form, startMatchday: e.target.value })}
-                placeholder="Ej: 10"
+                placeholder={leagueCurrentMatchday ? `Desde J${leagueCurrentMatchday}` : 'Ej: 10'}
               />
+              {leagueCurrentMatchday !== null && (
+                <p className="text-xs text-muted-foreground">
+                  Jornada actual de la liga: <span className="font-semibold">J{leagueCurrentMatchday}</span>.
+                  Puedes crear desde esa jornada en adelante.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">

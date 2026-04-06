@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
+import { MobileTopHeader } from '@/components/mobile/MobileTopHeader';
 
 type Team = { id: string; name: string; logoUrl: string };
 type Match = {
   id: string;
   status: string;
+  kickoffTime?: string | null;
   homeScore: number | null;
   awayScore: number | null;
   homeTeam: Team;
@@ -41,7 +44,7 @@ const PICK_STATUS_BADGE: Record<string, PickBadge> = {
 export default function EditionPage() {
   const { id: editionId } = useParams<{ id: string }>();
   const router = useRouter();
-  const { loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [editionStartMatchday, setEditionStartMatchday] = useState<number | null>(null);
   const [leagueSeason, setLeagueSeason] = useState<number | null>(null);
@@ -53,6 +56,22 @@ export default function EditionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [participantEliminated, setParticipantEliminated] = useState(false);
+  const [participantStatusLoading, setParticipantStatusLoading] = useState(false);
+  const [matchdayFirstKickoff, setMatchdayFirstKickoff] = useState<string | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000 * 30);
+    return () => clearInterval(t);
+  }, []);
+
+  const deadlinePassed = useMemo(() => {
+    if (!matchdayFirstKickoff) return false;
+    const ts = new Date(matchdayFirstKickoff).getTime();
+    if (Number.isNaN(ts)) return false;
+    return nowTs >= ts;
+  }, [matchdayFirstKickoff, nowTs]);
 
   const loadData = useCallback(async (matchday: number) => {
     setLoading(true);
@@ -66,6 +85,20 @@ export default function EditionPage() {
       const picksData = await picksRes.json();
 
       setMatches(Array.isArray(matchesData) ? matchesData : []);
+      if (Array.isArray(matchesData) && matchesData.length > 0) {
+        const kickoffValues = matchesData
+          .map((m: any) => m?.kickoffTime)
+          .filter((k: any) => typeof k === 'string' && !Number.isNaN(new Date(k).getTime()))
+          .map((k: string) => new Date(k).getTime());
+        if (kickoffValues.length > 0) {
+          const minTs = Math.min(...kickoffValues);
+          setMatchdayFirstKickoff(new Date(minTs).toISOString());
+        } else {
+          setMatchdayFirstKickoff(null);
+        }
+      } else {
+        setMatchdayFirstKickoff(null);
+      }
       if (picksData && typeof picksData === 'object') {
         setMyPick(picksData.myPick ?? null);
       } else {
@@ -88,11 +121,30 @@ export default function EditionPage() {
 
     fetch(`/api/editions/${editionId}/meta`)
       .then((r) => r.json())
-      .then((meta) => {
+      .then(async (meta) => {
         const start = Number(meta.startMatchday);
-        setEditionStartMatchday(Number.isFinite(start) ? start : 1);
+        const startMd = Number.isFinite(start) ? start : 1;
+        const endMd = meta.endMatchday != null ? Number(meta.endMatchday) : null;
+        setEditionStartMatchday(startMd);
         setLeagueSeason(meta.season ?? null);
-        setCurrentMatchday(Number.isFinite(start) ? start : 1);
+
+        let initialMd = startMd;
+        try {
+          const dRes = await fetch(`/api/editions/${editionId}/deadline`);
+          const dData = await dRes.json();
+          const current = Number(dData?.matchdayNumber);
+          if (Number.isFinite(current)) {
+            initialMd = current;
+            if (endMd != null && Number.isFinite(endMd)) {
+              initialMd = Math.min(Math.max(initialMd, startMd), endMd);
+            } else {
+              initialMd = Math.max(initialMd, startMd);
+            }
+          }
+        } catch {
+          /* mantener startMd */
+        }
+        setCurrentMatchday(initialMd);
       })
       .catch(() => {
         setError('Error al cargar la configuración de la edición');
@@ -109,7 +161,38 @@ export default function EditionPage() {
     loadData(currentMatchday);
   }, [authLoading, editionStartMatchday, currentMatchday, loadData]);
 
+  useEffect(() => {
+    const run = async () => {
+      if (!user?.alias) {
+        setParticipantEliminated(false);
+        return;
+      }
+      setParticipantStatusLoading(true);
+      try {
+        const res = await fetch(`/api/editions/${editionId}/standings`);
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [];
+        const me = rows.find((r: any) => r?.alias === user.alias);
+        setParticipantEliminated(me?.status === 'ELIMINATED');
+      } catch {
+        setParticipantEliminated(false);
+      } finally {
+        setParticipantStatusLoading(false);
+      }
+    };
+
+    if (!authLoading) run();
+  }, [editionId, user?.alias, authLoading]);
+
   const handlePick = async (teamId: string) => {
+    if (participantEliminated) {
+      setError('Estás eliminado de esta edición y no puedes elegir picks.');
+      return;
+    }
+    if (deadlinePassed) {
+      setError('La deadline de esta jornada ya ha pasado. No puedes cambiar tu pick.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -142,7 +225,9 @@ export default function EditionPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background">
+      <MobileTopHeader />
+      <main className="p-4 sm:p-6 pb-24">
       <div className="max-w-3xl mx-auto">
         {/* Top bar */}
         <div className="flex justify-between items-center mb-6">
@@ -196,6 +281,20 @@ export default function EditionPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+        {participantEliminated && !participantStatusLoading && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              Estás eliminado en esta edición. No puedes elegir ni modificar picks hasta la siguiente edición.
+            </AlertDescription>
+          </Alert>
+        )}
+        {deadlinePassed && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              La deadline de esta jornada ya ha pasado. No puedes elegir ni modificar picks.
+            </AlertDescription>
+          </Alert>
+        )}
         {success && (
           <Alert variant="success" className="mb-4">
             <AlertDescription>{success}</AlertDescription>
@@ -219,19 +318,27 @@ export default function EditionPage() {
           )}
 
           <h2 className="text-sm font-semibold text-foreground mb-4">
-            {myPick ? 'Cambia tu pick' : 'Elige tu equipo'}
+            {participantEliminated || deadlinePassed ? 'No disponible' : myPick ? 'Cambia tu pick' : 'Elige tu equipo'}
           </h2>
 
           {matches.length === 0 ? (
             <p className="text-muted-foreground text-sm">No hay partidos disponibles.</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {matches.map((match) => (
+              {matches.map((match) => {
+                const homeLocked = match.homeUsed && myPick?.team.id !== match.homeTeam.id;
+                const awayLocked = match.awayUsed && myPick?.team.id !== match.awayTeam.id;
+                return (
                 <div
                   key={match.id}
                   className="flex items-stretch justify-between gap-4 bg-card border border-border rounded-xl px-4 py-3"
                 >
-                  <div className="flex flex-1 items-center justify-center flex-col">
+                  <div
+                    className={cn(
+                      'flex flex-1 items-center justify-center flex-col rounded-lg transition-colors',
+                      homeLocked && 'opacity-45 grayscale bg-muted/40 border border-dashed border-border/60',
+                    )}
+                  >
                     {match.homeTeam.logoUrl && (
                       <img
                         src={match.homeTeam.logoUrl}
@@ -244,7 +351,12 @@ export default function EditionPage() {
                       size="sm"
                       variant="outline"
                       className="mt-2 w-full"
-                      disabled={submitting || (match.homeUsed && myPick?.team.id !== match.homeTeam.id)}
+                      disabled={
+                        submitting ||
+                        participantEliminated ||
+                        deadlinePassed ||
+                        homeLocked
+                      }
                       onClick={() => handlePick(match.homeTeam.id)}
                     >
                       {myPick?.team.id === match.homeTeam.id
@@ -264,7 +376,12 @@ export default function EditionPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-1 items-center justify-center flex-col">
+                  <div
+                    className={cn(
+                      'flex flex-1 items-center justify-center flex-col rounded-lg transition-colors',
+                      awayLocked && 'opacity-45 grayscale bg-muted/40 border border-dashed border-border/60',
+                    )}
+                  >
                     {match.awayTeam.logoUrl && (
                       <img
                         src={match.awayTeam.logoUrl}
@@ -277,7 +394,12 @@ export default function EditionPage() {
                       size="sm"
                       variant="outline"
                       className="mt-2 w-full"
-                      disabled={submitting || (match.awayUsed && myPick?.team.id !== match.awayTeam.id)}
+                      disabled={
+                        submitting ||
+                        participantEliminated ||
+                        deadlinePassed ||
+                        awayLocked
+                      }
                       onClick={() => handlePick(match.awayTeam.id)}
                     >
                       {myPick?.team.id === match.awayTeam.id
@@ -288,11 +410,14 @@ export default function EditionPage() {
                     </Button>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </section>
       </div>
-    </main>
+      <MobileBottomNav />
+      </main>
+    </div>
   );
 }

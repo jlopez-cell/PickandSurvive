@@ -12,7 +12,7 @@ import * as nodemailer from 'nodemailer';
 import { CreateChampionshipDto } from './dto/create-championship.dto';
 import { CreateEditionDto } from './dto/create-edition.dto';
 import { InviteEmailDto } from './dto/invite-email.dto';
-import { ChampionshipMode, EditionStatus, JoinRequestSource, JoinRequestStatus } from '@prisma/client';
+import { ChampionshipMode, EditionStatus, JoinRequestSource, JoinRequestStatus, MatchdayStatus } from '@prisma/client';
 
 @Injectable()
 export class ChampionshipsService {
@@ -105,7 +105,10 @@ export class ChampionshipsService {
       throw new ForbiddenException('No tienes acceso a este campeonato');
     }
 
-    return championship;
+    return {
+      ...championship,
+      leagueCurrentMatchday: await this.getLeagueCurrentMatchday(championship.footballLeagueId),
+    };
   }
 
   // ─── Ediciones ────────────────────────────────────────────────────────────
@@ -113,6 +116,13 @@ export class ChampionshipsService {
   async createEdition(userId: string, championshipId: string, dto: CreateEditionDto) {
     const championship = await this.prisma.championship.findUnique({
       where: { id: championshipId },
+      include: {
+        footballLeague: {
+          select: {
+            currentSeason: true,
+          },
+        },
+      },
     });
 
     if (!championship) throw new NotFoundException('Campeonato no encontrado');
@@ -126,6 +136,14 @@ export class ChampionshipsService {
     // Validate startMatchday < endMatchday if both provided
     if (dto.endMatchday && dto.startMatchday >= dto.endMatchday) {
       throw new BadRequestException('La jornada de inicio debe ser anterior a la jornada de fin');
+    }
+
+    const currentLeagueMatchday = await this.getLeagueCurrentMatchday(championship.footballLeagueId);
+
+    if (dto.startMatchday < currentLeagueMatchday) {
+      throw new BadRequestException(
+        `La jornada de inicio no puede ser anterior a la jornada actual de la liga (J${currentLeagueMatchday})`,
+      );
     }
 
     // Cannot have more than 1 ACTIVE edition at the same time
@@ -348,6 +366,10 @@ export class ChampionshipsService {
 
     if (!link) {
       throw new NotFoundException('Enlace de invitación inválido o expirado');
+    }
+
+    if (link.isActive === false) {
+      throw new ForbiddenException('Enlace de invitación desactivado');
     }
 
     const championshipId = link.championshipId;
@@ -644,5 +666,41 @@ export class ChampionshipsService {
         payload: { championshipId, requestingUserId },
       },
     });
+  }
+
+  /**
+   * Jornada "actual" robusta para validaciones de creación:
+   * - Prioriza la próxima jornada por fecha (firstKickoff >= ahora).
+   * - Si no hay fechas futuras, toma la primera SCHEDULED/ONGOING.
+   * - Si todo terminó, toma la última FINISHED.
+   * - Fallback final: 1.
+   */
+  private async getLeagueCurrentMatchday(leagueId: string): Promise<number> {
+    const now = new Date();
+
+    const nextByKickoff = await this.prisma.matchday.findFirst({
+      where: { leagueId, firstKickoff: { gte: now } },
+      orderBy: [{ firstKickoff: 'asc' }, { season: 'desc' }, { number: 'asc' }],
+      select: { number: true },
+    });
+    if (nextByKickoff?.number != null) {
+      return nextByKickoff.number;
+    }
+
+    const pendingByStatus = await this.prisma.matchday.findFirst({
+      where: { leagueId, status: { in: [MatchdayStatus.SCHEDULED, MatchdayStatus.ONGOING] } },
+      orderBy: [{ season: 'desc' }, { number: 'asc' }],
+      select: { number: true },
+    });
+    if (pendingByStatus?.number != null) {
+      return pendingByStatus.number;
+    }
+
+    const latestFinished = await this.prisma.matchday.findFirst({
+      where: { leagueId, status: MatchdayStatus.FINISHED },
+      orderBy: [{ season: 'desc' }, { number: 'desc' }],
+      select: { number: true },
+    });
+    return latestFinished?.number ?? 1;
   }
 }

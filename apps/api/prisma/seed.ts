@@ -15,9 +15,10 @@ const FOOTBALL_LEAGUES = [
   {
     name: 'LaLiga Hypermotion',
     country: 'Spain',
-    apiFootballId: 141,
+    // football-data.org: Segunda División (código SD)
+    apiFootballId: 2077,
     totalMatchdaysPerSeason: 42,
-    currentSeason: 2024,
+    currentSeason: 2025,
   },
   {
     name: 'Premier League',

@@ -17,9 +17,12 @@ export async function POST(request: NextRequest) {
   }
 
   const cookieStore = await cookies();
+  const isHttps = request.nextUrl.protocol === 'https:';
   cookieStore.set('auth_token', data.accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    // In production over plain HTTP (without TLS), secure cookies are ignored by browsers.
+    // Enable secure only when request comes via HTTPS.
+    secure: isHttps,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7,
     path: '/',

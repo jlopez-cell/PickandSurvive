@@ -100,6 +100,20 @@ export class PicksService {
       throw new BadRequestException('La jornada no está disponible para picks');
     }
 
+    // Hard deadline: once first kickoff has passed, picks cannot be created or modified.
+    let firstKickoff = matchday.firstKickoff ?? null;
+    if (!firstKickoff) {
+      const firstMatch = await this.prisma.match.findFirst({
+        where: { matchdayId: matchday.id },
+        orderBy: { kickoffTime: 'asc' },
+        select: { kickoffTime: true },
+      });
+      firstKickoff = firstMatch?.kickoffTime ?? null;
+    }
+    if (firstKickoff && new Date(firstKickoff).getTime() <= Date.now()) {
+      throw new BadRequestException('La deadline de esta jornada ya ha pasado. No puedes cambiar tu pick.');
+    }
+
     // Comprobar que el equipo pertenece a la liga.
     const team = await this.prisma.footballTeam.findFirst({
       where: { id: dto.teamId, leagueId: edition.championship.footballLeagueId },

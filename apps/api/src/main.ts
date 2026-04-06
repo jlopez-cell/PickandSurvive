@@ -14,7 +14,8 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
+    // Frontend origin(s), not API URL.
+    origin: process.env.APP_URL || 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });

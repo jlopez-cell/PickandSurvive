@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { Suspense, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-export default function RegisterPage() {
+function RegisterContent() {
   const searchParams = useSearchParams();
   const [form, setForm] = useState({ email: '', alias: '', password: '', confirm: '' });
   const [error, setError] = useState('');
@@ -153,5 +153,13 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen flex items-center justify-center bg-background p-4 text-muted-foreground">Cargando...</main>}>
+      <RegisterContent />
+    </Suspense>
   );
 }

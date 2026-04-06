@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Activity,
@@ -12,16 +12,21 @@ import {
   Clock3,
   LayoutDashboard,
   Mail,
+  Menu,
   Settings2,
+  Trash2,
   Trophy,
+  UserPlus,
   UserRound,
   Users,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 type Championship = {
   id: string;
@@ -104,6 +109,8 @@ export default function DashboardPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
 
+  const [mobileTab, setMobileTab] = useState<'home' | 'leagues' | 'notifications' | 'profile'>('home');
+
   const [championships, setChampionships] = useState<Championship[]>([]);
   const [fetching, setFetching] = useState(true);
 
@@ -118,6 +125,7 @@ export default function DashboardPage() {
   const [sidebarLoading, setSidebarLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingChampionshipId, setDeletingChampionshipId] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [editionDeadlines, setEditionDeadlines] = useState<Record<string, EditionDeadline>>({});
   const [deadlinesLoading, setDeadlinesLoading] = useState(false);
@@ -130,6 +138,11 @@ export default function DashboardPage() {
   const [sidebarMatchesLoading, setSidebarMatchesLoading] = useState(false);
   const [recentActivity, setRecentActivity] = useState<NotificationItem[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [markingNotificationId, setMarkingNotificationId] = useState<string | null>(null);
+  const [deletingNotificationId, setDeletingNotificationId] = useState<string | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -202,18 +215,14 @@ export default function DashboardPage() {
         setActiveEditionMatchday(candidate.startMatchday);
 
         setSidebarLoading(true);
-        const [metaRes, pickRes, standingsRes] = await Promise.all([
+        const [metaRes, standingsRes] = await Promise.all([
           fetch(`/api/editions/${candidate.editionId}/meta`),
-          fetch(`/api/editions/${candidate.editionId}/picks?matchday=${candidate.startMatchday}`),
           fetch(`/api/editions/${candidate.editionId}/standings`),
         ]);
 
         const meta: EditionMeta = await metaRes.json();
         setLeagueSeason(meta.season ?? null);
         setActiveEditionMatchday(meta.startMatchday ?? candidate.startMatchday);
-
-        const picksData = await pickRes.json();
-        setMyPick(picksData?.myPick ?? null);
 
         const standingsData = await standingsRes.json();
         setStandings(Array.isArray(standingsData) ? standingsData : []);
@@ -240,12 +249,12 @@ export default function DashboardPage() {
 
   const editionStartMatchdayById = useMemo(() => {
     const next: Record<string, number> = {};
-    for (const c of createdChampionships) {
+    for (const c of championships) {
       const e = c.editions?.[0];
       if (e?.id && typeof e.startMatchday === 'number') next[e.id] = e.startMatchday;
     }
     return next;
-  }, [createdChampionships]);
+  }, [championships]);
 
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 1000);
@@ -259,7 +268,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const editionIds = createdChampionships
+      const editionIds = championships
         .map((c) => c.editions?.[0]?.id)
         .filter((id): id is string => Boolean(id));
 
@@ -297,7 +306,7 @@ export default function DashboardPage() {
     };
 
     run();
-  }, [user?.id, createdChampionships]);
+  }, [user?.id, championships]);
 
   useEffect(() => {
     const run = async () => {
@@ -315,6 +324,9 @@ export default function DashboardPage() {
           firstKickoff: data?.firstKickoff ?? null,
           matchdayStatus: data?.matchdayStatus ?? null,
         });
+        if (typeof data?.matchdayNumber === 'number') {
+          setActiveEditionMatchday(data.matchdayNumber);
+        }
       } catch {
         setNextDeadline(null);
       } finally {
@@ -324,34 +336,80 @@ export default function DashboardPage() {
 
     if (loading || fetching) return;
     run();
+    const intervalId = setInterval(run, 30 * 60 * 1000);
+    return () => clearInterval(intervalId);
   }, [activeEditionId, loading, fetching]);
+
+  const fetchSidebarMatches = useCallback(async () => {
+    if (loading || fetching || nextDeadlineLoading) return;
+    if (!activeEditionId) {
+      setSidebarMatches([]);
+      return;
+    }
+    const md = nextDeadline?.matchdayNumber ?? activeEditionMatchday;
+    if (!md) {
+      setSidebarMatches([]);
+      return;
+    }
+
+    setSidebarMatchesLoading(true);
+    try {
+      const res = await fetch(`/api/editions/${activeEditionId}/matches?matchday=${md}`);
+      const data = await res.json();
+      setSidebarMatches(Array.isArray(data) ? data : []);
+    } catch {
+      setSidebarMatches([]);
+    } finally {
+      setSidebarMatchesLoading(false);
+    }
+  }, [
+    activeEditionId,
+    activeEditionMatchday,
+    nextDeadline?.matchdayNumber,
+    loading,
+    fetching,
+    nextDeadlineLoading,
+  ]);
+
+  useEffect(() => {
+    fetchSidebarMatches();
+    // Misma cadencia aproximada que el sync de resultados en API (solo lectura de BD).
+    const intervalId = setInterval(fetchSidebarMatches, 30 * 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [fetchSidebarMatches]);
 
   useEffect(() => {
     const run = async () => {
       if (!activeEditionId) {
-        setSidebarMatches([]);
-        return;
-      }
-      const md = nextDeadline?.matchdayNumber ?? activeEditionMatchday;
-      if (!md) {
-        setSidebarMatches([]);
+        setMyPick(null);
         return;
       }
 
-      setSidebarMatchesLoading(true);
+      const md = nextDeadline?.matchdayNumber ?? activeEditionMatchday;
+      if (!md) {
+        setMyPick(null);
+        return;
+      }
+
       try {
-        const res = await fetch(`/api/editions/${activeEditionId}/matches?matchday=${md}`);
+        const res = await fetch(`/api/editions/${activeEditionId}/picks?matchday=${md}`);
         const data = await res.json();
-        setSidebarMatches(Array.isArray(data) ? data : []);
+        setMyPick(data?.myPick ?? null);
       } catch {
-        setSidebarMatches([]);
-      } finally {
-        setSidebarMatchesLoading(false);
+        setMyPick(null);
       }
     };
 
-    if (!loading && !fetching && !nextDeadlineLoading) run();
-  }, [activeEditionId, activeEditionMatchday, nextDeadline?.matchdayNumber, nextDeadlineLoading, loading, fetching]);
+    if (loading || fetching || nextDeadlineLoading) return;
+    run();
+  }, [
+    activeEditionId,
+    activeEditionMatchday,
+    nextDeadline?.matchdayNumber,
+    loading,
+    fetching,
+    nextDeadlineLoading,
+  ]);
 
   useEffect(() => {
     const run = async () => {
@@ -527,6 +585,117 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchNotifications = useCallback(async () => {
+    setNotificationsLoading(true);
+    try {
+      const res = await fetch('/api/notifications?limit=20');
+      const data = await res.json();
+      setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
+  const markNotificationAsRead = useCallback(async (id: string) => {
+    setMarkingNotificationId(id);
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      setRecentActivity((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    } finally {
+      setMarkingNotificationId(null);
+    }
+  }, []);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    setDeletingNotificationId(id);
+    try {
+      await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setRecentActivity((prev) => prev.filter((n) => n.id !== id));
+    } finally {
+      setDeletingNotificationId(null);
+    }
+  }, []);
+
+  const getNotificationPrimaryAction = useCallback(
+    (n: NotificationItem): { label: string; action: () => void } | null => {
+      const payload = n.payload as Record<string, unknown> | undefined;
+      const championshipId = typeof payload?.championshipId === 'string' ? payload.championshipId : null;
+      const editionId = typeof payload?.editionId === 'string' ? payload.editionId : null;
+      const inviteToken =
+        typeof payload?.token === 'string'
+          ? payload.token
+          : typeof payload?.inviteToken === 'string'
+            ? payload.inviteToken
+            : typeof payload?.invitationToken === 'string'
+              ? payload.invitationToken
+              : null;
+
+      if (n.type === 'NEW_JOIN_REQUEST' && championshipId) {
+        return {
+          label: 'Ver y aprobar',
+          action: () => {
+            router.push(`/championship/${championshipId}/invite`);
+            setNotificationsOpen(false);
+          },
+        };
+      }
+      if (n.type === 'INVITATION' && championshipId) {
+        return {
+          label: 'Ver invitación',
+          action: () => {
+            if (inviteToken) {
+              router.push(`/join/${inviteToken}`);
+            } else {
+              router.push(`/championship/${championshipId}`);
+            }
+            setNotificationsOpen(false);
+          },
+        };
+      }
+      if (n.type === 'PICK_REMINDER' && editionId) {
+        return {
+          label: 'Ir a elegir pick',
+          action: () => {
+            router.push(`/edition/${editionId}`);
+            setNotificationsOpen(false);
+          },
+        };
+      }
+      return null;
+    },
+    [router],
+  );
+
+  const unreadNotificationsCount = useMemo(() => {
+    const source = notifications.length > 0 ? notifications : recentActivity;
+    return source.filter((n) => !n.read).length;
+  }, [notifications, recentActivity]);
+
+  useEffect(() => {
+    if (!notificationsOpen || !user?.id) return;
+    void fetchNotifications();
+  }, [notificationsOpen, user?.id, fetchNotifications]);
+
+  useEffect(() => {
+    if (mobileTab !== 'notifications' || !user?.id) return;
+    void fetchNotifications();
+  }, [mobileTab, user?.id, fetchNotifications]);
+
+  const SyncTabFromUrl = ({ onTab }: { onTab: (tab: 'home' | 'leagues' | 'notifications' | 'profile') => void }) => {
+    const sp = useSearchParams();
+    useEffect(() => {
+      const raw = (sp.get('tab') || '').toLowerCase();
+      if (raw === 'notifications' || raw === 'leagues' || raw === 'profile' || raw === 'home') {
+        onTab(raw as any);
+      }
+    }, [sp, onTab]);
+    return null;
+  };
+
   const pendingJoinRequests = useMemo(
     () => createdChampionships.reduce((sum, c) => sum + (c._count?.joinRequests ?? 0), 0),
     [createdChampionships],
@@ -567,6 +736,9 @@ export default function DashboardPage() {
 
   return (
     <div className="relative min-h-screen text-white overflow-hidden">
+      <Suspense fallback={null}>
+        <SyncTabFromUrl onTab={setMobileTab} />
+      </Suspense>
       <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${BG_IMAGE}')` }} />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/65 to-slate-950/95" />
 
@@ -579,8 +751,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="text-white/80 hover:text-white">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sm:hidden text-white/90 hover:text-white hover:bg-white/10"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Abrir menú"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative text-white/80 hover:text-white"
+            onClick={() => setNotificationsOpen(true)}
+            aria-label="Abrir notificaciones"
+          >
             <Bell className="h-4 w-4" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[10px] leading-4 text-white text-center">
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </span>
+            )}
           </Button>
           <div className="hidden sm:flex items-center gap-2 text-sm text-slate-200/90">
             <UserRound className="h-4 w-4" />
@@ -596,7 +788,584 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="relative z-10 flex gap-6 px-6 pt-6 pb-10">
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-[1px]">
+          <div className="absolute right-0 top-0 h-full w-[88%] max-w-sm bg-slate-950 border-l border-white/10 p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-semibold text-slate-100">Menú</div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white/80 hover:text-white hover:bg-white/10"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Cerrar menú"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-2">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  router.push('/championship/new');
+                }}
+              >
+                <Trophy className="h-4 w-4" /> + Nuevo campeonato
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleViewLeague();
+                }}
+              >
+                <LayoutDashboard className="h-4 w-4" /> Ver Liga
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  router.push('/profile');
+                }}
+              >
+                <UserRound className="h-4 w-4" /> Mi Perfil
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleManageLeague();
+                }}
+              >
+                <Settings2 className="h-4 w-4" /> Gestionar Liga
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-red-200 hover:text-red-100 hover:bg-red-500/10"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+              >
+                <UserRound className="h-4 w-4" /> Cerrar sesión
+              </Button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+              <div className="text-sm font-semibold text-slate-100 mb-2">Resumen de campeonatos</div>
+              {createdChampionships.length === 0 ? (
+                <div className="text-xs text-slate-400">Aún no has creado ninguno.</div>
+              ) : (
+                <div className="space-y-2">
+                  {createdChampionships.slice(0, 4).map((c) => (
+                    <button
+                      key={c.id}
+                      className="w-full text-left rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        const latestEdition = c.editions?.[0];
+                        if (latestEdition?.id) router.push(`/edition/${latestEdition.id}/standings`);
+                        else router.push(`/championship/${c.id}`);
+                      }}
+                    >
+                      <div className="text-xs font-semibold text-slate-100 truncate">{c.name}</div>
+                      <div className="text-[11px] text-slate-400 mt-1">
+                        {c.footballLeague.name} · {MODE_LABEL[c.mode] ?? c.mode}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-slate-100">
+                  Calendario actual (J{nextDeadline?.matchdayNumber ?? activeEditionMatchday})
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[11px] border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  onClick={() => void fetchSidebarMatches()}
+                  disabled={sidebarMatchesLoading}
+                >
+                  {sidebarMatchesLoading ? '…' : 'Actualizar'}
+                </Button>
+              </div>
+              <div className="mt-3 space-y-2 max-h-64 overflow-auto pr-1">
+                {sidebarMatchesLoading ? (
+                  <div className="text-xs text-slate-400">Cargando partidos...</div>
+                ) : sidebarMatches.length === 0 ? (
+                  <div className="text-xs text-slate-400">Sin partidos para mostrar.</div>
+                ) : (
+                  sidebarMatches.slice(0, 8).map((m) => (
+                    <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-cyan-200 font-semibold">{formatMatchKickoff(m.kickoffTime)}</span>
+                        <span className="text-[11px] text-slate-400">{m.status}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-center gap-2">
+                        <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-5 h-5 object-contain" />
+                        <span className="text-[11px] text-slate-300">vs</span>
+                        <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-5 h-5 object-contain" />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationsOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[1px]">
+          <div className="absolute right-0 top-0 h-full w-[92%] max-w-md bg-slate-950 border-l border-white/10 p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm font-semibold text-slate-100">Notificaciones</div>
+                <div className="text-xs text-slate-400">Revisa recordatorios y solicitudes</div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white/80 hover:text-white hover:bg-white/10"
+                onClick={() => setNotificationsOpen(false)}
+                aria-label="Cerrar notificaciones"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="mb-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                onClick={() => void fetchNotifications()}
+                disabled={notificationsLoading}
+              >
+                {notificationsLoading ? 'Actualizando...' : 'Actualizar'}
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {notificationsLoading ? (
+                <div className="text-sm text-slate-400">Cargando notificaciones...</div>
+              ) : notifications.length === 0 ? (
+                <div className="text-sm text-slate-400">No tienes notificaciones por ahora.</div>
+              ) : (
+                notifications.map((n) => {
+                  const primaryAction = getNotificationPrimaryAction(n);
+                  return (
+                    <div key={n.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-slate-100">{formatNotificationLabel(n)}</div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            {new Date(n.createdAt).toLocaleString('es-ES', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        </div>
+                        {!n.read && <Badge variant="destructive">Nueva</Badge>}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {primaryAction && (
+                          <Button
+                            size="sm"
+                            className="h-8 bg-cyan-500/85 hover:bg-cyan-500 text-slate-950"
+                            onClick={() => {
+                              if (!n.read) void markNotificationAsRead(n.id);
+                              primaryAction.action();
+                            }}
+                          >
+                            {primaryAction.label}
+                          </Button>
+                        )}
+                        {!n.read && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                            onClick={() => void markNotificationAsRead(n.id)}
+                            disabled={markingNotificationId === n.id}
+                          >
+                            {markingNotificationId === n.id ? 'Marcando...' : 'Marcar como leída'}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                          onClick={() => void deleteNotification(n.id)}
+                          disabled={deletingNotificationId === n.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {deletingNotificationId === n.id ? 'Eliminando...' : 'Eliminar'}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative z-10 lg:hidden px-4 pt-4 pb-24">
+        <div className="rounded-3xl border border-white/10 bg-slate-950/35 shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden">
+          <div className="p-4 border-b border-white/10">
+            <div className="text-xs text-slate-300">Hola,</div>
+            <div className="text-lg font-extrabold text-slate-50">@{user?.alias ?? 'usuario'}</div>
+            <div className="text-xs text-slate-400 mt-1">Elige una liga o revisa tus notificaciones.</div>
+          </div>
+
+          <div className="p-4">
+            {mobileTab === 'home' ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/25 overflow-hidden">
+                  <img
+                    src="/dashboard-hero.jpeg"
+                    alt="Pick & Survive"
+                    className="w-full h-40 object-cover"
+                  />
+                  <div className="p-3">
+                    <div className="text-sm font-semibold text-slate-100">Próxima deadline</div>
+                    <div className="text-xs text-slate-300 mt-1">
+                      {nextDeadlineLoading
+                        ? 'Cargando...'
+                        : nextDeadline?.matchdayNumber
+                          ? `J${nextDeadline.matchdayNumber} · ${formatDeadline(nextDeadline.firstKickoff)}`
+                          : formatDeadline(nextDeadline?.firstKickoff ?? null)}
+                    </div>
+                    <div className="text-xs text-emerald-200 mt-1">
+                      {nextDeadlineLoading ? '—' : formatCountdown(nextDeadline?.firstKickoff ?? null)}
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full h-12 text-base font-extrabold bg-emerald-500 hover:bg-emerald-500/90 text-slate-950"
+                  onClick={() => router.push('/dashboard?tab=leagues')}
+                >
+                  Elegir pick
+                </Button>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-slate-100">Resumen de campeonatos</div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      onClick={() => router.push('/dashboard?tab=leagues')}
+                    >
+                      Ver todos
+                    </Button>
+                  </div>
+
+                  {championships.length === 0 ? (
+                    <div className="mt-3 text-xs text-slate-400">Aún no tienes ligas.</div>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-1 gap-2">
+                      {championships.slice(0, 4).map((c) => {
+                        const e = c.editions?.[0];
+                        const status = e?.status ?? '—';
+                        const joinReq = c._count?.joinRequests ?? 0;
+                        return (
+                          <button
+                            key={c.id}
+                            className="text-left rounded-xl border border-white/10 bg-slate-950/25 hover:bg-slate-950/35 transition px-3 py-2"
+                            onClick={() => router.push(`/championship/${c.id}`)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold text-slate-50 truncate">{c.name}</div>
+                                <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                  {c.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · {c.footballLeague?.name ?? '—'}
+                                </div>
+                              </div>
+                              <div className="shrink-0 flex flex-col items-end gap-1">
+                                <Badge variant="secondary">{status}</Badge>
+                                {joinReq > 0 && <div className="text-[10px] text-cyan-200">{joinReq} solicitud(es)</div>}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-slate-100">
+                      Calendario (J{nextDeadline?.matchdayNumber ?? activeEditionMatchday})
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      onClick={() => void fetchSidebarMatches()}
+                      disabled={sidebarMatchesLoading}
+                    >
+                      {sidebarMatchesLoading ? '…' : 'Actualizar'}
+                    </Button>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {sidebarMatchesLoading ? (
+                      <div className="text-xs text-slate-400">Cargando partidos...</div>
+                    ) : sidebarMatches.length === 0 ? (
+                      <div className="text-xs text-slate-400">Sin partidos para mostrar.</div>
+                    ) : (
+                      sidebarMatches.slice(0, 8).map((m) => {
+                        const st = (m.status || '').toUpperCase();
+                        const finished = st === 'FINISHED' || st === 'FT' || st === 'AET' || st === 'PEN';
+                        return (
+                          <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/25 px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] text-cyan-200 font-semibold">
+                                {formatMatchKickoff(m.kickoffTime)}
+                              </span>
+                              <span className="text-[11px] text-slate-400">{finished ? 'Final' : m.status}</span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-center gap-2">
+                              <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-5 h-5 object-contain" />
+                              {finished ? (
+                                <span className="text-sm font-extrabold text-emerald-200 tabular-nums min-w-[3.5rem] text-center">
+                                  {m.homeScore ?? '—'} – {m.awayScore ?? '—'}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-slate-300">vs</span>
+                              )}
+                              <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-5 h-5 object-contain" />
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {mobileTab === 'leagues' ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-100">Mis ligas</div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      onClick={() => router.push('/join-code')}
+                    >
+                      Unirme por código
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      onClick={() => router.push('/championship/new')}
+                    >
+                      + Nueva
+                    </Button>
+                  </div>
+                </div>
+
+                {championships.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+                    Aún no tienes ligas. Crea una para empezar.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {championships.map((c) => {
+                      const e = c.editions?.[0];
+                      const status = e?.status ?? '—';
+                      const md = e?.startMatchday ?? null;
+                      const joinReq = c._count?.joinRequests ?? 0;
+                      const editionId = e?.id ?? null;
+                      const pick = editionId ? championshipMyPicks[editionId] : null;
+                      const hasPick = Boolean(pick?.team?.logoUrl);
+                      const deadlineMd =
+                        editionId ? (editionDeadlines[editionId]?.matchdayNumber ?? null) : null;
+                      const shouldWarnNoPick = editionId && deadlineMd !== null && !pick && !myPicksLoading;
+                      return (
+                        <button
+                          key={c.id}
+                          className="text-left rounded-2xl border border-white/10 bg-slate-950/30 hover:bg-slate-950/40 transition px-4 py-3"
+                          onClick={() => {
+                            router.push(`/championship/${c.id}`);
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold text-slate-50 truncate">{c.name}</div>
+                              <div className="text-xs text-slate-400 mt-1">
+                                {c.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · {c.footballLeague?.name ?? '—'}
+                              </div>
+                            </div>
+                            <div className="shrink-0 flex flex-col items-end gap-1">
+                              <Badge variant="secondary">{status}</Badge>
+                              {joinReq > 0 && (
+                                <div className="text-[11px] text-cyan-200">{joinReq} solicitud(es)</div>
+                              )}
+                              {myPicksLoading ? (
+                                <div className="text-[11px] text-slate-400">Pick…</div>
+                              ) : hasPick ? (
+                                <div className="flex items-center gap-1 text-[11px] text-emerald-200">
+                                  <img
+                                    src={pick!.team.logoUrl}
+                                    alt={pick!.team.name}
+                                    title={pick!.team.name}
+                                    className="w-4 h-4 object-contain"
+                                  />
+                                  Pick
+                                </div>
+                              ) : shouldWarnNoPick ? (
+                                <div className="flex items-center gap-1 text-[11px] text-amber-200">
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  Sin pick
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                          {md !== null && (
+                            <div className="mt-2 text-xs text-slate-300">
+                              Inicio: jornada {md}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {mobileTab === 'notifications' ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-100">Notificaciones</div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    onClick={() => void fetchNotifications()}
+                    disabled={notificationsLoading}
+                  >
+                    {notificationsLoading ? 'Actualizando...' : 'Actualizar'}
+                  </Button>
+                </div>
+
+                {notificationsLoading ? (
+                  <div className="text-sm text-slate-400">Cargando notificaciones...</div>
+                ) : notifications.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+                    No tienes notificaciones por ahora.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map((n) => {
+                      const primaryAction = getNotificationPrimaryAction(n);
+                      return (
+                        <div key={n.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-slate-100">{formatNotificationLabel(n)}</div>
+                              <div className="text-xs text-slate-400 mt-1">
+                                {new Date(n.createdAt).toLocaleString('es-ES', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                            </div>
+                            {!n.read && <Badge variant="destructive">Nueva</Badge>}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {primaryAction && (
+                              <Button
+                                size="sm"
+                                className="h-8 bg-cyan-500/85 hover:bg-cyan-500 text-slate-950"
+                                onClick={() => {
+                                  if (!n.read) void markNotificationAsRead(n.id);
+                                  primaryAction.action();
+                                }}
+                              >
+                                {primaryAction.label}
+                              </Button>
+                            )}
+                            {!n.read && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                                onClick={() => void markNotificationAsRead(n.id)}
+                                disabled={markingNotificationId === n.id}
+                              >
+                                {markingNotificationId === n.id ? 'Marcando...' : 'Marcar como leída'}
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                              onClick={() => void deleteNotification(n.id)}
+                              disabled={deletingNotificationId === n.id}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {deletingNotificationId === n.id ? 'Eliminando...' : 'Eliminar'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {mobileTab === 'profile' ? (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-slate-100">Perfil</div>
+                <Button
+                  variant="outline"
+                  className="w-full border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  onClick={() => router.push('/profile')}
+                >
+                  Ver mi perfil
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={logout}
+                >
+                  Cerrar sesión
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <MobileBottomNav unreadCount={unreadNotificationsCount} />
+      </div>
+
+      <div className="relative z-10 hidden lg:flex gap-6 px-6 pt-6 pb-10">
         <aside className="hidden lg:flex w-72 flex-col gap-4">
           <div className="rounded-2xl border border-white/10 bg-slate-950/40 shadow-[0_25px_70px_rgba(0,0,0,0.35)] p-4">
             <div className="text-xs text-slate-300 font-semibold">Mi Liga</div>
@@ -617,6 +1386,13 @@ export default function DashboardPage() {
               onClick={() => router.push('/championship/new')}
             >
               <Trophy className="h-4 w-4" /> + Nuevo campeonato
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
+              onClick={() => router.push('/join-code')}
+            >
+              <UserPlus className="h-4 w-4" /> Unirme por código
             </Button>
             <Button
               variant="ghost"
@@ -659,8 +1435,22 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-            <div className="text-sm font-semibold text-slate-100">
-              Partidos jornada {nextDeadline?.matchdayNumber ?? activeEditionMatchday}
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-slate-100">
+                Partidos jornada {nextDeadline?.matchdayNumber ?? activeEditionMatchday}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[11px] border-white/15 bg-white/5 text-white hover:bg-white/10"
+                onClick={() => void fetchSidebarMatches()}
+                disabled={sidebarMatchesLoading}
+              >
+                {sidebarMatchesLoading ? '…' : 'Actualizar'}
+              </Button>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1">
+              Marcadores al finalizar: vienen de tu BD (el servidor sincroniza con la API externa, p. ej. cada 30–90 min).
             </div>
             <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
               {sidebarMatchesLoading ? (
@@ -668,31 +1458,47 @@ export default function DashboardPage() {
               ) : sidebarMatches.length === 0 ? (
                 <div className="text-xs text-slate-400">Sin partidos para mostrar.</div>
               ) : (
-                sidebarMatches.map((m) => (
-                  <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-cyan-200 font-semibold">
-                        {formatMatchKickoff(m.kickoffTime)}
-                      </span>
-                      <span className="text-[11px] text-slate-400">{m.status}</span>
+                sidebarMatches.map((m) => {
+                  const st = (m.status || '').toUpperCase();
+                  const finished =
+                    st === 'FINISHED' ||
+                    st === 'FT' ||
+                    st === 'AET' ||
+                    st === 'PEN';
+                  return (
+                    <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-cyan-200 font-semibold">
+                          {formatMatchKickoff(m.kickoffTime)}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {finished ? 'Final' : m.status}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-center gap-2">
+                        <img
+                          src={m.homeTeam.logoUrl}
+                          alt={m.homeTeam.name}
+                          title={m.homeTeam.name}
+                          className="w-5 h-5 object-contain"
+                        />
+                        {finished ? (
+                          <span className="text-sm font-extrabold text-emerald-200 tabular-nums min-w-[3.5rem] text-center">
+                            {m.homeScore ?? '—'} – {m.awayScore ?? '—'}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-300">vs</span>
+                        )}
+                        <img
+                          src={m.awayTeam.logoUrl}
+                          alt={m.awayTeam.name}
+                          title={m.awayTeam.name}
+                          className="w-5 h-5 object-contain"
+                        />
+                      </div>
                     </div>
-                    <div className="mt-2 flex items-center justify-center gap-2">
-                      <img
-                        src={m.homeTeam.logoUrl}
-                        alt={m.homeTeam.name}
-                        title={m.homeTeam.name}
-                        className="w-5 h-5 object-contain"
-                      />
-                      <span className="text-[11px] text-slate-300">vs</span>
-                      <img
-                        src={m.awayTeam.logoUrl}
-                        alt={m.awayTeam.name}
-                        title={m.awayTeam.name}
-                        className="w-5 h-5 object-contain"
-                      />
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -926,22 +1732,31 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-6">
-              <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
                 <div>
                   <div className="text-lg font-semibold text-slate-200">Resumen de campeonatos</div>
                   <div className="text-xs text-slate-400 mt-1">
-                    {createdChampionships.length > 0 ? `${createdChampionships.length} creados por ti` : 'Aún no has creado ninguno.'}
+                    {championships.length > 0 ? `${championships.length} en los que participas` : 'Aún no participas en ninguno.'}
                   </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  onClick={() => router.push('/join-code')}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Unirme por código
+                </Button>
               </div>
 
-              {createdChampionships.length === 0 ? (
+              {championships.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-slate-200/80">
                   Crea tu primer campeonato desde el botón <span className="font-semibold">+ Nuevo campeonato</span>.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  {createdChampionships.map((c) => {
+                  {championships.map((c) => {
                     const latestEdition = c.editions?.[0];
                     const deadline =
                       latestEdition?.id ? editionDeadlines[latestEdition.id] : undefined;

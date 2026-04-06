@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Patch,
   Put,
@@ -34,6 +35,11 @@ export class NotificationsController {
   @Patch(':id/read')
   markRead(@Request() req, @Param('id') id: string) {
     return this.service.markRead(req.user.sub, id);
+  }
+
+  @Delete(':id')
+  deleteNotification(@Request() req, @Param('id') id: string) {
+    return this.service.deleteNotification(req.user.sub, id);
   }
 
   @Get('prefs')

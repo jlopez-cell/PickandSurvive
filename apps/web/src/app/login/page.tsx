@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { Suspense, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-export default function LoginPage() {
+function LoginContent() {
   const { login } = useAuth();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -90,5 +90,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen flex items-center justify-center bg-background p-4 text-muted-foreground">Cargando...</main>}>
+      <LoginContent />
+    </Suspense>
   );
 }
