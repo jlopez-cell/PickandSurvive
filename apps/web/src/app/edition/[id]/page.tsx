@@ -336,17 +336,27 @@ export default function EditionPage() {
                   <div
                     className={cn(
                       'flex flex-1 items-center justify-center flex-col rounded-lg transition-colors',
-                      homeLocked && 'opacity-45 grayscale bg-muted/40 border border-dashed border-border/60',
+                      homeLocked && 'bg-muted/40 border border-dashed border-border/60',
                     )}
                   >
                     {match.homeTeam.logoUrl && (
                       <img
                         src={match.homeTeam.logoUrl}
                         alt={match.homeTeam.name}
-                        className="w-10 h-10 object-contain"
+                        className={cn(
+                          'w-10 h-10 object-contain',
+                          homeLocked && 'grayscale brightness-[0.92] contrast-[1.08]',
+                        )}
                       />
                     )}
-                    <span className="text-xs text-foreground text-center">{match.homeTeam.name}</span>
+                    <span
+                      className={cn(
+                        'text-xs text-center',
+                        homeLocked ? 'text-muted-foreground' : 'text-foreground',
+                      )}
+                    >
+                      {match.homeTeam.name}
+                    </span>
                     <Button
                       size="sm"
                       variant="outline"
@@ -379,17 +389,27 @@ export default function EditionPage() {
                   <div
                     className={cn(
                       'flex flex-1 items-center justify-center flex-col rounded-lg transition-colors',
-                      awayLocked && 'opacity-45 grayscale bg-muted/40 border border-dashed border-border/60',
+                      awayLocked && 'bg-muted/40 border border-dashed border-border/60',
                     )}
                   >
                     {match.awayTeam.logoUrl && (
                       <img
                         src={match.awayTeam.logoUrl}
                         alt={match.awayTeam.name}
-                        className="w-10 h-10 object-contain"
+                        className={cn(
+                          'w-10 h-10 object-contain',
+                          awayLocked && 'grayscale brightness-[0.92] contrast-[1.08]',
+                        )}
                       />
                     )}
-                    <span className="text-xs text-foreground text-center">{match.awayTeam.name}</span>
+                    <span
+                      className={cn(
+                        'text-xs text-center',
+                        awayLocked ? 'text-muted-foreground' : 'text-foreground',
+                      )}
+                    >
+                      {match.awayTeam.name}
+                    </span>
                     <Button
                       size="sm"
                       variant="outline"
