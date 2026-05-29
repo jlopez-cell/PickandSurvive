@@ -200,7 +200,7 @@ export default function WcPickPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-4 sm:gap-6">
 
         {/* ── Main column ── */}
         <div className="space-y-6">
@@ -292,7 +292,7 @@ export default function WcPickPage() {
                 const isMyPickAway = ctx?.myPick?.team?.id === m.awayTeam.id;
 
                 return (
-                  <div key={m.id} className="rounded-xl border border-border bg-card p-4">
+                  <div key={m.id} className="rounded-xl border border-border bg-card p-3 sm:p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs text-muted-foreground">{formatKickoff(m.kickoffTime)}</span>
                       {m.status === 'LIVE' && (
@@ -303,7 +303,7 @@ export default function WcPickPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-2 sm:gap-3">
                       {/* Home team */}
                       <TeamPickCard
                         team={m.homeTeam}
@@ -318,13 +318,13 @@ export default function WcPickPage() {
                       />
 
                       {/* Score / VS */}
-                      <div className="text-center shrink-0 w-14">
+                      <div className="text-center shrink-0 w-10 sm:w-14">
                         {m.status === 'FINISHED' || m.status === 'LIVE' ? (
-                          <span className="text-lg font-bold font-mono">
-                            {m.homeScore ?? 0} – {m.awayScore ?? 0}
+                          <span className="text-base sm:text-lg font-bold font-mono">
+                            {m.homeScore ?? 0}–{m.awayScore ?? 0}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground text-sm font-medium">VS</span>
+                          <span className="text-muted-foreground text-xs sm:text-sm font-medium">VS</span>
                         )}
                       </div>
 
@@ -448,15 +448,15 @@ function TeamPickCard({
   const isRight = align === 'right';
 
   return (
-    <div className={`flex flex-col gap-2 flex-1 ${isRight ? 'items-end' : 'items-start'}`}>
+    <div className={`flex flex-col gap-2 flex-1 min-w-0 ${isRight ? 'items-end' : 'items-start'}`}>
       {/* Logo + nombre */}
-      <div className={`flex items-center gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
+      <div className={`flex items-center gap-1.5 sm:gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
         <img
           src={team.logoUrl}
           alt={team.name}
-          className={`w-10 h-10 object-contain transition-all ${used && !isMyPick ? 'grayscale opacity-40' : ''}`}
+          className={`w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0 transition-all ${used && !isMyPick ? 'grayscale opacity-40' : ''}`}
         />
-        <span className={`text-sm font-semibold leading-tight max-w-[80px] ${isRight ? 'text-right' : 'text-left'}`}>
+        <span className={`text-xs sm:text-sm font-semibold leading-tight truncate max-w-[60px] sm:max-w-[90px] ${isRight ? 'text-right' : 'text-left'}`}>
           {team.name}
         </span>
       </div>
@@ -464,22 +464,22 @@ function TeamPickCard({
       {/* Estado / botones */}
       {isMyPick ? (
         <div className={`flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
-          <span className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--wc-gold))]">
+          <span className="flex items-center gap-1 text-[11px] font-bold text-[hsl(var(--wc-gold))]">
             <Shield className="w-3 h-3" /> Tu pick
           </span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${myPickType === 'WIN_OR_DRAW' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'}`}>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${myPickType === 'WIN_OR_DRAW' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'}`}>
             {myPickType === 'WIN_OR_DRAW' ? 'No pierde' : 'Gana'}
           </span>
         </div>
       ) : used ? (
-        <span className="text-xs text-muted-foreground/40">Ya usado</span>
+        <span className="text-[10px] text-muted-foreground/40">Ya usado</span>
       ) : canPick ? (
-        <div className={`flex gap-1 flex-wrap ${isRight ? 'justify-end' : ''}`}>
+        <div className={`flex flex-col xs:flex-row gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
           <button
             onClick={onPickWin}
             disabled={loadingWin || loadingDraw}
             title="Tu equipo debe ganar"
-            className="text-[11px] px-2 py-1 rounded-full bg-[hsl(var(--wc-gold))]/15 border border-[hsl(var(--wc-gold))]/30 text-[hsl(var(--wc-gold))] hover:bg-[hsl(var(--wc-gold))]/30 transition-colors disabled:opacity-40 font-medium"
+            className="text-[10px] sm:text-[11px] px-2 py-1 rounded-full bg-[hsl(var(--wc-gold))]/15 border border-[hsl(var(--wc-gold))]/30 text-[hsl(var(--wc-gold))] hover:bg-[hsl(var(--wc-gold))]/30 transition-colors disabled:opacity-40 font-medium whitespace-nowrap"
           >
             {loadingWin ? '…' : '🏆 Gana'}
           </button>
@@ -487,7 +487,7 @@ function TeamPickCard({
             onClick={onPickDraw}
             disabled={loadingWin || loadingDraw}
             title="Tu equipo puede ganar o empatar"
-            className="text-[11px] px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 transition-colors disabled:opacity-40 font-medium"
+            className="text-[10px] sm:text-[11px] px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 transition-colors disabled:opacity-40 font-medium whitespace-nowrap"
           >
             {loadingDraw ? '…' : '🤝 No pierde'}
           </button>

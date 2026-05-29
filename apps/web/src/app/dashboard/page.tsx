@@ -1508,33 +1508,55 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-1 min-w-0">
-          {/* ── World Cup 2026 entry banner ── */}
-          {championships.filter((c) => c.mode === 'WORLD_CUP').map((c) => {
-            const activeEdition = c.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN');
-            if (!activeEdition) return null;
+          {/* ── World Cup 2026 — banner promocional siempre visible ── */}
+          {(() => {
+            const wcChamp = championships.find((c) => c.mode === 'WORLD_CUP');
+            const wcEdition = wcChamp?.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN');
+            const dest = wcEdition ? `/world-cup/${wcEdition.id}` : '/world-cup';
             return (
               <button
-                key={c.id}
-                onClick={() => router.push(`/world-cup/${activeEdition.id}`)}
-                className="w-full mb-4 rounded-2xl overflow-hidden border border-amber-400/20 bg-gradient-to-r from-amber-950/60 via-red-950/40 to-amber-950/60 hover:from-amber-900/70 hover:to-amber-900/70 transition-all group"
+                onClick={() => router.push(dest)}
+                className="relative w-full mb-5 rounded-2xl overflow-hidden group focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
               >
-                <div className="px-5 py-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center shrink-0">
-                      <Trophy className="w-5 h-5 text-amber-300" />
+                {/* Fondo animado */}
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-red-950 to-stone-950" />
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 via-transparent to-red-500/10 group-hover:from-amber-500/20 group-hover:to-red-500/20 transition-all duration-500" />
+                {/* Patrón sutil */}
+                <div className="absolute inset-0 opacity-[0.06]"
+                  style={{ backgroundImage: 'repeating-linear-gradient(45deg,#f59e0b 0,#f59e0b 1px,transparent 0,transparent 50%)', backgroundSize: '14px 14px' }} />
+                {/* Borde dorado */}
+                <div className="absolute inset-0 rounded-2xl border border-amber-400/30 group-hover:border-amber-400/60 transition-colors" />
+
+                <div className="relative px-5 py-5 sm:py-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                  {/* Icono trofeo */}
+                  <div className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center group-hover:bg-amber-400/25 transition-colors">
+                    <Trophy className="w-8 h-8 sm:w-9 sm:h-9 text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+                  </div>
+
+                  {/* Texto */}
+                  <div className="flex-1 text-center sm:text-left">
+                    <div className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] text-amber-400/60 mb-1">
+                      🌍 USA · México · Canadá 2026
                     </div>
-                    <div className="text-left">
-                      <div className="text-xs text-amber-400/70 font-semibold uppercase tracking-widest">Edición Mundial</div>
-                      <div className="font-extrabold text-amber-100 text-sm">{c.name}</div>
+                    <div className="text-xl sm:text-2xl font-black text-amber-100 leading-tight"
+                      style={{ textShadow: '0 0 20px rgba(251,191,36,0.3)' }}>
+                      ¡Juega la versión MUNDIAL!
+                    </div>
+                    <div className="text-xs sm:text-sm text-amber-300/60 mt-1">
+                      Picks diarios · Grupos · Eliminatorias · Pick Gana o No pierde
                     </div>
                   </div>
-                  <div className="text-xs text-amber-300/70 group-hover:text-amber-300 transition-colors font-medium flex items-center gap-1">
-                    Jugar <span className="text-base">→</span>
+
+                  {/* CTA */}
+                  <div className="shrink-0 px-5 py-2.5 rounded-xl bg-amber-400/20 border border-amber-400/40 group-hover:bg-amber-400/35 group-hover:border-amber-400/70 transition-all">
+                    <span className="text-sm font-extrabold text-amber-200 whitespace-nowrap">
+                      Entrar →
+                    </span>
                   </div>
                 </div>
               </button>
             );
-          })}
+          })()}
 
           <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-950/55 to-slate-950/20 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden">
             <div className="p-6 border-b border-white/10">

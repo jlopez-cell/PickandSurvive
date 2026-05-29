@@ -1,0 +1,124 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { Trophy, ChevronLeft, Globe, Shield, Zap, Users } from 'lucide-react';
+
+const FEATURES = [
+  {
+    icon: <Globe className="w-5 h-5" />,
+    title: '48 selecciones',
+    desc: 'El torneo más grande de la historia. 12 grupos, 104 partidos.',
+  },
+  {
+    icon: <Zap className="w-5 h-5" />,
+    title: 'Pick diario',
+    desc: 'Un equipo por día. Deadline: el primer partido de cada jornada.',
+  },
+  {
+    icon: <Shield className="w-5 h-5" />,
+    title: 'Gana o No pierde',
+    desc: 'Elige si tu equipo tiene que ganar, o con empatar te salva.',
+  },
+  {
+    icon: <Users className="w-5 h-5" />,
+    title: 'Supervivencia grupal',
+    desc: 'Compite con tus amigos. El último en pie gana el bote.',
+  },
+];
+
+export default function WcLobbyPage() {
+  const router = useRouter();
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-4 sm:px-6 h-14 border-b border-[hsl(var(--wc-gold))]/15">
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" /> Dashboard
+        </button>
+        <span className="text-xs font-bold tracking-widest uppercase text-[hsl(var(--wc-gold))]/60">
+          World Cup 2026
+        </span>
+        <div className="w-20" />
+      </nav>
+
+      {/* Hero */}
+      <section className="relative flex-1 flex flex-col items-center justify-center px-4 py-16 sm:py-24 text-center overflow-hidden">
+        {/* Fondo */}
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/40 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{ backgroundImage: 'repeating-linear-gradient(45deg,hsl(43,96%,56%) 0,hsl(43,96%,56%) 1px,transparent 0,transparent 50%)', backgroundSize: '20px 20px' }} />
+
+        <div className="relative z-10 max-w-2xl mx-auto space-y-6">
+          {/* Trofeo */}
+          <div className="flex justify-center">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-amber-400/10 border border-amber-400/25 flex items-center justify-center">
+              <Trophy
+                className="w-14 h-14 sm:w-16 sm:h-16 text-[hsl(var(--wc-gold))]"
+                style={{ filter: 'drop-shadow(0 0 20px hsl(43,96%,56%,0.5))' }}
+              />
+            </div>
+          </div>
+
+          {/* Título */}
+          <div>
+            <h1
+              className="text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight"
+              style={{
+                color: 'hsl(43,96%,56%)',
+                textShadow: '0 0 40px hsl(43,96%,56%,0.35), 0 2px 8px rgba(0,0,0,0.9)',
+              }}
+            >
+              World Cup
+            </h1>
+            <p className="text-amber-200/50 text-sm sm:text-base tracking-[0.3em] uppercase font-semibold mt-2">
+              USA · México · Canadá · 2026
+            </p>
+          </div>
+
+          <p className="text-base sm:text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
+            La versión más épica de Pick &amp; Survive. Picks diarios, grupos, eliminatorias y el Mundial entero en tus manos.
+          </p>
+
+          {/* Features grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left mt-2">
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="flex items-start gap-3 p-4 rounded-xl border border-[hsl(var(--wc-gold))]/15 bg-[hsl(var(--wc-gold))]/5"
+              >
+                <span className="text-[hsl(var(--wc-gold))] shrink-0 mt-0.5">{f.icon}</span>
+                <div>
+                  <p className="font-bold text-sm text-foreground">{f.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div className="pt-2 space-y-3">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-semibold">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Torneo en curso · 11 Jun – 19 Jul 2026
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Pide a tu admin que cree un campeonato de tipo <strong className="text-foreground">World Cup</strong> e invítate para empezar a jugar.
+            </p>
+
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-[hsl(var(--wc-gold))]/30 bg-[hsl(var(--wc-gold))]/10 text-[hsl(var(--wc-gold))] font-bold hover:bg-[hsl(var(--wc-gold))]/20 transition-colors text-sm"
+            >
+              <ChevronLeft className="w-4 h-4" /> Volver al dashboard
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
