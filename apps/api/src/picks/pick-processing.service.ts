@@ -6,6 +6,7 @@ import {
   MatchdayStatus,
   ParticipantStatus,
   PickStatus,
+  PickType,
 } from '@prisma/client';
 import { EditionResolutionService } from './edition-resolution.service';
 
@@ -60,8 +61,11 @@ export class PickProcessingService {
       const pickTeamWon = match.winnerTeamId === pick.teamId;
       const isDraw = match.winnerTeamId === null;
 
-      if (mode === ChampionshipMode.TOURNAMENT) {
-        if (pickTeamWon) {
+      if (mode === ChampionshipMode.TOURNAMENT || mode === ChampionshipMode.WORLD_CUP) {
+        const winsOrDraw = pick.pickType === PickType.WIN_OR_DRAW;
+        const survives = pickTeamWon || (winsOrDraw && isDraw);
+
+        if (survives) {
           await this.prisma.pick.update({
             where: { id: pick.id },
             data: { status: PickStatus.SURVIVED },
@@ -81,6 +85,9 @@ export class PickProcessingService {
               data: {
                 status: ParticipantStatus.ELIMINATED,
                 eliminatedAtMatchday: match.matchday.number,
+                ...(mode === ChampionshipMode.WORLD_CUP && {
+                  eliminatedAtPhase: match.tournamentPhase ?? undefined,
+                }),
               },
             }),
           ]);

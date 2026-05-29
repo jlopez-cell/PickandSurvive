@@ -98,6 +98,11 @@ enum PickHalf {
   SECOND
 }
 
+enum PickType {
+  WIN
+  WIN_OR_DRAW
+}
+
 model User {
   id             String    @id @default(uuid())
   email          String    @unique
@@ -271,6 +276,7 @@ model Pick {
   /// Ausente cuando status es NO_PICK_ELIMINATED (no se asigna equipo ficticio).
   teamId        String?
   status        PickStatus @default(PENDING)
+  pickType      PickType   @default(WIN)
   pointsAwarded Int?
   createdAt     DateTime   @default(now())
 

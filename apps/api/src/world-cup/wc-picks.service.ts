@@ -122,6 +122,7 @@ export class WcPicksService {
         ? {
             id: pick.id,
             status: pick.status,
+            pickType: pick.pickType,
             team: pick.team,
           }
         : null,

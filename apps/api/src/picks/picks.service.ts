@@ -163,6 +163,7 @@ export class PicksService {
             matchdayId: matchday.id,
             teamId: dto.teamId,
             status: PickStatus.PENDING,
+            pickType: dto.pickType ?? 'WIN',
           },
         }),
         this.prisma.teamUsage.create({
@@ -191,7 +192,7 @@ export class PicksService {
     const txOps: any[] = [
       this.prisma.pick.update({
         where: { id: existingPick.id },
-        data: { teamId: dto.teamId, status: PickStatus.PENDING, pointsAwarded: null },
+        data: { teamId: dto.teamId, status: PickStatus.PENDING, pointsAwarded: null, pickType: dto.pickType ?? 'WIN' },
       }),
     ];
 

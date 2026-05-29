@@ -22,7 +22,7 @@ type WcMatch = {
   awayUsed: boolean;
 };
 
-type MyPick = { id: string; status: string; team: Team | null };
+type MyPick = { id: string; status: string; pickType: 'WIN' | 'WIN_OR_DRAW'; team: Team | null };
 
 type TodayContext = {
   matchday: {
@@ -98,6 +98,7 @@ export default function WcPickPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState<string | null>(null);
+  const [pickingType, setPickingType] = useState<'WIN' | 'WIN_OR_DRAW'>('WIN');
   const [countdown, setCountdown] = useState('');
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
 
@@ -122,14 +123,14 @@ export default function WcPickPage() {
     return () => clearInterval(interval);
   }, [ctx?.matchday?.firstKickoff]);
 
-  async function handlePick(teamId: string) {
+  async function handlePick(teamId: string, pickType: 'WIN' | 'WIN_OR_DRAW') {
     if (!ctx?.matchday || ctx.matchday.deadlinePassed) return;
-    setPicking(teamId);
+    setPicking(`${teamId}-${pickType}`);
     try {
       const res = await fetch(`/api/editions/${editionId}/picks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, matchdayNumber: ctx.matchday.number }),
+        body: JSON.stringify({ teamId, matchdayNumber: ctx.matchday.number, pickType }),
       });
       if (res.ok) await loadData();
     } finally {
@@ -161,26 +162,41 @@ export default function WcPickPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.push('/dashboard')} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronLeft className="w-5 h-5" />
+      {/* Hero header */}
+      <header className="relative overflow-hidden border-b border-[hsl(var(--wc-gold))]/20">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-950/80 via-red-950/60 to-stone-950/90" />
+        <div className="absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: 'repeating-linear-gradient(45deg, hsl(43,96%,56%) 0, hsl(43,96%,56%) 1px, transparent 0, transparent 50%)', backgroundSize: '20px 20px' }} />
+
+        <div className="relative max-w-6xl mx-auto px-4">
+          {/* Nav bar */}
+          <div className="h-12 flex items-center justify-between">
+            <button onClick={() => router.push('/dashboard')} className="text-amber-300/60 hover:text-amber-300 transition-colors flex items-center gap-1 text-sm">
+              <ChevronLeft className="w-4 h-4" /> Volver
             </button>
-            <Trophy className="w-5 h-5 text-[hsl(var(--wc-gold))]" />
-            <span className="font-bold text-sm tracking-wide">WORLD CUP 2026</span>
+            <button onClick={() => router.push(`/world-cup/${editionId}/participants`)} className="text-amber-300/60 hover:text-amber-300 transition-colors">
+              <Users className="w-5 h-5" />
+            </button>
           </div>
 
-          {phase && (
-            <span className="text-xs font-medium px-2 py-1 rounded-full border border-[hsl(var(--wc-gold))]/30 text-[hsl(var(--wc-gold))]">
-              {PHASE_LABELS[phase] ?? phase}
-            </span>
-          )}
-
-          <button onClick={() => router.push(`/world-cup/${editionId}/participants`)} className="text-muted-foreground hover:text-foreground transition-colors">
-            <Users className="w-5 h-5" />
-          </button>
+          {/* Hero content */}
+          <div className="pb-6 pt-2 flex flex-col items-center text-center gap-3">
+            <Trophy className="w-12 h-12 text-[hsl(var(--wc-gold))] drop-shadow-[0_0_12px_hsl(43,96%,56%,0.6)]" />
+            <div>
+              <h1 className="text-3xl font-black tracking-widest uppercase"
+                style={{ color: 'hsl(43,96%,56%)', textShadow: '0 0 30px hsl(43,96%,56%,0.4), 0 2px 4px rgba(0,0,0,0.8)' }}>
+                World Cup
+              </h1>
+              <p className="text-amber-200/50 text-xs tracking-[0.3em] uppercase font-semibold mt-0.5">
+                USA · México · Canadá 2026
+              </p>
+            </div>
+            {phase && (
+              <span className="text-xs font-bold px-3 py-1 rounded-full border border-[hsl(var(--wc-gold))]/40 text-[hsl(var(--wc-gold))] bg-[hsl(var(--wc-gold))]/10 tracking-wider uppercase">
+                {PHASE_LABELS[phase] ?? phase}
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
@@ -218,16 +234,21 @@ export default function WcPickPage() {
                 {ctx.myPick.team ? (
                   <>
                     <img src={ctx.myPick.team.logoUrl} alt={ctx.myPick.team.name} className="w-12 h-12 object-contain" />
-                    <div>
+                    <div className="flex-1">
                       <p className="font-bold">{ctx.myPick.team.name}</p>
-                      {(() => {
-                        const cfg = PICK_STATUS_CONFIG[ctx.myPick!.status];
-                        return cfg ? (
-                          <span className={`flex items-center gap-1.5 text-sm ${cfg.color}`}>
-                            {cfg.icon} {cfg.label}
-                          </span>
-                        ) : null;
-                      })()}
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${ctx.myPick.pickType === 'WIN_OR_DRAW' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                          {ctx.myPick.pickType === 'WIN_OR_DRAW' ? 'No pierde' : 'Gana'}
+                        </span>
+                        {(() => {
+                          const cfg = PICK_STATUS_CONFIG[ctx.myPick!.status];
+                          return cfg ? (
+                            <span className={`flex items-center gap-1 text-xs ${cfg.color}`}>
+                              {cfg.icon} {cfg.label}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -288,10 +309,12 @@ export default function WcPickPage() {
                         team={m.homeTeam}
                         used={m.homeUsed}
                         isMyPick={isMyPickHome}
+                        myPickType={isMyPickHome ? ctx?.myPick?.pickType : undefined}
                         canPick={canPick && !m.homeUsed}
-                        loading={picking === m.homeTeam.id}
-                        score={m.homeScore}
-                        onPick={() => handlePick(m.homeTeam.id)}
+                        loadingWin={picking === `${m.homeTeam.id}-WIN`}
+                        loadingDraw={picking === `${m.homeTeam.id}-WIN_OR_DRAW`}
+                        onPickWin={() => handlePick(m.homeTeam.id, 'WIN')}
+                        onPickDraw={() => handlePick(m.homeTeam.id, 'WIN_OR_DRAW')}
                       />
 
                       {/* Score / VS */}
@@ -310,10 +333,12 @@ export default function WcPickPage() {
                         team={m.awayTeam}
                         used={m.awayUsed}
                         isMyPick={isMyPickAway}
+                        myPickType={isMyPickAway ? ctx?.myPick?.pickType : undefined}
                         canPick={canPick && !m.awayUsed}
-                        loading={picking === m.awayTeam.id}
-                        score={m.awayScore}
-                        onPick={() => handlePick(m.awayTeam.id)}
+                        loadingWin={picking === `${m.awayTeam.id}-WIN`}
+                        loadingDraw={picking === `${m.awayTeam.id}-WIN_OR_DRAW`}
+                        onPickWin={() => handlePick(m.awayTeam.id, 'WIN')}
+                        onPickDraw={() => handlePick(m.awayTeam.id, 'WIN_OR_DRAW')}
                         align="right"
                       />
                     </div>
@@ -401,49 +426,72 @@ function TeamPickCard({
   team,
   used,
   isMyPick,
+  myPickType,
   canPick,
-  loading,
-  onPick,
+  loadingWin,
+  loadingDraw,
+  onPickWin,
+  onPickDraw,
   align = 'left',
 }: {
   team: Team;
   used: boolean;
   isMyPick: boolean;
+  myPickType?: 'WIN' | 'WIN_OR_DRAW';
   canPick: boolean;
-  loading: boolean;
-  score?: number | null;
-  onPick: () => void;
+  loadingWin: boolean;
+  loadingDraw: boolean;
+  onPickWin: () => void;
+  onPickDraw: () => void;
   align?: 'left' | 'right';
 }) {
   const isRight = align === 'right';
 
   return (
-    <div className={`flex flex-col items-center gap-2 flex-1 ${isRight ? 'items-end' : 'items-start'}`}>
+    <div className={`flex flex-col gap-2 flex-1 ${isRight ? 'items-end' : 'items-start'}`}>
+      {/* Logo + nombre */}
       <div className={`flex items-center gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
         <img
           src={team.logoUrl}
           alt={team.name}
           className={`w-10 h-10 object-contain transition-all ${used && !isMyPick ? 'grayscale opacity-40' : ''}`}
         />
-        <span className={`text-sm font-semibold text-center leading-tight max-w-[80px] ${isRight ? 'text-right' : 'text-left'}`}>
+        <span className={`text-sm font-semibold leading-tight max-w-[80px] ${isRight ? 'text-right' : 'text-left'}`}>
           {team.name}
         </span>
       </div>
 
+      {/* Estado / botones */}
       {isMyPick ? (
-        <span className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--wc-gold))]">
-          <Shield className="w-3 h-3" /> Tu pick
-        </span>
+        <div className={`flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
+          <span className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--wc-gold))]">
+            <Shield className="w-3 h-3" /> Tu pick
+          </span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${myPickType === 'WIN_OR_DRAW' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'}`}>
+            {myPickType === 'WIN_OR_DRAW' ? 'No pierde' : 'Gana'}
+          </span>
+        </div>
       ) : used ? (
-        <span className="text-xs text-muted-foreground/50">Ya usado</span>
+        <span className="text-xs text-muted-foreground/40">Ya usado</span>
       ) : canPick ? (
-        <button
-          onClick={onPick}
-          disabled={loading}
-          className="text-xs px-3 py-1 rounded-full bg-[hsl(var(--wc-gold))]/15 border border-[hsl(var(--wc-gold))]/30 text-[hsl(var(--wc-gold))] hover:bg-[hsl(var(--wc-gold))]/25 transition-colors disabled:opacity-50"
-        >
-          {loading ? '...' : 'Elegir'}
-        </button>
+        <div className={`flex gap-1 flex-wrap ${isRight ? 'justify-end' : ''}`}>
+          <button
+            onClick={onPickWin}
+            disabled={loadingWin || loadingDraw}
+            title="Tu equipo debe ganar"
+            className="text-[11px] px-2 py-1 rounded-full bg-[hsl(var(--wc-gold))]/15 border border-[hsl(var(--wc-gold))]/30 text-[hsl(var(--wc-gold))] hover:bg-[hsl(var(--wc-gold))]/30 transition-colors disabled:opacity-40 font-medium"
+          >
+            {loadingWin ? '…' : '🏆 Gana'}
+          </button>
+          <button
+            onClick={onPickDraw}
+            disabled={loadingWin || loadingDraw}
+            title="Tu equipo puede ganar o empatar"
+            className="text-[11px] px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 transition-colors disabled:opacity-40 font-medium"
+          >
+            {loadingDraw ? '…' : '🤝 No pierde'}
+          </button>
+        </div>
       ) : null}
     </div>
   );
