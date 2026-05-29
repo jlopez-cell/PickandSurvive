@@ -8,6 +8,7 @@ import { FootballDataModule } from './football/football-data.module';
 import { PicksModule } from './picks/picks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
+import { WorldCupModule } from './world-cup/world-cup.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AdminModule } from './admin/admin.module';
     PicksModule,
     NotificationsModule,
     AdminModule,
+    WorldCupModule,
   ],
   controllers: [],
   providers: [],
