@@ -17,6 +17,16 @@ enum UserRole {
 enum ChampionshipMode {
   TOURNAMENT
   LEAGUE
+  WORLD_CUP
+}
+
+enum TournamentPhase {
+  GROUP_STAGE
+  ROUND_OF_16
+  QUARTER_FINALS
+  SEMI_FINALS
+  THIRD_PLACE
+  FINAL
 }
 
 enum EditionStatus {
@@ -148,6 +158,7 @@ model Participant {
   editionId            String
   status               ParticipantStatus @default(ACTIVE)
   eliminatedAtMatchday Int?
+  eliminatedAtPhase    TournamentPhase?
   totalPoints          Int               @default(0)
   joinedAt             DateTime          @default(now())
 
@@ -196,6 +207,7 @@ model FootballLeague {
   teams         FootballTeam[]
   matchdays     Matchday[]
   championships Championship[]
+  wcGroups      WcGroup[]
 }
 
 model FootballTeam {
@@ -205,21 +217,24 @@ model FootballTeam {
   logoUrl       String
   apiFootballId Int    @unique
 
-  league     FootballLeague @relation(fields: [leagueId], references: [id])
-  homeMatches Match[]      @relation("HomeTeam")
-  awayMatches Match[]      @relation("AwayTeam")
-  wonMatches  Match[]      @relation("WinnerTeam")
-  picks       Pick[]
-  teamUsages  TeamUsage[]
+  league          FootballLeague   @relation(fields: [leagueId], references: [id])
+  homeMatches     Match[]          @relation("HomeTeam")
+  awayMatches     Match[]          @relation("AwayTeam")
+  wonMatches      Match[]          @relation("WinnerTeam")
+  picks           Pick[]
+  teamUsages      TeamUsage[]
+  wcGroupStandings WcGroupStanding[]
 }
 
 model Matchday {
-  id            String         @id @default(uuid())
-  leagueId      String
-  season        Int
-  number        Int
-  status        MatchdayStatus @default(SCHEDULED)
-  firstKickoff  DateTime?
+  id               String          @id @default(uuid())
+  leagueId         String
+  season           Int
+  number           Int
+  status           MatchdayStatus  @default(SCHEDULED)
+  firstKickoff     DateTime?
+  tournamentPhase  TournamentPhase?
+  wcGroupDay       Int?
 
   league   FootballLeague @relation(fields: [leagueId], references: [id])
   matches  Match[]
@@ -229,7 +244,7 @@ model Matchday {
 }
 
 model Match {
-  id                   String      @id @default(uuid())
+  id                   String           @id @default(uuid())
   matchdayId           String
   homeTeamId           String
   awayTeamId           String
@@ -237,12 +252,14 @@ model Match {
   kickoffTime          DateTime
   homeScore            Int?
   awayScore            Int?
-  status               MatchStatus @default(SCHEDULED)
-  apiFootballFixtureId Int         @unique
+  status               MatchStatus      @default(SCHEDULED)
+  apiFootballFixtureId Int              @unique
+  tournamentPhase      TournamentPhase?
+  wcGroup              String?
 
-  matchday   Matchday     @relation(fields: [matchdayId], references: [id])
-  homeTeam   FootballTeam @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam   FootballTeam @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  matchday   Matchday      @relation(fields: [matchdayId], references: [id])
+  homeTeam   FootballTeam  @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   FootballTeam  @relation("AwayTeam", fields: [awayTeamId], references: [id])
   winnerTeam FootballTeam? @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
 }
 
@@ -250,14 +267,15 @@ model Pick {
   id            String     @id @default(uuid())
   participantId String
   matchdayId    String
-  teamId        String
+  /// Ausente cuando status es NO_PICK_ELIMINATED (no se asigna equipo ficticio).
+  teamId        String?
   status        PickStatus @default(PENDING)
   pointsAwarded Int?
   createdAt     DateTime   @default(now())
 
-  participant Participant  @relation(fields: [participantId], references: [id])
-  matchday    Matchday     @relation(fields: [matchdayId], references: [id])
-  team        FootballTeam @relation(fields: [teamId], references: [id])
+  participant Participant   @relation(fields: [participantId], references: [id])
+  matchday    Matchday      @relation(fields: [matchdayId], references: [id])
+  team        FootballTeam? @relation(fields: [teamId], references: [id])
 
   @@unique([participantId, matchdayId])
   @@index([matchdayId, status])
@@ -275,6 +293,38 @@ model TeamUsage {
 
   @@unique([participantId, teamId, editionId, half])
   @@index([participantId, editionId])
+}
+
+model WcGroup {
+  id       String @id @default(uuid())
+  leagueId String
+  season   Int
+  name     String
+
+  league    FootballLeague   @relation(fields: [leagueId], references: [id])
+  standings WcGroupStanding[]
+
+  @@unique([leagueId, season, name])
+}
+
+model WcGroupStanding {
+  id           String @id @default(uuid())
+  groupId      String
+  teamId       String
+  position     Int
+  played       Int    @default(0)
+  won          Int    @default(0)
+  drawn        Int    @default(0)
+  lost         Int    @default(0)
+  goalsFor     Int    @default(0)
+  goalsAgainst Int    @default(0)
+  points       Int    @default(0)
+
+  group WcGroup      @relation(fields: [groupId], references: [id])
+  team  FootballTeam @relation(fields: [teamId], references: [id])
+
+  @@unique([groupId, teamId])
+  @@index([groupId, points])
 }
 
 model PotLedger {
