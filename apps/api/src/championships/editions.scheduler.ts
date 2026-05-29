@@ -1,13 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChampionshipsService } from './championships.service';
 import { EditionStatus, JoinRequestStatus } from '@prisma/client';
 
 @Injectable()
 export class EditionsScheduler {
   private readonly logger = new Logger(EditionsScheduler.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly championshipsService: ChampionshipsService,
+  ) {}
 
   /**
    * Hourly cron: activate or cancel OPEN editions whose startMatchday has arrived.
@@ -70,24 +74,23 @@ export class EditionsScheduler {
         });
 
         if (approvedCount >= 2) {
-          await this.prisma.$transaction([
-            // Activate edition
-            this.prisma.edition.update({
+          await this.prisma.$transaction(async (tx) => {
+            await this.championshipsService.syncApprovedMembersToEditionTx(tx, edition.id);
+            await tx.edition.update({
               where: { id: edition.id },
               data: { status: EditionStatus.ACTIVE },
-            }),
-            // Auto-reject pending requests
-            this.prisma.joinRequest.updateMany({
+            });
+            await tx.joinRequest.updateMany({
               where: {
                 championshipId: edition.championshipId,
                 status: JoinRequestStatus.PENDING,
               },
               data: { status: JoinRequestStatus.REJECTED },
-            }),
-          ]);
+            });
+          });
 
           this.logger.log(
-            `Edition ${edition.id} → ACTIVE (${approvedCount} participants)`,
+            `Edition ${edition.id} → ACTIVE (${approvedCount} approved members synced + activated)`,
           );
         } else {
           await this.prisma.edition.update({

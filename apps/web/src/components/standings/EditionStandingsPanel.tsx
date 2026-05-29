@@ -18,7 +18,7 @@ export type StandingEntry = {
   totalPoints?: number;
   survivedPickCount?: number;
   survivalStreak?: number;
-  latestPick?: { team: { name: string; logoUrl: string }; status: string } | null;
+  latestPick?: { team: { name: string; logoUrl: string } | null; status: string } | null;
 };
 
 export type EditionStandingsPanelProps = {
@@ -27,6 +27,23 @@ export type EditionStandingsPanelProps = {
   variant: 'page' | 'embedded';
   showFullPageLink?: boolean;
 };
+
+function standingsPickDisplay(entry: StandingEntry): {
+  label: string;
+  showLogo: boolean;
+  logoUrl: string | null;
+} | null {
+  const lp = entry.latestPick;
+  if (!lp) return null;
+  if (lp.status === 'NO_PICK_ELIMINATED' || !lp.team) {
+    return { label: 'Sin pick (eliminado)', showLogo: false, logoUrl: null };
+  }
+  return {
+    label: lp.team.name,
+    showLogo: true,
+    logoUrl: lp.team.logoUrl || null,
+  };
+}
 
 function PageLeaderRow({
   entry,
@@ -38,6 +55,7 @@ function PageLeaderRow({
   ptsCell: ReactNode;
 }) {
   const initial = (entry.alias?.[0] ?? '?').toUpperCase();
+  const pickUi = standingsPickDisplay(entry);
   return (
     <div className="group rounded-xl border border-white/10 bg-gradient-to-br from-slate-950/55 via-slate-900/35 to-slate-950/50 p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/15">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -51,12 +69,12 @@ function PageLeaderRow({
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-white text-sm">@{entry.alias}</p>
             <div className="mt-0 flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:hidden">
-              {entry.latestPick && (
+              {pickUi && (
                 <span className="flex items-center gap-1.5 text-[11px] text-white/55">
-                  {entry.latestPick.team.logoUrl ? (
-                    <img src={entry.latestPick.team.logoUrl} alt="" className="h-4 w-4 object-contain" />
+                  {pickUi.showLogo && pickUi.logoUrl ? (
+                    <img src={pickUi.logoUrl} alt="" className="h-4 w-4 object-contain" />
                   ) : null}
-                  {entry.latestPick.team.name}
+                  {pickUi.label}
                 </span>
               )}
               {entry.survivedPickCount != null && (
@@ -71,16 +89,16 @@ function PageLeaderRow({
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 sm:pr-2">
           <div className="min-w-[4.5rem]">{ptsCell}</div>
           <div className="hidden min-w-0 max-w-[9rem] sm:block">
-            {entry.latestPick ? (
+            {pickUi ? (
               <div className="flex items-center gap-2">
-                {entry.latestPick.team.logoUrl && (
+                {pickUi.showLogo && pickUi.logoUrl ? (
                   <img
-                    src={entry.latestPick.team.logoUrl}
+                    src={pickUi.logoUrl}
                     alt=""
                     className="h-5 w-5 shrink-0 object-contain"
                   />
-                )}
-                <span className="truncate text-sm text-white/65">{entry.latestPick.team.name}</span>
+                ) : null}
+                <span className="truncate text-sm text-white/65">{pickUi.label}</span>
               </div>
             ) : (
               <span className="text-sm text-white/35">—</span>
@@ -342,11 +360,21 @@ export function EditionStandingsPanel({
             </div>
           </div>
 
-          <h2 className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-white/55">
-            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20" />
-            Clasificación
-            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20" />
-          </h2>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="flex flex-1 items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-white/55">
+              <span className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20 sm:max-w-[40%]" />
+              Clasificación
+              <span className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20 sm:max-w-[40%]" />
+            </h2>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              onClick={() => router.push(`/edition/${editionId}/all-picks`)}
+            >
+              Picks de todos
+            </Button>
+          </div>
 
           <div className="hidden lg:block pb-4">
             <Card className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
@@ -364,6 +392,7 @@ export function EditionStandingsPanel({
                   <TableBody>
                     {standings.map((entry, idx) => {
                             const initial = (entry.alias?.[0] ?? '?').toUpperCase();
+                            const pickUi = standingsPickDisplay(entry);
                             return (
                               <TableRow
                                 key={entry.participantId}
@@ -385,16 +414,16 @@ export function EditionStandingsPanel({
                                 </TableCell>
                                 <TableCell>{ptsEstadoCell(entry, true)}</TableCell>
                                 <TableCell>
-                                  {entry.latestPick ? (
+                                  {pickUi ? (
                                     <div className="flex items-center gap-2">
-                                      {entry.latestPick.team.logoUrl && (
+                                      {pickUi.showLogo && pickUi.logoUrl ? (
                                         <img
-                                          src={entry.latestPick.team.logoUrl}
+                                          src={pickUi.logoUrl}
                                           alt=""
                                           className="h-6 w-6 object-contain"
                                         />
-                                      )}
-                                      <span className="text-sm text-white/75">{entry.latestPick.team.name}</span>
+                                      ) : null}
+                                      <span className="text-sm text-white/75">{pickUi.label}</span>
                                     </div>
                                   ) : (
                                     <span className="text-white/35">—</span>
@@ -451,12 +480,17 @@ export function EditionStandingsPanel({
             Jornada {deadlineLoading ? '…' : deadline?.matchdayNumber ?? '—'}
           </p>
         </div>
-        {showFullPageLink && (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => router.push(`/edition/${editionId}/standings`)}>
-            Pantalla completa
-            <ChevronRight className="h-4 w-4" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push(`/edition/${editionId}/all-picks`)}>
+            Picks de todos
           </Button>
-        )}
+          {showFullPageLink && (
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => router.push(`/edition/${editionId}/standings`)}>
+              Pantalla completa
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -504,6 +538,7 @@ export function EditionStandingsPanel({
                 <TableBody>
                   {standings.map((entry, idx) => {
                     const initial = (entry.alias?.[0] ?? '?').toUpperCase();
+                    const pickUi = standingsPickDisplay(entry);
                     return (
                       <TableRow key={entry.participantId}>
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
@@ -515,12 +550,12 @@ export function EditionStandingsPanel({
                             <div className="min-w-0">
                               <div className="truncate font-semibold">@{entry.alias}</div>
                               <div className="mt-1 space-y-1 text-[11px] text-muted-foreground sm:hidden">
-                                {entry.latestPick && (
+                                {pickUi && (
                                   <div className="flex items-center gap-1">
-                                    {entry.latestPick.team.logoUrl && (
-                                      <img src={entry.latestPick.team.logoUrl} alt="" className="h-4 w-4 object-contain" />
-                                    )}
-                                    <span>{entry.latestPick.team.name}</span>
+                                    {pickUi.showLogo && pickUi.logoUrl ? (
+                                      <img src={pickUi.logoUrl} alt="" className="h-4 w-4 object-contain" />
+                                    ) : null}
+                                    <span>{pickUi.label}</span>
                                   </div>
                                 )}
                               </div>
@@ -529,12 +564,12 @@ export function EditionStandingsPanel({
                         </TableCell>
                         <TableCell>{ptsEstadoCell(entry, false)}</TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          {entry.latestPick ? (
+                          {pickUi ? (
                             <div className="flex items-center gap-2">
-                              {entry.latestPick.team.logoUrl && (
-                                <img src={entry.latestPick.team.logoUrl} alt="" className="h-6 w-6 object-contain rounded" />
-                              )}
-                              <span className="text-sm text-muted-foreground">{entry.latestPick.team.name}</span>
+                              {pickUi.showLogo && pickUi.logoUrl ? (
+                                <img src={pickUi.logoUrl} alt="" className="h-6 w-6 object-contain rounded" />
+                              ) : null}
+                              <span className="text-sm text-muted-foreground">{pickUi.label}</span>
                             </div>
                           ) : (
                             '—'

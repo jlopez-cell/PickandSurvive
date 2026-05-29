@@ -3,7 +3,6 @@
 import { Suspense, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,10 +34,18 @@ function RegisterContent() {
     setLoading(true);
 
     try {
-      await apiFetch('/auth/register', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email, password: form.password, alias: form.alias }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const message = Array.isArray(data.message) ? data.message[0] : data.message;
+        throw new Error(message || 'Error al registrarse');
+      }
+
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrarse');

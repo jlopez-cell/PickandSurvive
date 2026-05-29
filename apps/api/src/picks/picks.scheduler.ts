@@ -26,6 +26,7 @@ export class PicksScheduler {
         status: MatchdayStatus.SCHEDULED,
         firstKickoff: { lte: now },
       },
+      orderBy: [{ firstKickoff: 'asc' }, { number: 'asc' }],
     });
 
     for (const matchday of overdueMatchdays) {

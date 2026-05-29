@@ -44,6 +44,11 @@ export class PicksController {
     return this.service.getPicksHistory(req.user.sub, editionId);
   }
 
+  @Get('picks/everyone-history')
+  getEveryonePicksHistory(@Request() req, @Param('editionId') editionId: string) {
+    return this.service.getEveryonePicksHistory(req.user.sub, editionId);
+  }
+
   @Get('teams')
   getAvailableTeams(
     @Request() req,

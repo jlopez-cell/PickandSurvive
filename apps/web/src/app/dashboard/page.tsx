@@ -31,7 +31,7 @@ import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 type Championship = {
   id: string;
   name: string;
-  mode: 'TOURNAMENT' | 'LEAGUE';
+  mode: 'TOURNAMENT' | 'LEAGUE' | 'WORLD_CUP';
   adminId: string;
   footballLeague: { id: string; name: string; country: string };
   editions: { id: string; status: string; startMatchday: number }[];
@@ -48,7 +48,7 @@ type StandingsEntry = {
 
 type Pick = {
   status: string;
-  team: { id: string; name: string; logoUrl: string };
+  team: { id: string; name: string; logoUrl: string } | null;
   participant: { user: { alias: string } };
   matchday: { number: number; status: string };
 };
@@ -742,7 +742,7 @@ export default function DashboardPage() {
       <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${BG_IMAGE}')` }} />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/65 to-slate-950/95" />
 
-      <header className="relative z-10 h-16 px-6 flex items-center justify-between border-b border-white/10 bg-gradient-to-b from-black/40 to-transparent">
+      <header className="relative z-10 flex min-h-[3.25rem] items-center justify-between border-b border-white/10 bg-gradient-to-b from-black/40 to-transparent px-6 pb-2 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-b from-yellow-400/30 to-yellow-600/15 border border-yellow-300/30 flex items-center justify-center">
             <Trophy className="h-5 w-5 text-yellow-200" />
@@ -1025,7 +1025,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="relative z-10 lg:hidden px-4 pt-4 pb-24">
+      <div className="relative z-10 lg:hidden px-4 pb-24 pt-5">
         <div className="rounded-3xl border border-white/10 bg-slate-950/35 shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden">
           <div className="p-4 border-b border-white/10">
             <div className="text-xs text-slate-300">Hola,</div>
@@ -1199,10 +1199,11 @@ export default function DashboardPage() {
                       const joinReq = c._count?.joinRequests ?? 0;
                       const editionId = e?.id ?? null;
                       const pick = editionId ? championshipMyPicks[editionId] : null;
-                      const hasPick = Boolean(pick?.team?.logoUrl);
+                      const hasPickTeam = Boolean(pick?.team);
                       const deadlineMd =
                         editionId ? (editionDeadlines[editionId]?.matchdayNumber ?? null) : null;
-                      const shouldWarnNoPick = editionId && deadlineMd !== null && !pick && !myPicksLoading;
+                      const shouldWarnNoPick =
+                        editionId && deadlineMd !== null && !pick && !myPicksLoading;
                       return (
                         <button
                           key={c.id}
@@ -1225,16 +1226,18 @@ export default function DashboardPage() {
                               )}
                               {myPicksLoading ? (
                                 <div className="text-[11px] text-slate-400">Pick…</div>
-                              ) : hasPick ? (
+                              ) : hasPickTeam && pick?.team ? (
                                 <div className="flex items-center gap-1 text-[11px] text-emerald-200">
                                   <img
-                                    src={pick!.team.logoUrl}
-                                    alt={pick!.team.name}
-                                    title={pick!.team.name}
+                                    src={pick.team.logoUrl}
+                                    alt={pick.team.name}
+                                    title={pick.team.name}
                                     className="w-4 h-4 object-contain"
                                   />
                                   Pick
                                 </div>
+                              ) : pick && !pick.team ? (
+                                <div className="text-[11px] text-slate-400">Sin pick</div>
                               ) : shouldWarnNoPick ? (
                                 <div className="flex items-center gap-1 text-[11px] text-amber-200">
                                   <AlertTriangle className="h-3.5 w-3.5" />
@@ -1505,6 +1508,34 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-1 min-w-0">
+          {/* ── World Cup 2026 entry banner ── */}
+          {championships.filter((c) => c.mode === 'WORLD_CUP').map((c) => {
+            const activeEdition = c.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN');
+            if (!activeEdition) return null;
+            return (
+              <button
+                key={c.id}
+                onClick={() => router.push(`/world-cup/${activeEdition.id}`)}
+                className="w-full mb-4 rounded-2xl overflow-hidden border border-amber-400/20 bg-gradient-to-r from-amber-950/60 via-red-950/40 to-amber-950/60 hover:from-amber-900/70 hover:to-amber-900/70 transition-all group"
+              >
+                <div className="px-5 py-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center shrink-0">
+                      <Trophy className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs text-amber-400/70 font-semibold uppercase tracking-widest">Edición Mundial</div>
+                      <div className="font-extrabold text-amber-100 text-sm">{c.name}</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-amber-300/70 group-hover:text-amber-300 transition-colors font-medium flex items-center gap-1">
+                    Jugar <span className="text-base">→</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+
           <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-950/55 to-slate-950/20 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden">
             <div className="p-6 border-b border-white/10">
               <div className="flex items-start justify-between gap-4">
@@ -1593,15 +1624,15 @@ export default function DashboardPage() {
                         <div className="text-xs text-slate-300">Cargando...</div>
                       ) : myPick ? (
                         <div className="flex items-center gap-3">
-                          {myPick.team.logoUrl && (
+                          {myPick.team?.logoUrl ? (
                             <img
                               src={myPick.team.logoUrl}
                               alt={myPick.team.name}
                               className="w-12 h-12 object-contain"
                             />
-                          )}
+                          ) : null}
                           <div className="min-w-0">
-                            <div className="font-semibold truncate">{myPick.team.name}</div>
+                            <div className="font-semibold truncate">{myPick.team?.name ?? 'Sin pick'}</div>
                             <div className="text-xs text-slate-300 mt-1">Estado: {myPick.status}</div>
                           </div>
                           <div className="ml-auto">
@@ -1669,7 +1700,8 @@ export default function DashboardPage() {
                   ) : myPick ? (
                     <div className="space-y-2 text-sm">
                       <div className="text-slate-200">
-                        Pick actual: <span className="font-semibold text-white">{myPick.team.name}</span>
+                        Pick actual:{' '}
+                        <span className="font-semibold text-white">{myPick.team?.name ?? 'Sin pick'}</span>
                       </div>
                       <div className="text-slate-300">
                         Estado: <span className="font-semibold text-white">{myPick.status}</span>
@@ -1834,15 +1866,15 @@ export default function DashboardPage() {
                                   <div className="text-xs text-slate-300">Cargando...</div>
                                 ) : myPick ? (
                                   <div className="flex items-center gap-3">
-                                    {myPick.team.logoUrl && (
+                                    {myPick.team?.logoUrl ? (
                                       <img
                                         src={myPick.team.logoUrl}
                                         alt={myPick.team.name}
                                         className="w-10 h-10 object-contain"
                                       />
-                                    )}
+                                    ) : null}
                                     <div className="min-w-0">
-                                      <div className="font-semibold truncate">{myPick.team.name}</div>
+                                      <div className="font-semibold truncate">{myPick.team?.name ?? 'Sin pick'}</div>
                                       <div className="text-xs text-slate-300 mt-1">Estado: {myPick.status}</div>
                                     </div>
                                     <div className="ml-auto">

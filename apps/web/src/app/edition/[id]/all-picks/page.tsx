@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
-type PickRecord = {
+type EveryonePickRow = {
   id: string;
-  status: string;
+  pickStatus: string;
   pointsAwarded: number | null;
-  team: { name: string; logoUrl: string } | null;
-  matchday: { number: number; status: string };
-  participant: { user: { alias: string } };
+  matchdayNumber: number;
+  matchdayStatus: string;
+  alias: string;
+  team: { id: string; name: string; logoUrl: string } | null;
 };
 
 type BadgeVariant = 'muted' | 'success' | 'warning' | 'destructive' | 'default';
@@ -34,28 +35,28 @@ const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Pendiente',
 };
 
-export default function HistoryPage() {
+export default function EveryonePicksHistoryPage() {
   const { id: editionId } = useParams<{ id: string }>();
   const router = useRouter();
-  const [history, setHistory] = useState<PickRecord[]>([]);
+  const [rows, setRows] = useState<EveryonePickRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/editions/${editionId}/picks/history`)
+    fetch(`/api/editions/${editionId}/picks/everyone-history`)
       .then((r) => {
         if (!r.ok) throw new Error('Sin acceso');
         return r.json();
       })
-      .then((data) => setHistory(Array.isArray(data) ? data : []))
+      .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [editionId]);
 
-  const grouped = history.reduce<Record<number, PickRecord[]>>((acc, pick) => {
-    const n = pick.matchday.number;
+  const grouped = rows.reduce<Record<number, EveryonePickRow[]>>((acc, row) => {
+    const n = row.matchdayNumber;
     if (!acc[n]) acc[n] = [];
-    acc[n].push(pick);
+    acc[n].push(row);
     return acc;
   }, {});
 
@@ -67,14 +68,18 @@ export default function HistoryPage() {
         <Button variant="ghost" size="sm" className="-ml-2 mb-6 text-muted-foreground" onClick={() => router.back()}>
           ← Volver
         </Button>
-        <h1 className="text-2xl font-bold text-foreground mb-6">Historial de picks</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Picks de todos los participantes</h1>
+        <p className="text-sm text-muted-foreground mb-6">
+          Equipo elegido por jornada. En la jornada en curso, los picks del resto se muestran cuando ha pasado el cierre
+          (misma regla que la clasificación).
+        </p>
 
         {loading ? (
-          <p className="text-muted-foreground">Cargando...</p>
+          <p className="text-muted-foreground">Cargando…</p>
         ) : error ? (
           <p className="text-destructive">{error}</p>
         ) : matchdayNumbers.length === 0 ? (
-          <p className="text-muted-foreground">No hay historial todavía.</p>
+          <p className="text-muted-foreground">No hay picks registrados en esta edición.</p>
         ) : (
           matchdayNumbers.map((num) => (
             <section key={num} className="mb-8">
@@ -82,21 +87,24 @@ export default function HistoryPage() {
                 Jornada {num}
               </h2>
               <div className="flex flex-col gap-2">
-                {grouped[num].map((pick) => (
-                  <div key={pick.id} className="flex justify-between items-center bg-card border border-border rounded-lg px-4 py-3 gap-3">
-                    <span className="text-muted-foreground text-sm min-w-[100px]">@{pick.participant.user.alias}</span>
-                    <div className="flex items-center gap-2 flex-1">
-                      {pick.team?.logoUrl ? (
-                        <img src={pick.team.logoUrl} alt={pick.team.name} className="w-5 h-5 object-contain" />
+                {grouped[num].map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex flex-wrap justify-between items-center gap-2 bg-card border border-border rounded-lg px-4 py-3"
+                  >
+                    <span className="text-muted-foreground text-sm min-w-[7rem]">@{row.alias}</span>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {row.team?.logoUrl ? (
+                        <img src={row.team.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />
                       ) : null}
-                      <span className="text-foreground text-sm">
-                        {pick.team?.name ?? 'Sin pick'}
+                      <span className="text-foreground text-sm truncate">
+                        {row.team?.name ?? 'Sin pick (eliminado)'}
                       </span>
                     </div>
-                    <Badge variant={STATUS_BADGE[pick.status] ?? 'muted'} className="text-xs shrink-0">
-                      {STATUS_LABEL[pick.status] ?? pick.status}
-                      {pick.pointsAwarded !== null && pick.pointsAwarded !== undefined
-                        ? ` (+${pick.pointsAwarded})`
+                    <Badge variant={STATUS_BADGE[row.pickStatus] ?? 'muted'} className="text-xs shrink-0">
+                      {STATUS_LABEL[row.pickStatus] ?? row.pickStatus}
+                      {row.pointsAwarded !== null && row.pointsAwarded !== undefined
+                        ? ` (+${row.pointsAwarded})`
                         : ''}
                     </Badge>
                   </div>

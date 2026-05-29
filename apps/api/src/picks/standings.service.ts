@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChampionshipMode, MatchdayStatus, ParticipantStatus, PickStatus } from '@prisma/client';
+import { findNextOpenMatchdayByCalendar } from '../matchdays/find-next-open-matchday-by-calendar';
 
 /** Torneo: racha de victorias (SURVIVED). Ignora PENDING/POSTPONED sin romper la racha previa. */
 function computeSurvivalStreak(
@@ -74,20 +75,15 @@ export class StandingsService {
     const leagueId = edition.championship.footballLeagueId;
     const season = edition.championship.footballLeague.currentSeason;
 
-    // Misma jornada que GET /deadline (primera SCHEDULED|ONGOING). "Pick actual" = pick de esa jornada,
-    // no el de la jornada más alta (evita mostrar J30 mientras la vigente en UI es J29).
+    // Misma jornada que GET /deadline (abierta más próxima en calendario). "Pick actual" = pick de esa jornada.
     let pickDisplayMatchdayNumber: number | null = null;
     let canRevealPicks = true;
 
     try {
-      const deadlineMatchday = await this.prisma.matchday.findFirst({
-        where: {
-          leagueId,
-          season,
-          number: matchdayNumberFilter,
-          status: { in: [MatchdayStatus.SCHEDULED, MatchdayStatus.ONGOING] },
-        },
-        orderBy: { number: 'asc' },
+      const deadlineMatchday = await findNextOpenMatchdayByCalendar(this.prisma, {
+        leagueId,
+        season,
+        number: matchdayNumberFilter,
       });
 
       pickDisplayMatchdayNumber = deadlineMatchday?.number ?? null;

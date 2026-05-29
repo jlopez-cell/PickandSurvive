@@ -26,7 +26,7 @@ type Match = {
 type Pick = {
   id: string;
   status: string;
-  team: { id: string; name: string; logoUrl: string };
+  team: { id: string; name: string; logoUrl: string } | null;
   participant: { user: { alias: string } };
   matchday: { number: number; status: string };
 };
@@ -227,7 +227,7 @@ export default function EditionPage() {
   return (
     <div className="min-h-screen bg-background">
       <MobileTopHeader />
-      <main className="p-4 sm:p-6 pb-24">
+      <main className="px-4 pb-24 pt-3 sm:p-6 sm:pt-6">
       <div className="max-w-3xl mx-auto">
         {/* Top bar */}
         <div className="flex justify-between items-center mb-6">
@@ -240,6 +240,9 @@ export default function EditionPage() {
             </Button>
             <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/history`)}>
               Historial
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/all-picks`)}>
+              Picks de todos
             </Button>
           </div>
         </div>
@@ -307,10 +310,12 @@ export default function EditionPage() {
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground mb-2">Tu pick</p>
                 <div className="flex items-center gap-3">
-                  {myPick.team.logoUrl && (
+                  {myPick.team?.logoUrl ? (
                     <img src={myPick.team.logoUrl} alt={myPick.team.name} className="w-12 h-12 object-contain" />
-                  )}
-                  <span className="font-semibold text-foreground flex-1">{myPick.team.name}</span>
+                  ) : null}
+                  <span className="font-semibold text-foreground flex-1">
+                    {myPick.team?.name ?? 'Sin pick'}
+                  </span>
                   <Badge variant={PICK_STATUS_BADGE[myPick.status] ?? 'muted'}>{myPick.status}</Badge>
                 </div>
               </CardContent>
@@ -326,8 +331,8 @@ export default function EditionPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {matches.map((match) => {
-                const homeLocked = match.homeUsed && myPick?.team.id !== match.homeTeam.id;
-                const awayLocked = match.awayUsed && myPick?.team.id !== match.awayTeam.id;
+                const homeLocked = match.homeUsed && myPick?.team?.id !== match.homeTeam.id;
+                const awayLocked = match.awayUsed && myPick?.team?.id !== match.awayTeam.id;
                 return (
                 <div
                   key={match.id}
@@ -375,7 +380,7 @@ export default function EditionPage() {
                       }
                       onClick={() => handlePick(match.homeTeam.id)}
                     >
-                      {myPick?.team.id === match.homeTeam.id
+                      {myPick?.team?.id === match.homeTeam.id
                         ? 'Tu pick'
                         : match.homeUsed
                           ? 'Usado'
@@ -434,7 +439,7 @@ export default function EditionPage() {
                       }
                       onClick={() => handlePick(match.awayTeam.id)}
                     >
-                      {myPick?.team.id === match.awayTeam.id
+                      {myPick?.team?.id === match.awayTeam.id
                         ? 'Tu pick'
                         : match.awayUsed
                           ? 'Usado'

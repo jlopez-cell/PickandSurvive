@@ -83,6 +83,16 @@ export class ChampionshipsController {
     return this.service.activateEdition(req.user.sub, id, editionId);
   }
 
+  @Post(':id/editions/:editionId/sync-members')
+  @UseGuards(ChampionshipAdminGuard)
+  resyncEditionMembers(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('editionId') editionId: string,
+  ) {
+    return this.service.resyncEditionMembers(req.user.sub, id, editionId);
+  }
+
   // ─── Invitaciones ────────────────────────────────────────────────────────
 
   @Post(':id/invite-link')

@@ -12,7 +12,16 @@ import * as nodemailer from 'nodemailer';
 import { CreateChampionshipDto } from './dto/create-championship.dto';
 import { CreateEditionDto } from './dto/create-edition.dto';
 import { InviteEmailDto } from './dto/invite-email.dto';
-import { ChampionshipMode, EditionStatus, JoinRequestSource, JoinRequestStatus, MatchdayStatus } from '@prisma/client';
+import { syncApprovedMembersToEditionTx as syncMembersToEditionTx } from './edition-member-sync';
+import {
+  ChampionshipMode,
+  EditionStatus,
+  JoinRequestSource,
+  JoinRequestStatus,
+  MatchdayStatus,
+  Prisma,
+} from '@prisma/client';
+import { findNextOpenMatchdayByCalendar } from '../matchdays/find-next-open-matchday-by-calendar';
 
 @Injectable()
 export class ChampionshipsService {
@@ -176,10 +185,15 @@ export class ChampionshipsService {
       throw new ConflictException(`La edición no está en estado BORRADOR (estado actual: ${edition.status})`);
     }
 
-    return this.prisma.edition.update({
-      where: { id: editionId },
-      data: { status: EditionStatus.OPEN },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.edition.update({
+        where: { id: editionId },
+        data: { status: EditionStatus.OPEN },
+      });
+      await syncMembersToEditionTx(tx, editionId);
     });
+
+    return this.prisma.edition.findUnique({ where: { id: editionId } });
   }
 
   async activateEdition(userId: string, championshipId: string, editionId: string) {
@@ -193,35 +207,47 @@ export class ChampionshipsService {
       throw new ConflictException(`La edición debe estar ABIERTA para activarse (estado actual: ${edition.status})`);
     }
 
-    // Auto-add admin as participant if not already
-    const existing = await this.prisma.participant.findUnique({
-      where: { userId_editionId: { userId, editionId } },
-    });
-
     await this.prisma.$transaction(async (tx) => {
       await tx.edition.update({
         where: { id: editionId },
         data: { status: EditionStatus.ACTIVE },
       });
-
-      if (!existing) {
-        await tx.participant.create({ data: { userId, editionId } });
-
-        // Ensure JoinRequest exists and is approved
-        await tx.joinRequest.upsert({
-          where: { championshipId_userId: { championshipId, userId } },
-          update: { status: JoinRequestStatus.APPROVED },
-          create: {
-            championshipId,
-            userId,
-            source: JoinRequestSource.LINK,
-            status: JoinRequestStatus.APPROVED,
-          },
-        });
-      }
+      await syncMembersToEditionTx(tx, editionId);
     });
 
     return { message: 'Edición activada correctamente.' };
+  }
+
+  /**
+   * Vuelve a matricular en la edición a miembros APPROVED, admin y participantes de la última edición FINISHED.
+   * Solo admin; ediciones DRAFT, OPEN o ACTIVE. Idempotente.
+   */
+  async resyncEditionMembers(userId: string, championshipId: string, editionId: string) {
+    const edition = await this.getEditionOrThrow(championshipId, editionId);
+
+    if (edition.championship.adminId !== userId) {
+      throw new ForbiddenException('Solo el admin puede sincronizar participantes');
+    }
+
+    if (
+      edition.status !== EditionStatus.DRAFT &&
+      edition.status !== EditionStatus.OPEN &&
+      edition.status !== EditionStatus.ACTIVE
+    ) {
+      throw new ConflictException(
+        `Solo se pueden sincronizar ediciones en borrador, abiertas o activas (estado actual: ${edition.status})`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await syncMembersToEditionTx(tx, editionId);
+    });
+
+    return {
+      message:
+        'Participantes sincronizados con los miembros aprobados y la última edición finalizada.',
+      editionId,
+    };
   }
 
   // ─── Invitaciones — Enlace ─────────────────────────────────────────────────
@@ -440,52 +466,32 @@ export class ChampionshipsService {
       throw new ConflictException(`La solicitud ya fue procesada (estado: ${request.status})`);
     }
 
-    // Find a joinable edition (OPEN or ACTIVE) to add participant
-    const joinableEdition = await this.prisma.edition.findFirst({
+    const joinableEditions = await this.prisma.edition.findMany({
       where: { championshipId, status: { in: [EditionStatus.OPEN, EditionStatus.ACTIVE] } },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
-    if (!joinableEdition) {
+    if (joinableEditions.length === 0) {
       throw new ForbiddenException('No hay edición abierta o activa. No se puede aprobar la solicitud.');
     }
-
-    // Check if already a participant (defensive)
-    const existingParticipant = await this.prisma.participant.findUnique({
-      where: { userId_editionId: { userId: request.userId, editionId: joinableEdition.id } },
-    });
 
     await this.prisma.$transaction(async (tx) => {
       await tx.joinRequest.update({
         where: { id: requestId },
         data: { status: JoinRequestStatus.APPROVED },
       });
-
-      if (!existingParticipant) {
-        await tx.participant.create({
-          data: { userId: request.userId, editionId: joinableEdition.id },
-        });
-
-        // Register entry fee if applicable
-        if (joinableEdition.potAmountCents > 0) {
-          await tx.potLedger.create({
-            data: {
-              editionId: joinableEdition.id,
-              userId: request.userId,
-              type: 'ENTRY_FEE',
-              amountCents: joinableEdition.potAmountCents,
-              description: `Entrada de participante ${request.userId}`,
-            },
-          });
-        }
+      for (const ed of joinableEditions) {
+        await syncMembersToEditionTx(tx, ed.id);
       }
     });
 
-    // Notify user
+    const primaryEditionId = joinableEditions[0].id;
+
     await this.prisma.notification.create({
       data: {
         userId: request.userId,
         type: 'JOIN_APPROVED',
-        payload: { championshipId, editionId: joinableEdition.id },
+        payload: { championshipId, editionId: primaryEditionId },
       },
     });
 
@@ -635,6 +641,14 @@ export class ChampionshipsService {
 
   // ─── Helpers privados ─────────────────────────────────────────────────────
 
+  /**
+   * @deprecated Usar `syncApprovedMembersToEditionTx` importado desde `./edition-member-sync`.
+   * Se mantiene como delegado para `EditionsScheduler` y pruebas.
+   */
+  async syncApprovedMembersToEditionTx(tx: Prisma.TransactionClient, editionId: string): Promise<void> {
+    return syncMembersToEditionTx(tx, editionId);
+  }
+
   private async getEditionOrThrow(championshipId: string, editionId: string) {
     const edition = await this.prisma.edition.findFirst({
       where: { id: editionId, championshipId },
@@ -669,36 +683,42 @@ export class ChampionshipsService {
   }
 
   /**
-   * Jornada "actual" robusta para validaciones de creación:
-   * - Prioriza la próxima jornada por fecha (firstKickoff >= ahora).
-   * - Si no hay fechas futuras, toma la primera SCHEDULED/ONGOING.
-   * - Si todo terminó, toma la última FINISHED.
-   * - Fallback final: 1.
+   * Jornada mínima permitida al crear una edición: temporada actual de la liga.
+   * - Primero: entre jornadas abiertas (SCHEDULED u ONGOING), la que viene antes en **calendario**
+   *   (primer pitido más temprano), no la de número mínimo — la API puede adelantar una jornada
+   *   mayor antes que otra menor siga pendiente.
+   * - Si no hay ninguna abierta: la primera con primer pitido futuro (por si el estado aún no está sincronizado).
+   * - Si la temporada está toda cerrada: última jornada FINISHED.
+   * - Fallback: 1.
    */
   private async getLeagueCurrentMatchday(leagueId: string): Promise<number> {
+    const league = await this.prisma.footballLeague.findUnique({
+      where: { id: leagueId },
+      select: { currentSeason: true },
+    });
+    const season = league?.currentSeason;
+    if (season == null) return 1;
+
+    const inSeason = { leagueId, season } as const;
     const now = new Date();
 
+    const nextOpen = await findNextOpenMatchdayByCalendar(this.prisma, inSeason);
+    if (nextOpen?.number != null) {
+      return nextOpen.number;
+    }
+
     const nextByKickoff = await this.prisma.matchday.findFirst({
-      where: { leagueId, firstKickoff: { gte: now } },
-      orderBy: [{ firstKickoff: 'asc' }, { season: 'desc' }, { number: 'asc' }],
+      where: { ...inSeason, firstKickoff: { gte: now } },
+      orderBy: [{ firstKickoff: 'asc' }, { number: 'asc' }],
       select: { number: true },
     });
     if (nextByKickoff?.number != null) {
       return nextByKickoff.number;
     }
 
-    const pendingByStatus = await this.prisma.matchday.findFirst({
-      where: { leagueId, status: { in: [MatchdayStatus.SCHEDULED, MatchdayStatus.ONGOING] } },
-      orderBy: [{ season: 'desc' }, { number: 'asc' }],
-      select: { number: true },
-    });
-    if (pendingByStatus?.number != null) {
-      return pendingByStatus.number;
-    }
-
     const latestFinished = await this.prisma.matchday.findFirst({
-      where: { leagueId, status: MatchdayStatus.FINISHED },
-      orderBy: [{ season: 'desc' }, { number: 'desc' }],
+      where: { ...inSeason, status: MatchdayStatus.FINISHED },
+      orderBy: { number: 'desc' },
       select: { number: true },
     });
     return latestFinished?.number ?? 1;

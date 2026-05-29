@@ -62,6 +62,7 @@ export default function ChampionshipDetailPage() {
   const [error, setError] = useState('');
   const [publishing, setPublishing] = useState<string | null>(null);
   const [activating, setActivating] = useState<string | null>(null);
+  const [syncingMembers, setSyncingMembers] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [standingsRows, setStandingsRows] = useState<StandingRow[] | null>(null);
@@ -179,6 +180,13 @@ export default function ChampionshipDetailPage() {
     setActivating(null);
   };
 
+  const handleSyncMembers = async (editionId: string) => {
+    setSyncingMembers(editionId);
+    const res = await fetch(`/api/championships/${id}/editions/${editionId}/sync-members`, { method: 'POST' });
+    if (res.ok) fetchChampionship();
+    setSyncingMembers(null);
+  };
+
   const handleDeleteChampionship = async () => {
     if (deleting) return;
     const ok = window.confirm('¿Seguro que quieres eliminar este campeonato? Esta acción no se puede deshacer.');
@@ -254,7 +262,7 @@ export default function ChampionshipDetailPage() {
     <div className="relative min-h-screen text-white overflow-hidden">
       {shellBg}
       <MobileTopHeader />
-      <main className="relative z-10 min-h-screen px-4 sm:px-6 pb-24 pt-4 md:pt-[max(1rem,env(safe-area-inset-top))]">
+      <main className="relative z-10 min-h-screen px-4 pb-24 pt-3 sm:px-6 sm:pt-6 md:pt-[max(1.25rem,env(safe-area-inset-top,0px))]">
         <div className="max-w-3xl mx-auto">
           <Button
             variant="ghost"
@@ -446,6 +454,21 @@ export default function ChampionshipDetailPage() {
                           {activating === edition.id ? 'Activando...' : 'Activar'}
                         </Button>
                       )}
+                      {isAdmin &&
+                        (edition.status === 'DRAFT' ||
+                          edition.status === 'OPEN' ||
+                          edition.status === 'ACTIVE') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={btnOutlineLight}
+                            title="Añade a la edición a los miembros aprobados y a quienes jugaron la última edición finalizada (sin nueva invitación)"
+                            onClick={() => handleSyncMembers(edition.id)}
+                            disabled={syncingMembers === edition.id}
+                          >
+                            {syncingMembers === edition.id ? 'Sincronizando…' : 'Sincronizar jugadores'}
+                          </Button>
+                        )}
                       {(edition.status === 'ACTIVE' || edition.status === 'OPEN') && (
                         <Button
                           size="sm"

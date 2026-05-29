@@ -55,6 +55,7 @@ export class PickProcessingService {
     });
 
     for (const pick of pendingPicks) {
+      if (!pick.teamId) continue;
       const mode = pick.participant.edition.championship.mode;
       const pickTeamWon = match.winnerTeamId === pick.teamId;
       const isDraw = match.winnerTeamId === null;
@@ -147,7 +148,7 @@ export class PickProcessingService {
               data: {
                 participantId: participant.id,
                 matchdayId,
-                teamId: await this.getPlaceholderTeamId(edition.id),
+                teamId: null,
                 status: PickStatus.NO_PICK_ELIMINATED,
               },
             }),
@@ -170,19 +171,5 @@ export class PickProcessingService {
 
       await this.editionResolution.checkEditionEnd(edition.id);
     }
-  }
-
-  /**
-   * Returns a placeholder teamId for NO_PICK records in TOURNAMENT mode.
-   * Uses any team from the league (the pick record is just a marker — team is irrelevant).
-   */
-  private async getPlaceholderTeamId(editionId: string): Promise<string> {
-    const edition = await this.prisma.edition.findUnique({
-      where: { id: editionId },
-      include: { championship: { include: { footballLeague: { include: { teams: { take: 1 } } } } } },
-    });
-    const team = edition?.championship.footballLeague.teams[0];
-    if (!team) throw new Error('No teams found in league');
-    return team.id;
   }
 }

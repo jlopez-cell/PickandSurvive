@@ -8,7 +8,7 @@ export function MobileTopHeader() {
   const router = useRouter();
 
   return (
-    <header className="relative z-20 h-16 px-4 flex items-center justify-between border-b border-white/10 bg-gradient-to-b from-black/40 to-transparent md:hidden">
+    <header className="relative z-20 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] flex min-h-[3.25rem] items-center justify-between border-b border-white/10 bg-gradient-to-b from-black/40 to-transparent md:hidden">
       <button
         type="button"
         className="flex items-center gap-3"

@@ -14,6 +14,7 @@ import {
   PickHalf,
   PickStatus,
 } from '@prisma/client';
+import { findNextOpenMatchdayByCalendar } from '../matchdays/find-next-open-matchday-by-calendar';
 
 @Injectable()
 export class PicksService {
@@ -183,6 +184,9 @@ export class PicksService {
     }
 
     const oldTeamId = existingPick.teamId;
+    if (!oldTeamId) {
+      throw new ConflictException('Pick sin equipo; no se puede modificar');
+    }
 
     const txOps: any[] = [
       this.prisma.pick.update({
@@ -268,7 +272,7 @@ export class PicksService {
       myPick: {
         id: pick.id,
         status: pick.status,
-        team: pick.team,
+        team: pick.status === PickStatus.NO_PICK_ELIMINATED || !pick.team ? null : pick.team,
         participant: pick.participant,
         matchday: pick.matchday,
       },
@@ -299,9 +303,106 @@ export class PicksService {
       id: p.id,
       status: p.status,
       pointsAwarded: p.pointsAwarded,
-      team: p.team,
+      team: p.status === PickStatus.NO_PICK_ELIMINATED || !p.team ? null : p.team,
       matchday: p.matchday,
       participant: { user: { alias: p.participant.user.alias } },
+    }));
+  }
+
+  /**
+   * Picks de todos los participantes en el rango de la edición.
+   * Reglas de revelado alineadas con la clasificación: jornadas ya finalizadas siempre;
+   * jornada abierta solo todos los picks tras el primer pitido, salvo el propio usuario.
+   */
+  async getEveryonePicksHistory(userId: string, editionId: string) {
+    const edition = await this.prisma.edition.findUnique({
+      where: { id: editionId },
+      include: {
+        championship: { include: { footballLeague: true } },
+      },
+    });
+
+    if (!edition) throw new NotFoundException('Edición no encontrada');
+
+    const participant = await this.prisma.participant.findUnique({
+      where: { userId_editionId: { userId, editionId } },
+    });
+
+    const isAdmin = edition.championship.adminId === userId;
+    if (!participant && !isAdmin) {
+      throw new ForbiddenException('Solo los participantes pueden ver esta información');
+    }
+
+    const matchdayNumberFilter = {
+      gte: edition.startMatchday,
+      ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
+    };
+
+    const leagueId = edition.championship.footballLeagueId;
+    const season = edition.championship.footballLeague.currentSeason;
+
+    let canRevealPicks = true;
+
+    try {
+      const deadlineMatchday = await findNextOpenMatchdayByCalendar(this.prisma, {
+        leagueId,
+        season,
+        number: matchdayNumberFilter,
+      });
+
+      let firstKickoff = deadlineMatchday?.firstKickoff ?? null;
+      if (deadlineMatchday && !firstKickoff) {
+        const firstMatch = await this.prisma.match.findFirst({
+          where: { matchdayId: deadlineMatchday.id },
+          orderBy: { kickoffTime: 'asc' },
+          select: { kickoffTime: true },
+        });
+        firstKickoff = firstMatch?.kickoffTime ?? null;
+      }
+
+      if (firstKickoff) {
+        canRevealPicks = new Date(firstKickoff).getTime() <= Date.now();
+      }
+    } catch {
+      canRevealPicks = true;
+    }
+
+    const picks = await this.prisma.pick.findMany({
+      where: {
+        participant: { editionId },
+        matchday: {
+          leagueId,
+          season,
+          number: matchdayNumberFilter,
+        },
+      },
+      include: {
+        participant: {
+          include: { user: { select: { alias: true } } },
+        },
+        team: { select: { id: true, name: true, logoUrl: true } },
+        matchday: { select: { number: true, status: true } },
+      },
+      orderBy: [{ matchday: { number: 'desc' } }, { participant: { user: { alias: 'asc' } } }],
+    });
+
+    const visible = picks.filter((p) => {
+      if (p.matchday.status === MatchdayStatus.FINISHED) return true;
+      if (canRevealPicks) return true;
+      return p.participant.userId === userId;
+    });
+
+    return visible.map((p) => ({
+      id: p.id,
+      pickStatus: p.status,
+      pointsAwarded: p.pointsAwarded,
+      matchdayNumber: p.matchday.number,
+      matchdayStatus: p.matchday.status,
+      alias: p.participant.user.alias,
+      team:
+        p.status === PickStatus.NO_PICK_ELIMINATED || !p.team
+          ? null
+          : { id: p.team.id, name: p.team.name, logoUrl: p.team.logoUrl },
     }));
   }
 
@@ -396,8 +497,8 @@ export class PicksService {
   // ─── Deadline: jornada en vigor ─────────────────────────────────────────
 
   /**
-   * Devuelve la primera matchday con estado SCHEDULED u ONGOING dentro del rango de la edición.
-   * (No depende de si el `firstKickoff` ya pasó.)
+   * Matchday en vigor dentro del rango de la edición: la abierta (SCHEDULED u ONGOING) que viene
+   * antes en calendario de competición (primer pitido), no necesariamente la de número mínimo.
    */
   async getEditionDeadline(editionId: string) {
     const edition = await this.prisma.edition.findUnique({
@@ -411,17 +512,13 @@ export class PicksService {
 
     if (!edition) throw new NotFoundException('Edición no encontrada');
 
-    const matchday = await this.prisma.matchday.findFirst({
-      where: {
-        leagueId: edition.championship.footballLeagueId,
-        season: edition.championship.footballLeague.currentSeason,
-        number: {
-          gte: edition.startMatchday,
-          ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
-        },
-        status: { in: [MatchdayStatus.SCHEDULED, MatchdayStatus.ONGOING] },
+    const matchday = await findNextOpenMatchdayByCalendar(this.prisma, {
+      leagueId: edition.championship.footballLeagueId,
+      season: edition.championship.footballLeague.currentSeason,
+      number: {
+        gte: edition.startMatchday,
+        ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
       },
-      orderBy: { number: 'asc' },
     });
 
     let firstKickoff = matchday?.firstKickoff ?? null;

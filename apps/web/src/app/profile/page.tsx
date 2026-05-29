@@ -31,7 +31,7 @@ export default function ProfilePage() {
 
       <MobileTopHeader />
 
-      <main className="relative z-10 p-4 sm:p-6 pb-24">
+      <main className="relative z-10 px-4 pb-24 pt-3 sm:p-6 sm:pt-6">
         <div className="max-w-xl mx-auto">
           <Button
             variant="ghost"

@@ -33,3 +33,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── World Cup 2026 theme ─────────────────────────────────────────────────── */
+[data-theme="world-cup"] {
+  --background:          20 14% 6%;
+  --foreground:          45 100% 96%;
+  --card:                20 14% 11%;
+  --card-foreground:     45 100% 96%;
+  --border:              20 14% 20%;
+  --input:               20 14% 20%;
+  --ring:                43 96% 56%;
+  --primary:             43 96% 56%;
+  --primary-foreground:  20 14% 6%;
+  --secondary:           20 14% 16%;
+  --secondary-foreground: 45 60% 75%;
+  --destructive:         0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --muted:               20 14% 11%;
+  --muted-foreground:    45 20% 55%;
+  --accent:              20 14% 16%;
+  --accent-foreground:   45 100% 96%;
+  --wc-gold:             43 96% 56%;
+  --wc-red:              0 72% 51%;
+  --wc-phase-group:      213 94% 60%;
+  --wc-phase-knockout:   283 50% 60%;
+}
