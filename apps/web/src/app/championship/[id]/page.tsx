@@ -211,7 +211,7 @@ export default function ChampionshipDetailPage() {
     <>
       <div
         className="absolute inset-0 bg-cover bg-center opacity-60"
-        style={{ backgroundImage: `url('/dashboard-hero.jpeg')` }}
+        style={{ backgroundImage: `url('/Logo_WorldCup.png')` }}
       />
       <div className={`absolute inset-0 bg-gradient-to-b ${isWcMode ? 'from-amber-950/85 via-slate-950/65 to-slate-950/95' : 'from-slate-950/90 via-slate-950/65 to-slate-950/95'}`} />
       {isWcMode && <div className="absolute inset-0 bg-gradient-to-br from-amber-900/30 via-transparent to-amber-900/20 pointer-events-none" />}

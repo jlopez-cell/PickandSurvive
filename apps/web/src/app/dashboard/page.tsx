@@ -1068,7 +1068,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className={`rounded-2xl border overflow-hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/25' : 'border-white/10 bg-slate-950/25'}`}>
                   <img
-                    src="/dashboard-hero.jpeg"
+                    src="/Logo_WorldCup.png"
                     alt="Pick & Survive"
                     className="w-full h-40 object-cover"
                   />

@@ -26,7 +26,7 @@ export default function ProfilePage() {
 
   return (
     <div className="relative min-h-screen text-white overflow-hidden">
-      <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('/dashboard-hero.jpeg')` }} />
+      <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('/Logo_WorldCup.png')` }} />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/65 to-slate-950/95" />
 
       <MobileTopHeader />

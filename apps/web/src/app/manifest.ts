@@ -12,7 +12,7 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     icons: [
       {
-        src: '/dashboard-hero.jpeg',
+        src: '/Logo_WorldCup.png',
         sizes: '1024x1024',
         type: 'image/jpeg',
       },
