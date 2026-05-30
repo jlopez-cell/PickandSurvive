@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { MatchdayStatus, ParticipantStatus, PickStatus } from '@prisma/client';
@@ -13,6 +14,7 @@ export class NotificationsScheduler {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -89,7 +91,7 @@ export class NotificationsScheduler {
                 <h2>Recuerda hacer tu pick, @${participant.user.alias}!</h2>
                 <p>La jornada ${matchday.number} comienza en aproximadamente ${minutesLeft} minutos.</p>
                 <p>Si no haces tu pick antes del inicio, serás penalizado.</p>
-                <p><a href="${this.prisma['config']?.get?.('APP_URL') ?? 'http://localhost:3000'}/edition/${edition.id}">Ir a hacer mi pick →</a></p>
+                <p><a href="${this.config.get('APP_URL', 'http://localhost:3000')}/edition/${edition.id}">Ir a hacer mi pick →</a></p>
               `,
             },
           );
