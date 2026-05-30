@@ -96,7 +96,7 @@ const PICK_STATUS_BADGE: Record<string, 'muted' | 'success' | 'warning' | 'destr
   POSTPONED_PENDING: 'default',
 };
 
-const MODE_LABEL: Record<string, string> = { TOURNAMENT: 'Torneo', LEAGUE: 'Liga' };
+const MODE_LABEL: Record<string, string> = { TOURNAMENT: 'Torneo', LEAGUE: 'Liga', WORLD_CUP: 'World Cup' };
 const EDITION_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Borrador',
   OPEN: 'Abierta',
@@ -522,9 +522,17 @@ export default function DashboardPage() {
     });
   };
 
+  const getChampionshipHref = (c: Championship): string => {
+    if (c.mode === 'WORLD_CUP') {
+      const ed = c.editions?.find((e) => e.status === 'ACTIVE') ?? c.editions?.find((e) => e.status === 'OPEN');
+      if (ed) return `/world-cup/${ed.id}`;
+    }
+    return `/championship/${c.id}`;
+  };
+
   const handleViewLeague = () => {
     if (activeEditionId) {
-      router.push(`/edition/${activeEditionId}/standings`);
+      router.push(isWcMode ? `/world-cup/${activeEditionId}` : `/edition/${activeEditionId}/standings`);
       return;
     }
     if (championships[0]?.id) {
@@ -612,9 +620,11 @@ export default function DashboardPage() {
   const deleteNotification = useCallback(async (id: string) => {
     setDeletingNotificationId(id);
     try {
-      await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-      setRecentActivity((prev) => prev.filter((n) => n.id !== id));
+      const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        setRecentActivity((prev) => prev.filter((n) => n.id !== id));
+      }
     } finally {
       setDeletingNotificationId(null);
     }
@@ -701,6 +711,20 @@ export default function DashboardPage() {
     [createdChampionships],
   );
 
+  // Vía de escape: WC_END_DATE pasada o sin edición activa/abierta → estilo normal
+  const isWcMode = useMemo(() => {
+    if (Date.now() >= new Date('2026-07-20T00:00:00Z').getTime()) return false;
+    return championships.some(
+      (c) => c.mode === 'WORLD_CUP' && c.editions.some((e) => e.status === 'ACTIVE' || e.status === 'OPEN'),
+    );
+  }, [championships]);
+
+  const wcEditionId = useMemo(() => {
+    if (!isWcMode) return null;
+    const wc = championships.find((c) => c.mode === 'WORLD_CUP');
+    return wc?.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN')?.id ?? null;
+  }, [championships, isWcMode]);
+
   const contextualAlerts = useMemo(() => {
     const alerts: { id: string; text: string; tone: 'warning' | 'info' }[] = [];
     if (activeEditionId && !myPick) {
@@ -741,13 +765,21 @@ export default function DashboardPage() {
       </Suspense>
       <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${BG_IMAGE}')` }} />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/65 to-slate-950/95" />
+      {isWcMode && (
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/40 via-transparent to-amber-900/30 pointer-events-none" />
+      )}
 
-      <header className="relative z-10 flex min-h-[3.25rem] items-center justify-between border-b border-white/10 bg-gradient-to-b from-black/40 to-transparent px-6 pb-2 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
+      <header className={`relative z-10 flex min-h-[3.25rem] items-center justify-between border-b px-6 pb-2 pt-[max(0.75rem,env(safe-area-inset-top,0px))] bg-gradient-to-b to-transparent ${isWcMode ? 'border-amber-500/30 from-amber-950/60' : 'border-white/10 from-black/40'}`}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-b from-yellow-400/30 to-yellow-600/15 border border-yellow-300/30 flex items-center justify-center">
-            <Trophy className="h-5 w-5 text-yellow-200" />
+          <div className={`w-9 h-9 rounded-lg border flex items-center justify-center bg-gradient-to-b ${isWcMode ? 'from-amber-400/40 to-amber-600/20 border-amber-400/40' : 'from-yellow-400/30 to-yellow-600/15 border-yellow-300/30'}`}>
+            <Trophy className={`h-5 w-5 ${isWcMode ? 'text-amber-300' : 'text-yellow-200'}`} />
           </div>
           <div className="font-extrabold tracking-wide">Pick &amp; Survive</div>
+          {isWcMode && (
+            <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-1.5 py-0.5">
+              WC 2026
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -869,9 +901,7 @@ export default function DashboardPage() {
                       className="w-full text-left rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2"
                       onClick={() => {
                         setMobileMenuOpen(false);
-                        const latestEdition = c.editions?.[0];
-                        if (latestEdition?.id) router.push(`/edition/${latestEdition.id}/standings`);
-                        else router.push(`/championship/${c.id}`);
+                        router.push(getChampionshipHref(c));
                       }}
                     >
                       <div className="text-xs font-semibold text-slate-100 truncate">{c.name}</div>
@@ -1026,7 +1056,7 @@ export default function DashboardPage() {
       )}
 
       <div className="relative z-10 lg:hidden px-4 pb-24 pt-5">
-        <div className="rounded-3xl border border-white/10 bg-slate-950/35 shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden">
+        <div className={`rounded-3xl border shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/35' : 'border-white/10 bg-slate-950/35'}`}>
           <div className="p-4 border-b border-white/10">
             <div className="text-xs text-slate-300">Hola,</div>
             <div className="text-lg font-extrabold text-slate-50">@{user?.alias ?? 'usuario'}</div>
@@ -1036,7 +1066,7 @@ export default function DashboardPage() {
           <div className="p-4">
             {mobileTab === 'home' ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/25 overflow-hidden">
+                <div className={`rounded-2xl border overflow-hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/25' : 'border-white/10 bg-slate-950/25'}`}>
                   <img
                     src="/dashboard-hero.jpeg"
                     alt="Pick & Survive"
@@ -1051,20 +1081,42 @@ export default function DashboardPage() {
                           ? `J${nextDeadline.matchdayNumber} · ${formatDeadline(nextDeadline.firstKickoff)}`
                           : formatDeadline(nextDeadline?.firstKickoff ?? null)}
                     </div>
-                    <div className="text-xs text-emerald-200 mt-1">
+                    <div className={`text-xs mt-1 ${isWcMode ? 'text-amber-200' : 'text-emerald-200'}`}>
                       {nextDeadlineLoading ? '—' : formatCountdown(nextDeadline?.firstKickoff ?? null)}
                     </div>
                   </div>
                 </div>
 
                 <Button
-                  className="w-full h-12 text-base font-extrabold bg-emerald-500 hover:bg-emerald-500/90 text-slate-950"
-                  onClick={() => router.push('/dashboard?tab=leagues')}
+                  className={`w-full h-12 text-base font-extrabold ${isWcMode ? 'bg-amber-500 hover:bg-amber-400 text-black' : 'bg-emerald-500 hover:bg-emerald-500/90 text-slate-950'}`}
+                  onClick={() =>
+                    isWcMode && wcEditionId
+                      ? router.push(`/world-cup/${wcEditionId}`)
+                      : router.push('/dashboard?tab=leagues')
+                  }
                 >
-                  Elegir pick
+                  {isWcMode ? '⚽ Ir al Mundial' : 'Elegir pick'}
                 </Button>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-3">
+                {isWcMode && wcEditionId && (
+                  <button
+                    onClick={() => router.push(`/world-cup/${wcEditionId}`)}
+                    className="relative w-full rounded-2xl overflow-hidden text-left"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-red-950 to-stone-950" />
+                    <div className="absolute inset-0 rounded-2xl border border-amber-400/30" />
+                    <div className="relative flex items-center gap-3 px-4 py-3">
+                      <Trophy className="w-7 h-7 text-amber-300 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">FIFA World Cup 2026</div>
+                        <div className="text-sm font-black text-amber-100 leading-tight">¡Hacé tu pick del día!</div>
+                      </div>
+                      <span className="ml-auto text-amber-300 text-sm font-bold">→</span>
+                    </div>
+                  </button>
+                )}
+
+                <div className={`rounded-2xl border p-3 ${isWcMode ? 'border-amber-500/15 bg-amber-950/20' : 'border-white/10 bg-slate-950/30'}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold text-slate-100">Resumen de campeonatos</div>
                     <Button
@@ -1089,13 +1141,13 @@ export default function DashboardPage() {
                           <button
                             key={c.id}
                             className="text-left rounded-xl border border-white/10 bg-slate-950/25 hover:bg-slate-950/35 transition px-3 py-2"
-                            onClick={() => router.push(`/championship/${c.id}`)}
+                            onClick={() => router.push(getChampionshipHref(c))}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-sm font-bold text-slate-50 truncate">{c.name}</div>
                                 <div className="text-[11px] text-slate-400 mt-0.5 truncate">
-                                  {c.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · {c.footballLeague?.name ?? '—'}
+                                  {MODE_LABEL[c.mode] ?? c.mode} · {c.footballLeague?.name ?? '—'}
                                 </div>
                               </div>
                               <div className="shrink-0 flex flex-col items-end gap-1">
@@ -1208,15 +1260,13 @@ export default function DashboardPage() {
                         <button
                           key={c.id}
                           className="text-left rounded-2xl border border-white/10 bg-slate-950/30 hover:bg-slate-950/40 transition px-4 py-3"
-                          onClick={() => {
-                            router.push(`/championship/${c.id}`);
-                          }}
+                          onClick={() => router.push(getChampionshipHref(c))}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="text-sm font-bold text-slate-50 truncate">{c.name}</div>
                               <div className="text-xs text-slate-400 mt-1">
-                                {c.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · {c.footballLeague?.name ?? '—'}
+                                {MODE_LABEL[c.mode] ?? c.mode} · {c.footballLeague?.name ?? '—'}
                               </div>
                             </div>
                             <div className="shrink-0 flex flex-col items-end gap-1">
@@ -1370,12 +1420,12 @@ export default function DashboardPage() {
 
       <div className="relative z-10 hidden lg:flex gap-6 px-6 pt-6 pb-10">
         <aside className="hidden lg:flex w-72 flex-col gap-4">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/40 shadow-[0_25px_70px_rgba(0,0,0,0.35)] p-4">
+          <div className={`rounded-2xl border shadow-[0_25px_70px_rgba(0,0,0,0.35)] p-4 ${isWcMode ? 'border-amber-500/25 bg-amber-950/40' : 'border-white/10 bg-slate-950/40'}`}>
             <div className="text-xs text-slate-300 font-semibold">Mi Liga</div>
             <div className="text-base font-bold mt-1">{activeEditionName}</div>
             <div className="mt-3 flex items-center justify-between">
               <span className="text-xs text-slate-400">Jornada</span>
-              <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-300/20 text-emerald-200">
+              <span className={`text-xs px-2 py-1 rounded-full ${isWcMode ? 'bg-amber-500/20 border border-amber-300/20 text-amber-200' : 'bg-emerald-500/20 border border-emerald-300/20 text-emerald-200'}`}>
                 {activeEditionMatchday}
               </span>
             </div>
@@ -1420,9 +1470,9 @@ export default function DashboardPage() {
             </Button>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+          <div className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-400/25 bg-amber-950/35' : 'border-white/10 bg-slate-950/35'}`}>
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Mail className="h-4 w-4 text-emerald-200" />
+              <Mail className={`h-4 w-4 ${isWcMode ? 'text-amber-300' : 'text-emerald-200'}`} />
               Próxima Deadline
             </div>
             <div className="text-xs text-slate-300 mt-2">
@@ -1432,7 +1482,7 @@ export default function DashboardPage() {
                   ? `J${nextDeadline.matchdayNumber} · ${formatDeadline(nextDeadline.firstKickoff)}`
                   : formatDeadline(nextDeadline?.firstKickoff ?? null)}
             </div>
-            <div className="mt-4 text-xs text-emerald-200/95 bg-emerald-500/10 border border-emerald-300/20 rounded-lg px-3 py-2">
+            <div className={`mt-4 text-xs rounded-lg px-3 py-2 ${isWcMode ? 'text-amber-200/95 bg-amber-500/10 border border-amber-300/20' : 'text-emerald-200/95 bg-emerald-500/10 border border-emerald-300/20'}`}>
               ¡Haz tu pick antes del primer partido!
             </div>
           </div>
@@ -1543,7 +1593,7 @@ export default function DashboardPage() {
                       ¡Juega la versión MUNDIAL!
                     </div>
                     <div className="text-xs sm:text-sm text-amber-300/60 mt-1">
-                      Picks diarios · Grupos · Eliminatorias · Pick Gana o No pierde
+                      Picks diarios · Grupos · Eliminatorias · Pick Gana o Empata
                     </div>
                   </div>
 
@@ -1558,7 +1608,7 @@ export default function DashboardPage() {
             );
           })()}
 
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-950/55 to-slate-950/20 shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden">
+          <div className={`rounded-3xl border shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden bg-gradient-to-b ${isWcMode ? 'border-amber-500/15 from-amber-950/45 to-amber-950/10' : 'border-white/10 from-slate-950/55 to-slate-950/20'}`}>
             <div className="p-6 border-b border-white/10">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -1604,7 +1654,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
                     <div className="text-xs text-slate-300">Cuenta atrás</div>
-                    <div className="text-sm font-semibold mt-1 text-emerald-200">
+                    <div className={`text-sm font-semibold mt-1 ${isWcMode ? 'text-amber-200' : 'text-emerald-200'}`}>
                       {nextDeadlineLoading ? 'Cargando...' : formatCountdown(nextDeadline?.firstKickoff ?? null)}
                     </div>
                   </div>
@@ -1673,16 +1723,25 @@ export default function DashboardPage() {
                       )}
 
                       <div className="mt-4 flex gap-3">
-                        <Button onClick={() => router.push(`/edition/${activeEditionId}/standings`)} className="flex-1">
+                        <Button
+                          onClick={() => router.push(
+                            isWcMode
+                              ? `/world-cup/${activeEditionId}`
+                              : `/edition/${activeEditionId}/standings`
+                          )}
+                          className="flex-1"
+                        >
                           Abrir edición
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => router.push(`/edition/${activeEditionId}/standings`)}
-                        >
-                          Clasificación
-                        </Button>
+                        {!isWcMode && (
+                          <Button
+                            variant="outline"
+                            onClick={() => router.push(`/edition/${activeEditionId}/standings`)}
+                          >
+                            Clasificación
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -1820,9 +1879,7 @@ export default function DashboardPage() {
                       <Card
                         key={c.id}
                         className="rounded-2xl border border-white/10 bg-white/5 text-white cursor-pointer hover:bg-white/10 transition-colors"
-                        onClick={() =>
-                          latestEdition?.id ? router.push(`/edition/${latestEdition.id}/standings`) : router.push(`/championship/${c.id}`)
-                        }
+                        onClick={() => router.push(getChampionshipHref(c))}
                       >
                         <CardHeader className="pb-2">
                           <div className="flex items-start justify-between gap-3">
@@ -1931,7 +1988,11 @@ export default function DashboardPage() {
                                   variant="outline"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (latestEdition.id) router.push(`/edition/${latestEdition.id}/standings`);
+                                    if (latestEdition.id) router.push(
+                                      c.mode === 'WORLD_CUP'
+                                        ? `/world-cup/${latestEdition.id}`
+                                        : `/edition/${latestEdition.id}/standings`
+                                    );
                                   }}
                                 >
                                   Abrir edición
@@ -1956,7 +2017,9 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-100">Ranking de la Liga</div>
               <Link
-                href={activeEditionId ? `/edition/${activeEditionId}/standings` : '/dashboard'}
+                href={activeEditionId
+                  ? (isWcMode ? `/world-cup/${activeEditionId}` : `/edition/${activeEditionId}/standings`)
+                  : '/dashboard'}
                 className="text-slate-200/80 hover:text-white"
               >
                 <BarChart3 className="h-4 w-4" />

@@ -61,6 +61,20 @@ export class NotificationsScheduler {
           // EC-33: Skip if already picked
           if (participant.picks.length > 0) continue;
 
+          // Skip if reminder already sent for this edition+matchday combo
+          const alreadySent = await this.prisma.notification.findFirst({
+            where: {
+              userId: participant.userId,
+              type: 'PICK_REMINDER',
+              AND: [
+                { payload: { path: ['editionId'], equals: edition.id } },
+                { payload: { path: ['matchdayNumber'], equals: matchday.number } },
+              ],
+            },
+            select: { id: true },
+          });
+          if (alreadySent) continue;
+
           const minutesLeft = Math.round(
             (matchday.firstKickoff!.getTime() - now.getTime()) / 60000,
           );
