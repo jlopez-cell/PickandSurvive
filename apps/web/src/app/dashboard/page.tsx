@@ -1070,7 +1070,7 @@ export default function DashboardPage() {
                   <img
                     src="/Logo_WorldCup.png"
                     alt="Pick & Survive"
-                    className="w-3/4 max-w-[220px] mx-auto block py-3 object-contain"
+                    className="w-3/4 max-w-[220px] mx-auto block object-contain"
                   />
                   <div className="p-3">
                     <div className="text-sm font-semibold text-slate-100">Próxima deadline</div>
