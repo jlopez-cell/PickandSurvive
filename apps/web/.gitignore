@@ -1,0 +1,7 @@
+# Next.js
+.next/
+out/
+
+# Capacitor native projects (generated — run `cap add android/ios` to regenerate)
+android/
+ios/
