@@ -10,23 +10,32 @@ const WC_SEASON = 2026;
 export class WcPicksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Matchday de hoy para el Mundial ────────────────────────────────────────
-  private async getTodayMatchday(leagueId: string) {
+  // ── Jornada actual o próxima del Mundial ───────────────────────────────────
+  // Retorna la jornada de hoy si hay partidos hoy, o la siguiente jornada
+  // con partidos futuros (para permitir picks antes de que empiece el torneo).
+  private async getCurrentMatchday(leagueId: string) {
     const now = new Date();
     const todayStart = new Date(now);
     todayStart.setUTCHours(0, 0, 0, 0);
     const todayEnd = new Date(now);
     todayEnd.setUTCHours(23, 59, 59, 999);
 
+    const today = await this.prisma.matchday.findFirst({
+      where: {
+        leagueId,
+        season: WC_SEASON,
+        matches: { some: { kickoffTime: { gte: todayStart, lte: todayEnd } } },
+      },
+      orderBy: { number: 'asc' },
+    });
+    if (today) return today;
+
+    // Próxima jornada con partidos futuros
     return this.prisma.matchday.findFirst({
       where: {
         leagueId,
         season: WC_SEASON,
-        matches: {
-          some: {
-            kickoffTime: { gte: todayStart, lte: todayEnd },
-          },
-        },
+        matches: { some: { kickoffTime: { gt: now } } },
       },
       orderBy: { number: 'asc' },
     });
@@ -34,7 +43,7 @@ export class WcPicksService {
 
   // ── GET /wc/editions/:id/today ─────────────────────────────────────────────
   // Devuelve: matchday actual, partidos de hoy con contexto de grupo, pick actual
-  async getTodayContext(userId: string, editionId: string) {
+  async getTodayContext(userId: string, editionId: string, matchdayNumber?: number) {
     const edition = await this.prisma.edition.findUnique({
       where: { id: editionId },
       include: {
@@ -56,10 +65,15 @@ export class WcPicksService {
     });
     if (!participant) throw new ForbiddenException('No eres participante de esta edición');
 
-    const matchday = await this.getTodayMatchday(league.id);
+    const matchday = matchdayNumber
+      ? await this.prisma.matchday.findFirst({
+          where: { leagueId: league.id, season: WC_SEASON, number: matchdayNumber },
+        })
+      : await this.getCurrentMatchday(league.id);
 
     if (!matchday) {
       return {
+        championshipName: edition.championship.name,
         matchday: null,
         matches: [],
         myPick: null,
@@ -95,7 +109,21 @@ export class WcPicksService {
     const deadline = matchday.firstKickoff ?? matches[0]?.kickoffTime ?? null;
     const deadlinePassed = deadline ? new Date() >= deadline : false;
 
+    const [prev, next] = await Promise.all([
+      this.prisma.matchday.findFirst({
+        where: { leagueId: league.id, season: WC_SEASON, number: { lt: matchday.number } },
+        orderBy: { number: 'desc' },
+        select: { number: true },
+      }),
+      this.prisma.matchday.findFirst({
+        where: { leagueId: league.id, season: WC_SEASON, number: { gt: matchday.number } },
+        orderBy: { number: 'asc' },
+        select: { number: true },
+      }),
+    ]);
+
     return {
+      championshipName: edition.championship.name,
       matchday: {
         id: matchday.id,
         number: matchday.number,
@@ -104,6 +132,8 @@ export class WcPicksService {
         wcGroupDay: matchday.wcGroupDay,
         firstKickoff: deadline,
         deadlinePassed,
+        prevNumber: prev?.number ?? null,
+        nextNumber: next?.number ?? null,
       },
       matches: matches.map((m) => ({
         id: m.id,
@@ -161,20 +191,55 @@ export class WcPicksService {
       orderBy: { name: 'asc' },
     });
 
-    return groups.map((g) => ({
-      name: g.name,
-      standings: g.standings.map((s) => ({
-        position: s.position,
-        team: s.team,
-        played: s.played,
-        won: s.won,
-        drawn: s.drawn,
-        lost: s.lost,
-        goalsFor: s.goalsFor,
-        goalsAgainst: s.goalsAgainst,
-        points: s.points,
-      })),
-    }));
+    // Standings exist — return them as-is
+    if (groups.length > 0) {
+      return groups.map((g) => ({
+        name: g.name,
+        standings: g.standings.map((s) => ({
+          position: s.position,
+          team: s.team,
+          played: s.played,
+          won: s.won,
+          drawn: s.drawn,
+          lost: s.lost,
+          goalsFor: s.goalsFor,
+          goalsAgainst: s.goalsAgainst,
+          points: s.points,
+        })),
+      }));
+    }
+
+    // No standings yet (pre-tournament) — derive groups from match data
+    const matches = await this.prisma.match.findMany({
+      where: {
+        matchday: { leagueId: league.id, season: WC_SEASON },
+        wcGroup: { not: null },
+      },
+      include: {
+        homeTeam: { select: { id: true, name: true, logoUrl: true } },
+        awayTeam: { select: { id: true, name: true, logoUrl: true } },
+      },
+    });
+
+    const groupMap = new Map<string, Map<string, { id: string; name: string; logoUrl: string }>>();
+    for (const m of matches) {
+      if (!m.wcGroup) continue;
+      if (!groupMap.has(m.wcGroup)) groupMap.set(m.wcGroup, new Map());
+      const gTeams = groupMap.get(m.wcGroup)!;
+      gTeams.set(m.homeTeam.id, m.homeTeam);
+      gTeams.set(m.awayTeam.id, m.awayTeam);
+    }
+
+    return [...groupMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, teamsMap]) => ({
+        name,
+        standings: [...teamsMap.values()].sort((a, b) => a.name.localeCompare(b.name)).map((team, i) => ({
+          position: i + 1,
+          team,
+          played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0,
+        })),
+      }));
   }
 
   // ── GET /wc/editions/:id/participants ──────────────────────────────────────

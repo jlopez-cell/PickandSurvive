@@ -8,7 +8,8 @@ export class CreateChampionshipDto {
 
   @IsString()
   @IsNotEmpty()
-  footballLeagueId: string;
+  @IsOptional()
+  footballLeagueId?: string;
 
   @IsEnum(ChampionshipMode)
   mode: ChampionshipMode;

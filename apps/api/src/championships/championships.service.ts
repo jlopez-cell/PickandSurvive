@@ -46,15 +46,35 @@ export class ChampionshipsService {
   // ─── Campeonatos ───────────────────────────────────────────────────────────
 
   async createChampionship(userId: string, dto: CreateChampionshipDto) {
-    const league = await this.prisma.footballLeague.findUnique({
-      where: { id: dto.footballLeagueId },
-    });
-    if (!league) throw new NotFoundException('Liga no encontrada');
+    let footballLeagueId: string;
+
+    if (dto.mode === ChampionshipMode.WORLD_CUP) {
+      const existing = await this.prisma.footballLeague.findUnique({
+        where: { apiFootballId: 2000 },
+      });
+      const wcLeague = existing ?? (await this.prisma.footballLeague.create({
+        data: {
+          name: 'FIFA World Cup',
+          country: 'World',
+          apiFootballId: 2000,
+          totalMatchdaysPerSeason: 64,
+          currentSeason: 2026,
+        },
+      }));
+      footballLeagueId = wcLeague.id;
+    } else {
+      if (!dto.footballLeagueId) throw new BadRequestException('La liga es obligatoria');
+      const league = await this.prisma.footballLeague.findUnique({
+        where: { id: dto.footballLeagueId },
+      });
+      if (!league) throw new NotFoundException('Liga no encontrada');
+      footballLeagueId = league.id;
+    }
 
     return this.prisma.championship.create({
       data: {
         name: dto.name,
-        footballLeagueId: dto.footballLeagueId,
+        footballLeagueId,
         mode: dto.mode,
         pickResetAtMidseason: dto.pickResetAtMidseason ?? false,
         creatorId: userId,
