@@ -16,8 +16,8 @@ const FEATURES = [
   },
   {
     icon: <Shield className="w-5 h-5" />,
-    title: 'Gana o No pierde',
-    desc: 'Elige si tu equipo tiene que ganar, o con empatar te salva.',
+    title: 'Gana o Empata',
+    desc: 'Elige si tu equipo tiene que ganar, o apostás al empate.',
   },
   {
     icon: <Users className="w-5 h-5" />,

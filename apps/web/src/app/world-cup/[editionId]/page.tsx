@@ -25,6 +25,7 @@ type WcMatch = {
 type MyPick = { id: string; status: string; pickType: 'WIN' | 'WIN_OR_DRAW'; team: Team | null };
 
 type TodayContext = {
+  championshipName: string;
   matchday: {
     id: string;
     number: number;
@@ -33,6 +34,8 @@ type TodayContext = {
     wcGroupDay: number | null;
     firstKickoff: string | null;
     deadlinePassed: boolean;
+    prevNumber: number | null;
+    nextNumber: number | null;
   } | null;
   matches: WcMatch[];
   myPick: MyPick | null;
@@ -42,36 +45,38 @@ type TodayContext = {
 type GroupStanding = {
   position: number;
   team: Team;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  points: number;
+  played: number; won: number; drawn: number; lost: number;
+  goalsFor: number; goalsAgainst: number; points: number;
 };
 
-type Group = { name: string; standings: GroupStanding[] };
+type Group = { name: string; standings: GroupStanding[] }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+type Participant = {
+  alias: string;
+  status: string;
+  eliminatedAtPhase: string | null;
+  lastPick: { team: { name: string; logoUrl: string }; pickStatus: string } | null;
+};
+
+// ── Constants ──────────────────────────────────────────────────────────────
 
 const PHASE_LABELS: Record<string, string> = {
-  GROUP_STAGE:    'Fase de Grupos',
-  ROUND_OF_32:   'Octavos de Final',
-  ROUND_OF_16:   'Dieciseisavos',
+  GROUP_STAGE:     'Fase de Grupos',
+  ROUND_OF_32:    'Ronda de 32',
+  ROUND_OF_16:    'Octavos de Final',
   QUARTER_FINALS: 'Cuartos de Final',
-  SEMI_FINALS:   'Semifinales',
-  THIRD_PLACE:   'Tercer Puesto',
-  FINAL:         'Final',
+  SEMI_FINALS:    'Semifinales',
+  THIRD_PLACE:    'Tercer Puesto',
+  FINAL:          'Gran Final',
 };
 
-const PICK_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  SURVIVED:          { label: 'Sobreviviste', color: 'text-emerald-400', icon: <CheckCircle2 className="w-4 h-4" /> },
-  DRAW_ELIMINATED:   { label: 'Eliminado (empate)', color: 'text-red-400', icon: <XCircle className="w-4 h-4" /> },
-  LOSS_ELIMINATED:   { label: 'Eliminado (derrota)', color: 'text-red-400', icon: <XCircle className="w-4 h-4" /> },
-  NO_PICK_ELIMINATED:{ label: 'Sin pick (eliminado)', color: 'text-red-400', icon: <XCircle className="w-4 h-4" /> },
-  PENDING:           { label: 'Pendiente', color: 'text-amber-400', icon: <Clock className="w-4 h-4" /> },
-  POSTPONED_PENDING: { label: 'Aplazado', color: 'text-blue-400', icon: <AlertCircle className="w-4 h-4" /> },
+const PICK_STATUS_CONFIG: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+  SURVIVED:           { label: 'Sobreviviste', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  DRAW_ELIMINATED:    { label: 'Eliminado · empate', cls: 'text-red-400 bg-red-500/10 border-red-500/25', icon: <XCircle className="w-3.5 h-3.5" /> },
+  LOSS_ELIMINATED:    { label: 'Eliminado · derrota', cls: 'text-red-400 bg-red-500/10 border-red-500/25', icon: <XCircle className="w-3.5 h-3.5" /> },
+  NO_PICK_ELIMINATED: { label: 'Sin pick · eliminado', cls: 'text-red-400 bg-red-500/10 border-red-500/25', icon: <XCircle className="w-3.5 h-3.5" /> },
+  PENDING:            { label: 'Pendiente', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/25', icon: <Clock className="w-3.5 h-3.5" /> },
+  POSTPONED_PENDING:  { label: 'Aplazado', cls: 'text-sky-400 bg-sky-500/10 border-sky-500/25', icon: <AlertCircle className="w-3.5 h-3.5" /> },
 };
 
 function formatKickoff(iso: string | null) {
@@ -85,10 +90,65 @@ function formatCountdown(iso: string | null): string {
   if (diff <= 0) return 'Cerrado';
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const s = Math.floor((diff % 60000) / 1000);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── GroupTable ─────────────────────────────────────────────────────────────
+
+function GroupTable({ group }: { group: Group }) {
+  const hasStats = group.standings.some((s) => s.played > 0);
+  return (
+    <div className="overflow-hidden rounded-xl border border-white/10">
+      <div className="px-3 py-2.5 bg-gradient-to-r from-amber-500/20 to-transparent border-b border-white/8 flex items-center justify-between">
+        <span className="text-xs font-black tracking-widest uppercase text-amber-400">
+          Grupo {group.name}
+        </span>
+        {hasStats && (
+          <div className="flex gap-2 text-[10px] font-bold text-white/30 uppercase tracking-wider">
+            <span>J</span><span>G</span><span>E</span><span>P</span>
+            <span className="text-amber-400/60">Pts</span>
+          </div>
+        )}
+      </div>
+      {group.standings.map((s, i) => {
+        const qualifies = hasStats && i < 2;
+        return (
+          <div
+            key={s.team.id}
+            className={`flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0 transition-colors
+              ${qualifies ? 'bg-emerald-500/5' : ''}`}
+          >
+            <span className={`w-4 text-[11px] font-black shrink-0 ${qualifies ? 'text-emerald-400' : 'text-white/20'}`}>
+              {s.position}
+            </span>
+            <img src={s.team.logoUrl} alt={s.team.name} className="w-5 h-5 object-contain shrink-0" />
+            <span className="flex-1 text-xs font-semibold truncate text-white/80">{s.team.name}</span>
+            {hasStats && (
+              <div className="flex gap-2 text-[11px] text-white/35 font-medium">
+                <span className="w-4 text-center">{s.played}</span>
+                <span className="w-4 text-center">{s.won}</span>
+                <span className="w-4 text-center">{s.drawn}</span>
+                <span className="w-4 text-center">{s.lost}</span>
+                <span className="w-5 text-center font-black text-amber-400">{s.points}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {hasStats && (
+        <div className="px-3 py-1.5 flex items-center gap-1.5 bg-black/20">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="text-[10px] text-white/25">Clasifican top 2</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 
 export default function WcPickPage() {
   const { editionId } = useParams<{ editionId: string }>();
@@ -98,29 +158,41 @@ export default function WcPickPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState<string | null>(null);
-  const [pickingType, setPickingType] = useState<'WIN' | 'WIN_OR_DRAW'>('WIN');
   const [countdown, setCountdown] = useState('');
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores'>('picks');
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantsFetched, setParticipantsFetched] = useState(false);
+  const [selectedMatchday, setSelectedMatchday] = useState<number | null>(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (matchdayNum?: number) => {
+    const mdParam = matchdayNum ? `?matchday=${matchdayNum}` : '';
     const [todayRes, groupsRes] = await Promise.all([
-      fetch(`/api/wc/editions/${editionId}/today`),
+      fetch(`/api/wc/editions/${editionId}/today${mdParam}`),
       fetch(`/api/wc/editions/${editionId}/groups`),
     ]);
-    if (todayRes.ok) setCtx(await todayRes.json());
-    if (groupsRes.ok) setGroups(await groupsRes.json());
+    if (todayRes.ok) {
+      const data = await todayRes.json();
+      setCtx(data);
+    }
+    if (groupsRes.ok) {
+      const data = await groupsRes.json();
+      setGroups(data);
+      if (data.length > 0) setActiveGroup((prev) => prev ?? data[0].name);
+    }
     setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editionId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
     if (!ctx?.matchday?.firstKickoff) return;
-    const interval = setInterval(() => {
-      setCountdown(formatCountdown(ctx.matchday!.firstKickoff));
-    }, 10000);
+    const id = setInterval(() => setCountdown(formatCountdown(ctx.matchday!.firstKickoff)), 1000);
     setCountdown(formatCountdown(ctx.matchday.firstKickoff));
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, [ctx?.matchday?.firstKickoff]);
 
   async function handlePick(teamId: string, pickType: 'WIN' | 'WIN_OR_DRAW') {
@@ -132,13 +204,37 @@ export default function WcPickPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teamId, matchdayNumber: ctx.matchday.number, pickType }),
       });
-      if (res.ok) await loadData();
-    } finally {
-      setPicking(null);
-    }
+      if (res.ok) {
+        setSelectedTeamId(null);
+        await loadData(selectedMatchday ?? undefined);
+      }
+    } finally { setPicking(null); }
   }
 
-  // Grupos únicos con partidos de hoy
+  function handleMatchdayNav(direction: 'prev' | 'next') {
+    const target = direction === 'prev'
+      ? ctx?.matchday?.prevNumber ?? null
+      : ctx?.matchday?.nextNumber ?? null;
+    if (target === null) return;
+    setSelectedMatchday(target);
+    setSelectedTeamId(null);
+    loadData(target);
+  }
+
+  function handleSelectTeam(teamId: string) {
+    setSelectedTeamId((prev) => (prev === teamId ? null : teamId));
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'jugadores' || participantsFetched) return;
+    setParticipantsLoading(true);
+    fetch(`/api/wc/editions/${editionId}/participants`)
+      .then((r) => r.json())
+      .then((data) => { setParticipants(Array.isArray(data) ? data : []); setParticipantsFetched(true); })
+      .catch(() => setParticipantsFetched(true))
+      .finally(() => setParticipantsLoading(false));
+  }, [activeTab, editionId, participantsFetched]);
+
   const matchesByGroup = ctx?.matches.reduce<Record<string, WcMatch[]>>((acc, m) => {
     const key = m.wcGroup ?? m.tournamentPhase ?? 'knockout';
     (acc[key] ??= []).push(m);
@@ -148,193 +244,380 @@ export default function WcPickPage() {
   const isEliminated = ctx?.participant.status === 'ELIMINATED';
   const phase = ctx?.matchday?.tournamentPhase;
   const isGroupStage = phase === 'GROUP_STAGE';
+  const activeGroupData = groups.find((g) => g.name === activeGroup) ?? null;
+
+  // ── Loading ────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-3">
-          <Trophy className="w-12 h-12 text-[hsl(var(--wc-gold))] mx-auto animate-pulse" />
-          <p className="text-muted-foreground">Cargando Mundial 2026...</p>
+      <div className="flex items-center justify-center min-h-screen bg-[#0d0b08]">
+        <div className="text-center space-y-5">
+          <Trophy className="w-16 h-16 mx-auto text-amber-400 drop-shadow-[0_0_24px_rgba(251,191,36,0.6)] animate-pulse" />
+          <p className="text-xs font-black tracking-[0.4em] uppercase text-white/30">Cargando Mundial…</p>
         </div>
       </div>
     );
   }
 
+  // ── Page ───────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen">
-      {/* Hero header */}
-      <header className="relative overflow-hidden border-b border-[hsl(var(--wc-gold))]/20">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-950/80 via-red-950/60 to-stone-950/90" />
-        <div className="absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, hsl(43,96%,56%) 0, hsl(43,96%,56%) 1px, transparent 0, transparent 50%)', backgroundSize: '20px 20px' }} />
+    <div className="min-h-screen bg-[#0d0b08]">
+
+      {/* ══ HERO HEADER ═══════════════════════════════════════════════════ */}
+      <header className="relative overflow-hidden">
+        {/* Layered backgrounds */}
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/70 via-stone-950/95 to-[#0d0b08]" />
+        {/* Stadium spotlight from top */}
+        <div
+          className="absolute inset-0"
+          style={{ background: 'radial-gradient(ellipse 70% 55% at 50% -10%, rgba(217,119,6,0.25) 0%, transparent 65%)' }}
+        />
+        {/* Diamond grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: 'repeating-linear-gradient(45deg,#f59e0b 0,#f59e0b 1px,transparent 0,transparent 50%)',
+            backgroundSize: '22px 22px',
+          }}
+        />
+        {/* Bottom fade line */}
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
 
         <div className="relative max-w-6xl mx-auto px-4">
-          {/* Nav bar */}
-          <div className="h-12 flex items-center justify-between">
-            <button onClick={() => router.push('/dashboard')} className="text-amber-300/60 hover:text-amber-300 transition-colors flex items-center gap-1 text-sm">
-              <ChevronLeft className="w-4 h-4" /> Volver
+          {/* Nav */}
+          <div className="h-13 flex items-center justify-between py-3">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center gap-1.5 text-sm font-semibold text-amber-400/50 hover:text-amber-400 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" /> Dashboard
             </button>
-            <button onClick={() => router.push(`/world-cup/${editionId}/participants`)} className="text-amber-300/60 hover:text-amber-300 transition-colors">
+            <div className="hidden sm:flex flex-col items-center gap-0.5">
+              <span className="text-[10px] font-black tracking-[0.45em] uppercase text-amber-500/30">
+                FIFA WORLD CUP
+              </span>
+              {ctx?.championshipName && (
+                <span className="text-[11px] font-bold text-amber-300/60 truncate max-w-[180px]">
+                  {ctx.championshipName}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setActiveTab('jugadores')}
+              className="text-amber-400/50 hover:text-amber-400 transition-colors"
+            >
               <Users className="w-5 h-5" />
             </button>
           </div>
 
           {/* Hero content */}
-          <div className="pb-6 pt-2 flex flex-col items-center text-center gap-3">
-            <Trophy className="w-12 h-12 text-[hsl(var(--wc-gold))] drop-shadow-[0_0_12px_hsl(43,96%,56%,0.6)]" />
+          <div className="pb-9 pt-4 flex flex-col items-center text-center gap-4">
+
+            {/* Trophy with glow */}
+            <div className="relative">
+              <div className="absolute inset-0 scale-150 blur-2xl bg-amber-400/15 rounded-full" />
+              <Trophy
+                className="relative w-16 h-16 sm:w-20 sm:h-20 text-amber-400 drop-shadow-[0_0_24px_rgba(251,191,36,0.7)]"
+              />
+            </div>
+
+            {/* Title */}
             <div>
-              <h1 className="text-3xl font-black tracking-widest uppercase"
-                style={{ color: 'hsl(43,96%,56%)', textShadow: '0 0 30px hsl(43,96%,56%,0.4), 0 2px 4px rgba(0,0,0,0.8)' }}>
+              <h1
+                className="text-5xl sm:text-6xl font-black uppercase tracking-tight text-amber-400"
+                style={{ textShadow: '0 0 50px rgba(251,191,36,0.5), 0 0 100px rgba(251,191,36,0.2), 0 3px 10px rgba(0,0,0,0.9)' }}
+              >
                 World Cup
               </h1>
-              <p className="text-amber-200/50 text-xs tracking-[0.3em] uppercase font-semibold mt-0.5">
-                USA · México · Canadá 2026
+              <p className="text-xs font-bold tracking-[0.35em] uppercase text-amber-300/40 mt-1.5">
+                🇺🇸 USA · 🇲🇽 México · 🇨🇦 Canadá · 2026
               </p>
             </div>
-            {phase && (
-              <span className="text-xs font-bold px-3 py-1 rounded-full border border-[hsl(var(--wc-gold))]/40 text-[hsl(var(--wc-gold))] bg-[hsl(var(--wc-gold))]/10 tracking-wider uppercase">
+
+            {/* Phase / date badge */}
+            {phase ? (
+              <span className="text-xs font-black px-4 py-1.5 rounded-full border border-amber-500/35 text-amber-400 bg-amber-500/10 tracking-widest uppercase">
                 {PHASE_LABELS[phase] ?? phase}
               </span>
+            ) : (
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-500/20 text-amber-300/50 bg-amber-500/5 tracking-wider">
+                11 Jun – 19 Jul 2026
+              </span>
+            )}
+
+            {/* Deadline pill */}
+            {ctx?.matchday && (
+              <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full text-sm border
+                ${ctx.matchday.deadlinePassed
+                  ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                  : 'border-amber-500/25 bg-amber-500/8 text-white/70'}`}
+              >
+                {ctx.matchday.deadlinePassed ? (
+                  <>
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span className="font-bold text-red-400">Plazo cerrado</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      Deadline: <strong className="text-white">{formatKickoff(ctx.matchday.firstKickoff)}</strong>
+                    </span>
+                    {countdown && (
+                      <span className="ml-1 font-black font-mono text-amber-400 tabular-nums">{countdown}</span>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Matchday navigation */}
+            {ctx?.matchday && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleMatchdayNav('prev')}
+                  disabled={ctx.matchday!.prevNumber === null}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black transition-all
+                    border border-amber-500/25 text-amber-400/60
+                    hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/45
+                    disabled:opacity-20 disabled:cursor-not-allowed"
+                >
+                  ‹
+                </button>
+                <span className="text-xs font-black tracking-widest uppercase text-amber-400/60 min-w-[4rem] text-center">
+                  J{ctx.matchday!.number}
+                </span>
+                <button
+                  onClick={() => handleMatchdayNav('next')}
+                  disabled={ctx.matchday!.nextNumber === null}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black transition-all
+                    border border-amber-500/25 text-amber-400/60
+                    hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/45
+                    disabled:opacity-20 disabled:cursor-not-allowed"
+                >
+                  ›
+                </button>
+              </div>
             )}
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-4 sm:gap-6">
+      {/* ══ TAB NAV ════════════════════════════════════════════════════════ */}
+      <div className="border-b border-amber-500/15">
+        <div className="max-w-6xl mx-auto px-4 flex">
+          {(['picks', 'jugadores'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-3 text-[11px] font-black uppercase tracking-widest transition-all border-b-2
+                ${activeTab === tab
+                  ? 'border-amber-400 text-amber-400'
+                  : 'border-transparent text-white/30 hover:text-white/55'}`}
+            >
+              {tab === 'picks' ? '⚽ Picks' : '👥 Jugadores'}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* ── Main column ── */}
-        <div className="space-y-6">
+      {/* ══ CONTENT ════════════════════════════════════════════════════════ */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-[1fr_290px] xl:grid-cols-[1fr_310px] gap-6 sm:gap-8">
 
-          {/* Estado del participante */}
-          {isEliminated && (
-            <div className="flex items-center gap-3 p-4 rounded-xl border border-red-500/30 bg-red-500/10">
+        {/* ── LEFT COLUMN ─────────────────────────────────────────────── */}
+        <div className="space-y-5">
+
+          {/* Eliminated */}
+          {activeTab === 'picks' && isEliminated && (
+            <div className="flex items-center gap-3 p-4 rounded-2xl border border-red-500/25 bg-red-500/8">
               <XCircle className="w-5 h-5 text-red-400 shrink-0" />
               <div>
-                <p className="font-semibold text-red-300 text-sm">Estás eliminado</p>
+                <p className="font-bold text-red-300 text-sm">Has sido eliminado</p>
                 {ctx?.participant.eliminatedAtPhase && (
-                  <p className="text-xs text-red-400/70">{PHASE_LABELS[ctx.participant.eliminatedAtPhase] ?? ctx.participant.eliminatedAtPhase}</p>
+                  <p className="text-xs text-red-400/50 mt-0.5">
+                    en {PHASE_LABELS[ctx.participant.eliminatedAtPhase] ?? ctx.participant.eliminatedAtPhase}
+                  </p>
                 )}
               </div>
             </div>
           )}
 
-          {/* Sin partidos hoy */}
-          {!ctx?.matchday && (
-            <div className="text-center py-16 space-y-3">
-              <Trophy className="w-10 h-10 text-[hsl(var(--wc-gold))]/40 mx-auto" />
-              <p className="text-muted-foreground text-sm">No hay partidos programados para hoy.</p>
+          {/* ── NO DATA FOR NAVIGATED MATCHDAY ── */}
+          {activeTab === 'picks' && selectedMatchday !== null && !ctx?.matchday && (
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <span className="text-4xl font-black text-white/10">J{selectedMatchday}</span>
+              <p className="text-sm text-white/30">No hay partidos disponibles para esta jornada.</p>
+              <p className="text-xs text-white/20">Puede que aún no esté sincronizada. Intentá con otra.</p>
             </div>
           )}
 
-          {/* Tu pick del día */}
-          {ctx?.myPick && (
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">Tu pick de hoy</p>
-              <div className="flex items-center gap-4">
-                {ctx.myPick.team ? (
-                  <>
-                    <img src={ctx.myPick.team.logoUrl} alt={ctx.myPick.team.name} className="w-12 h-12 object-contain" />
-                    <div className="flex-1">
-                      <p className="font-bold">{ctx.myPick.team.name}</p>
-                      <div className="flex items-center gap-2 flex-wrap mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${ctx.myPick.pickType === 'WIN_OR_DRAW' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
-                          {ctx.myPick.pickType === 'WIN_OR_DRAW' ? 'No pierde' : 'Gana'}
-                        </span>
-                        {(() => {
-                          const cfg = PICK_STATUS_CONFIG[ctx.myPick!.status];
-                          return cfg ? (
-                            <span className={`flex items-center gap-1 text-xs ${cfg.color}`}>
-                              {cfg.icon} {cfg.label}
-                            </span>
-                          ) : null;
-                        })()}
+          {/* ── PRE-TOURNAMENT COUNTDOWN ── */}
+          {activeTab === 'picks' && selectedMatchday === null && !ctx?.matchday && (() => {
+            const wcStart = new Date('2026-06-11T00:00:00Z');
+            const msLeft = wcStart.getTime() - Date.now();
+            const daysLeft = Math.ceil(msLeft / 86400000);
+            const isBefore = msLeft > 0;
+            return (
+              <div className="relative overflow-hidden rounded-3xl p-8 sm:p-10 text-center border border-amber-500/15 bg-gradient-to-br from-amber-950/40 via-stone-900/30 to-[#0d0b08]">
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 0%, rgba(217,119,6,0.15) 0%, transparent 65%)' }}
+                />
+                <div className="relative space-y-6">
+                  <div className="space-y-2">
+                    <Trophy className="w-14 h-14 mx-auto text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.5)]" />
+                    <p className="text-[11px] font-black tracking-[0.4em] uppercase text-amber-400/40">
+                      FIFA World Cup 2026
+                    </p>
+                  </div>
+                  {isBefore ? (
+                    <div className="space-y-3">
+                      <div
+                        className="text-8xl sm:text-9xl font-black font-mono leading-none text-amber-400"
+                        style={{ textShadow: '0 0 60px rgba(251,191,36,0.45)' }}
+                      >
+                        {daysLeft}
                       </div>
+                      <p className="text-lg font-bold tracking-widest uppercase text-amber-300/50">
+                        {daysLeft === 1 ? 'día' : 'días'} para el pitido inicial
+                      </p>
+                      <div className="flex justify-center gap-5 text-sm text-white/40">
+                        <span>🇺🇸 USA</span>
+                        <span>🇲🇽 México</span>
+                        <span>🇨🇦 Canadá</span>
+                      </div>
+                      <p className="text-xs text-white/25 pt-1">
+                        Primer partido: <span className="text-white/50 font-semibold">11 Jun 2026</span>
+                        {' · '}Podrás hacer tu pick ese día antes del primer partido.
+                      </p>
                     </div>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">Sin equipo asignado</p>
-                )}
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-white/70 font-semibold">No hay partidos hoy</p>
+                      <p className="text-sm text-white/35">Volvé mañana para los próximos partidos.</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
-          {/* Deadline */}
-          {ctx?.matchday && !ctx.matchday.deadlinePassed && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="w-4 h-4 text-[hsl(var(--wc-gold))]" />
-              <span>Deadline: primer partido a las <strong className="text-foreground">{formatKickoff(ctx.matchday.firstKickoff)}</strong></span>
-              {countdown && (
-                <span className="ml-auto font-mono text-[hsl(var(--wc-gold))] font-bold">{countdown}</span>
-              )}
-            </div>
-          )}
-          {ctx?.matchday?.deadlinePassed && (
-            <div className="flex items-center gap-2 text-sm text-red-400">
-              <AlertCircle className="w-4 h-4" />
-              <span>El plazo de hoy ya cerró</span>
-            </div>
-          )}
+          {/* ── MY PICK ── */}
+          {activeTab === 'picks' && ctx?.myPick?.team && (() => {
+            const cfg = PICK_STATUS_CONFIG[ctx.myPick!.status];
+            return (
+              <div className="flex items-center gap-4 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+                <div className="w-14 h-14 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shrink-0">
+                  <img src={ctx.myPick.team.logoUrl} alt={ctx.myPick.team.name} className="w-10 h-10 object-contain" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-black tracking-widest uppercase text-amber-400/50 mb-1">Tu pick de hoy</p>
+                  <p className="font-bold text-sm truncate text-white">{ctx.myPick.team.name}</p>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border
+                      ${ctx.myPick.pickType === 'WIN_OR_DRAW'
+                        ? 'text-sky-400 bg-sky-500/10 border-sky-500/25'
+                        : 'text-amber-400 bg-amber-500/10 border-amber-500/25'}`}
+                    >
+                      {ctx.myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
+                    </span>
+                    {cfg && (
+                      <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
+                        {cfg.icon} {cfg.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
-          {/* Partidos por grupo */}
-          {Object.entries(matchesByGroup).map(([groupKey, gMatches]) => (
+          {/* ── MATCH CARDS ── */}
+          {activeTab === 'picks' && Object.entries(matchesByGroup).map(([groupKey, gMatches]) => (
             <div key={groupKey} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--wc-gold))]">
+
+              {/* Group section header */}
+              <div className="flex items-center gap-3 pt-1">
+                <div className="w-0.5 h-5 rounded-full bg-gradient-to-b from-amber-400 to-transparent shrink-0" />
+                <span className="text-xs font-black tracking-widest uppercase text-amber-400">
                   {isGroupStage ? `Grupo ${groupKey}` : (PHASE_LABELS[groupKey] ?? groupKey)}
                 </span>
-                <div className="flex-1 h-px bg-border" />
+                <div className="flex-1 h-px bg-amber-500/15" />
               </div>
 
               {gMatches.map((m) => {
                 const deadlinePassed = ctx?.matchday?.deadlinePassed ?? true;
-                const canPick = !deadlinePassed && !isEliminated && ctx?.myPick == null;
+                const canPick = !deadlinePassed && !isEliminated;
                 const isMyPickHome = ctx?.myPick?.team?.id === m.homeTeam.id;
                 const isMyPickAway = ctx?.myPick?.team?.id === m.awayTeam.id;
+                const hasMyPick = isMyPickHome || isMyPickAway;
 
                 return (
-                  <div key={m.id} className="rounded-xl border border-border bg-card p-3 sm:p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs text-muted-foreground">{formatKickoff(m.kickoffTime)}</span>
+                  <div
+                    key={m.id}
+                    className={`rounded-2xl overflow-hidden transition-all
+                      ${hasMyPick
+                        ? 'border border-amber-500/40 bg-gradient-to-br from-amber-950/30 to-stone-900/80 shadow-[0_0_30px_rgba(217,119,6,0.1)]'
+                        : 'border border-white/8 bg-gradient-to-br from-stone-900/60 to-neutral-900/80'}`}
+                  >
+                    {/* Match meta */}
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/6">
+                      <span className="font-mono text-xs text-white/35">{formatKickoff(m.kickoffTime)}</span>
                       {m.status === 'LIVE' && (
-                        <span className="text-xs font-bold text-emerald-400 animate-pulse">EN VIVO</span>
+                        <span className="flex items-center gap-1.5 text-xs font-black text-red-400">
+                          <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+                          EN VIVO
+                        </span>
                       )}
                       {m.status === 'FINISHED' && (
-                        <span className="text-xs text-muted-foreground">FIN</span>
+                        <span className="text-[11px] font-bold text-white/25 tracking-widest">FINALIZADO</span>
+                      )}
+                      {m.status !== 'LIVE' && m.status !== 'FINISHED' && (
+                        <span className="text-[10px] text-amber-400/30 font-bold tracking-wider uppercase">
+                          {isGroupStage ? `GRP ${m.wcGroup ?? ''}` : (PHASE_LABELS[m.tournamentPhase ?? ''] ?? '')}
+                        </span>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 sm:gap-3">
-                      {/* Home team */}
-                      <TeamPickCard
-                        team={m.homeTeam}
-                        used={m.homeUsed}
+                    {/* Teams + score */}
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5 px-4 py-5">
+                      <TeamSection
+                        team={m.homeTeam} used={m.homeUsed}
                         isMyPick={isMyPickHome}
                         myPickType={isMyPickHome ? ctx?.myPick?.pickType : undefined}
                         canPick={canPick && !m.homeUsed}
+                        isSelected={selectedTeamId === m.homeTeam.id}
+                        isOtherSelected={selectedTeamId !== null && selectedTeamId !== m.homeTeam.id}
+                        onSelect={() => handleSelectTeam(m.homeTeam.id)}
                         loadingWin={picking === `${m.homeTeam.id}-WIN`}
                         loadingDraw={picking === `${m.homeTeam.id}-WIN_OR_DRAW`}
                         onPickWin={() => handlePick(m.homeTeam.id, 'WIN')}
                         onPickDraw={() => handlePick(m.homeTeam.id, 'WIN_OR_DRAW')}
+                        align="left"
                       />
 
                       {/* Score / VS */}
-                      <div className="text-center shrink-0 w-10 sm:w-14">
+                      <div className="text-center shrink-0 min-w-[2.5rem]">
                         {m.status === 'FINISHED' || m.status === 'LIVE' ? (
-                          <span className="text-base sm:text-lg font-bold font-mono">
+                          <span className={`text-2xl sm:text-3xl font-black font-mono
+                            ${m.status === 'LIVE' ? 'text-red-400' : 'text-white'}`}
+                          >
                             {m.homeScore ?? 0}–{m.awayScore ?? 0}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground text-xs sm:text-sm font-medium">VS</span>
+                          <span className="text-sm font-black text-white/15 tracking-widest">VS</span>
                         )}
                       </div>
 
-                      {/* Away team */}
-                      <TeamPickCard
-                        team={m.awayTeam}
-                        used={m.awayUsed}
+                      <TeamSection
+                        team={m.awayTeam} used={m.awayUsed}
                         isMyPick={isMyPickAway}
                         myPickType={isMyPickAway ? ctx?.myPick?.pickType : undefined}
                         canPick={canPick && !m.awayUsed}
+                        isSelected={selectedTeamId === m.awayTeam.id}
+                        isOtherSelected={selectedTeamId !== null && selectedTeamId !== m.awayTeam.id}
+                        onSelect={() => handleSelectTeam(m.awayTeam.id)}
                         loadingWin={picking === `${m.awayTeam.id}-WIN`}
                         loadingDraw={picking === `${m.awayTeam.id}-WIN_OR_DRAW`}
                         onPickWin={() => handlePick(m.awayTeam.id, 'WIN')}
@@ -342,77 +625,87 @@ export default function WcPickPage() {
                         align="right"
                       />
                     </div>
+
+                    {/* Gold bottom bar when picked */}
+                    {hasMyPick && (
+                      <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+                    )}
                   </div>
                 );
               })}
             </div>
           ))}
+
+          {/* ── JUGADORES TAB ─────────────────────────────────────────── */}
+          {activeTab === 'jugadores' && (
+            <ParticipantsList participants={participants} loading={participantsLoading} phaseLabels={PHASE_LABELS} />
+          )}
+
+          {/* ── GRUPOS MOBILE ─────────────────────────────────────────── */}
+          {activeTab === 'picks' && groups.length > 0 && (
+            <div className="lg:hidden space-y-4 pt-3">
+              {/* Section title */}
+              <div className="flex items-center gap-3">
+                <div className="w-0.5 h-5 rounded-full bg-gradient-to-b from-amber-400 to-transparent shrink-0" />
+                <span className="text-xs font-black tracking-widest uppercase text-amber-400">
+                  {isGroupStage ? 'Clasificación' : 'Equipos por grupo'}
+                </span>
+                <div className="flex-1 h-px bg-amber-500/15" />
+              </div>
+
+              {/* Scrollable group tabs */}
+              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {groups.map((g) => (
+                  <button
+                    key={g.name}
+                    onClick={() => setActiveGroup(activeGroup === g.name ? null : g.name)}
+                    className={`shrink-0 w-11 h-11 rounded-xl text-sm font-black transition-all
+                      ${activeGroup === g.name
+                        ? 'bg-amber-400 text-black shadow-[0_0_16px_rgba(251,191,36,0.4)]'
+                        : 'bg-white/5 text-amber-400/60 border border-amber-500/15 hover:bg-white/8'}`}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Active group table */}
+              {activeGroupData && <GroupTable group={activeGroupData} />}
+            </div>
+          )}
         </div>
 
-        {/* ── Sidebar: Group standings ── */}
-        {isGroupStage && groups.length > 0 && (
-          <aside className="space-y-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clasificación</p>
+        {/* ── DESKTOP SIDEBAR ──────────────────────────────────────────── */}
+        {groups.length > 0 && (
+          <aside className="hidden lg:flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-0.5 h-4 rounded-full bg-gradient-to-b from-amber-400 to-transparent shrink-0" />
+              <span className="text-xs font-black tracking-widest uppercase text-amber-400">
+                {isGroupStage ? 'Clasificación' : 'Grupos'}
+              </span>
+            </div>
 
             {/* Group tabs */}
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {groups.map((g) => (
                 <button
                   key={g.name}
                   onClick={() => setActiveGroup(activeGroup === g.name ? null : g.name)}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-md border transition-colors
+                  className={`w-9 h-9 rounded-lg text-xs font-black transition-all
                     ${activeGroup === g.name
-                      ? 'bg-[hsl(var(--wc-gold))] text-background border-[hsl(var(--wc-gold))]'
-                      : 'border-border text-muted-foreground hover:text-foreground'}`}
+                      ? 'bg-amber-400 text-black shadow-[0_0_14px_rgba(251,191,36,0.35)]'
+                      : 'bg-white/5 text-amber-400/55 border border-amber-500/12 hover:bg-white/8'}`}
                 >
                   {g.name}
                 </button>
               ))}
             </div>
 
-            {/* Standing table */}
-            {(activeGroup ? groups.filter((g) => g.name === activeGroup) : groups.slice(0, 3)).map((g) => (
-              <div key={g.name} className="rounded-xl border border-border bg-card overflow-hidden">
-                <div className="px-3 py-2 bg-card border-b border-border flex items-center gap-2">
-                  <span className="text-xs font-bold text-[hsl(var(--wc-gold))]">Grupo {g.name}</span>
-                </div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-muted-foreground border-b border-border">
-                      <th className="text-left px-3 py-1.5 font-medium">Equipo</th>
-                      <th className="px-1.5 py-1.5 font-medium">J</th>
-                      <th className="px-1.5 py-1.5 font-medium">G</th>
-                      <th className="px-1.5 py-1.5 font-medium">E</th>
-                      <th className="px-1.5 py-1.5 font-medium">P</th>
-                      <th className="px-2 py-1.5 font-bold text-[hsl(var(--wc-gold))]">Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.standings.map((s, i) => (
-                      <tr key={s.team.id} className={`border-b border-border/50 ${i < 2 ? 'bg-emerald-500/5' : ''}`}>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-3">{s.position}</span>
-                            <img src={s.team.logoUrl} alt={s.team.name} className="w-4 h-4 object-contain" />
-                            <span className="truncate max-w-[90px]">{s.team.name}</span>
-                          </div>
-                        </td>
-                        <td className="text-center px-1.5 py-2 text-muted-foreground">{s.played}</td>
-                        <td className="text-center px-1.5 py-2 text-muted-foreground">{s.won}</td>
-                        <td className="text-center px-1.5 py-2 text-muted-foreground">{s.drawn}</td>
-                        <td className="text-center px-1.5 py-2 text-muted-foreground">{s.lost}</td>
-                        <td className="text-center px-2 py-2 font-bold text-[hsl(var(--wc-gold))]">{s.points}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {g.standings.length > 0 && (
-                  <p className="px-3 py-1.5 text-[10px] text-muted-foreground/60">
-                    🟢 Clasifican los 2 primeros
-                  </p>
-                )}
-              </div>
-            ))}
+            {/* Table */}
+            {activeGroupData
+              ? <GroupTable group={activeGroupData} />
+              : groups.slice(0, 4).map((g) => <GroupTable key={g.name} group={g} />)
+            }
           </aside>
         )}
       </div>
@@ -420,78 +713,253 @@ export default function WcPickPage() {
   );
 }
 
-// ── TeamPickCard ───────────────────────────────────────────────────────────
+// ── ParticipantsList ───────────────────────────────────────────────────────
 
-function TeamPickCard({
-  team,
-  used,
-  isMyPick,
-  myPickType,
-  canPick,
-  loadingWin,
-  loadingDraw,
-  onPickWin,
-  onPickDraw,
-  align = 'left',
-}: {
-  team: Team;
-  used: boolean;
-  isMyPick: boolean;
-  myPickType?: 'WIN' | 'WIN_OR_DRAW';
-  canPick: boolean;
-  loadingWin: boolean;
-  loadingDraw: boolean;
-  onPickWin: () => void;
-  onPickDraw: () => void;
-  align?: 'left' | 'right';
+const PARTICIPANT_PICK_STATUS: Record<string, { label: string; cls: string }> = {
+  SURVIVED:           { label: 'Sobrevivió', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+  DRAW_ELIMINATED:    { label: 'Eliminado · empate', cls: 'text-red-400 bg-red-500/10 border-red-500/25' },
+  LOSS_ELIMINATED:    { label: 'Eliminado · derrota', cls: 'text-red-400 bg-red-500/10 border-red-500/25' },
+  NO_PICK_ELIMINATED: { label: 'Sin pick', cls: 'text-red-400 bg-red-500/10 border-red-500/25' },
+  PENDING:            { label: 'Pendiente', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/25' },
+  POSTPONED_PENDING:  { label: 'Aplazado', cls: 'text-sky-400 bg-sky-500/10 border-sky-500/25' },
+};
+
+function ParticipantsList({ participants, loading, phaseLabels }: {
+  participants: Participant[];
+  loading: boolean;
+  phaseLabels: Record<string, string>;
 }) {
-  const isRight = align === 'right';
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-white/30 text-xs font-black tracking-widest uppercase">
+        Cargando jugadores…
+      </div>
+    );
+  }
 
-  return (
-    <div className={`flex flex-col gap-2 flex-1 min-w-0 ${isRight ? 'items-end' : 'items-start'}`}>
-      {/* Logo + nombre */}
-      <div className={`flex items-center gap-1.5 sm:gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
-        <img
-          src={team.logoUrl}
-          alt={team.name}
-          className={`w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0 transition-all ${used && !isMyPick ? 'grayscale opacity-40' : ''}`}
-        />
-        <span className={`text-xs sm:text-sm font-semibold leading-tight truncate max-w-[60px] sm:max-w-[90px] ${isRight ? 'text-right' : 'text-left'}`}>
-          {team.name}
+  const alive = participants.filter((p) => p.status !== 'ELIMINATED');
+  const eliminated = participants.filter((p) => p.status === 'ELIMINATED');
+
+  const renderRow = (p: Participant, i: number) => {
+    const pickSt = p.lastPick?.pickStatus ? PARTICIPANT_PICK_STATUS[p.lastPick.pickStatus] : null;
+    return (
+      <div
+        key={p.alias}
+        className={`flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 transition-colors
+          ${p.status === 'ELIMINATED' ? 'opacity-50' : ''}`}
+      >
+        <span className="w-5 text-[11px] font-black text-white/20 shrink-0 text-right">{i + 1}</span>
+        <div className="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+          <span className="text-xs font-black text-amber-400">{p.alias[0]?.toUpperCase()}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-bold text-white/90 truncate block">{p.alias}</span>
+          {p.status === 'ELIMINATED' && p.eliminatedAtPhase && (
+            <span className="text-[10px] text-red-400/50">
+              {phaseLabels[p.eliminatedAtPhase] ?? p.eliminatedAtPhase}
+            </span>
+          )}
+        </div>
+        {p.lastPick?.team && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <img src={p.lastPick.team.logoUrl} alt={p.lastPick.team.name} className="w-5 h-5 object-contain" />
+            {pickSt && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${pickSt.cls}`}>
+                {pickSt.label}
+              </span>
+            )}
+          </div>
+        )}
+        <span className={`shrink-0 text-[10px] font-black px-2.5 py-1 rounded-full border
+          ${p.status === 'ELIMINATED'
+            ? 'text-red-400/60 bg-red-500/8 border-red-500/20'
+            : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'}`}
+        >
+          {p.status === 'ELIMINATED' ? '✕' : '✓'}
         </span>
       </div>
+    );
+  };
 
-      {/* Estado / botones */}
-      {isMyPick ? (
-        <div className={`flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
-          <span className="flex items-center gap-1 text-[11px] font-bold text-[hsl(var(--wc-gold))]">
-            <Shield className="w-3 h-3" /> Tu pick
-          </span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${myPickType === 'WIN_OR_DRAW' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'}`}>
-            {myPickType === 'WIN_OR_DRAW' ? 'No pierde' : 'Gana'}
-          </span>
+  return (
+    <div className="space-y-4">
+      {alive.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-0.5 h-5 rounded-full bg-gradient-to-b from-emerald-400 to-transparent shrink-0" />
+            <span className="text-xs font-black tracking-widest uppercase text-emerald-400">
+              En pie · {alive.length}
+            </span>
+            <div className="flex-1 h-px bg-emerald-500/15" />
+          </div>
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            {alive.map((p, i) => renderRow(p, i))}
+          </div>
         </div>
+      )}
+      {eliminated.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-0.5 h-5 rounded-full bg-gradient-to-b from-red-400 to-transparent shrink-0" />
+            <span className="text-xs font-black tracking-widest uppercase text-red-400/70">
+              Eliminados · {eliminated.length}
+            </span>
+            <div className="flex-1 h-px bg-red-500/10" />
+          </div>
+          <div className="overflow-hidden rounded-xl border border-white/8">
+            {eliminated.map((p, i) => renderRow(p, i))}
+          </div>
+        </div>
+      )}
+      {participants.length === 0 && (
+        <div className="text-center py-10 text-white/25 text-sm">
+          No hay jugadores en esta edición todavía.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TeamSection ────────────────────────────────────────────────────────────
+
+function TeamSection({
+  team, used, isMyPick, myPickType, canPick,
+  isSelected, isOtherSelected, onSelect,
+  loadingWin, loadingDraw, onPickWin, onPickDraw, align,
+}: {
+  team: Team; used: boolean; isMyPick: boolean;
+  myPickType?: 'WIN' | 'WIN_OR_DRAW'; canPick: boolean;
+  isSelected: boolean; isOtherSelected: boolean; onSelect: () => void;
+  loadingWin: boolean; loadingDraw: boolean;
+  onPickWin: () => void; onPickDraw: () => void;
+  align: 'left' | 'right';
+}) {
+  const isRight = align === 'right';
+  const clickable = canPick && !used;
+  const dimmed = (used && !isMyPick) || (isOtherSelected && !isSelected);
+
+  return (
+    <div className={`flex flex-col gap-2.5 min-w-0 transition-opacity ${dimmed ? 'opacity-35' : 'opacity-100'} ${isRight ? 'items-end' : 'items-start'}`}>
+
+      {/* Logo + name — clickable to select when canPick */}
+      <button
+        type="button"
+        disabled={!clickable}
+        onClick={clickable ? onSelect : undefined}
+        className={`flex items-center gap-2 sm:gap-2.5 rounded-xl transition-all
+          ${isRight ? 'flex-row-reverse' : ''}
+          ${clickable ? 'cursor-pointer active:scale-95' : 'cursor-default pointer-events-none'}`}
+      >
+        <div className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all
+          ${isMyPick
+            ? 'bg-amber-500/15 shadow-[0_0_20px_rgba(251,191,36,0.35),inset_0_0_0_1.5px_rgba(251,191,36,0.5)]'
+            : isSelected
+              ? 'bg-sky-500/15 shadow-[0_0_18px_rgba(14,165,233,0.35),inset_0_0_0_1.5px_rgba(14,165,233,0.5)]'
+              : used
+                ? 'bg-white/3'
+                : 'bg-white/5 hover:bg-white/10'}`}
+        >
+          <img
+            src={team.logoUrl}
+            alt={team.name}
+            className={`w-8 h-8 sm:w-10 sm:h-10 object-contain transition-all ${used && !isMyPick ? 'grayscale' : ''}`}
+          />
+          {/* Tap-to-select hint ring */}
+          {clickable && !isSelected && (
+            <span className="absolute inset-0 rounded-xl ring-1 ring-white/10 group-hover:ring-amber-400/30 transition-all" />
+          )}
+        </div>
+        <span className={`text-xs sm:text-sm font-bold leading-tight max-w-[60px] sm:max-w-[85px]
+          ${isRight ? 'text-right' : 'text-left'}
+          ${used && !isMyPick ? 'text-white/20' : isSelected ? 'text-sky-200' : 'text-white/90'}`}
+          style={{ wordBreak: 'break-word' }}
+        >
+          {team.name}
+        </span>
+      </button>
+
+      {/* Status / pick actions */}
+      {isMyPick ? (
+        isSelected && canPick ? (
+          // Step 2 for own pick: change pick type
+          <div className={`flex flex-col gap-1.5 ${isRight ? 'items-end' : 'items-start'}`}>
+            <button
+              onClick={onPickWin}
+              disabled={loadingWin || loadingDraw}
+              className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
+                text-amber-400 bg-amber-500/15 border border-amber-500/35
+                hover:bg-amber-500/25 hover:border-amber-500/55 active:scale-95"
+            >
+              {loadingWin ? '…' : '🏆 Gana'}
+            </button>
+            <button
+              onClick={onPickDraw}
+              disabled={loadingWin || loadingDraw}
+              className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
+                text-sky-400 bg-sky-500/12 border border-sky-500/30
+                hover:bg-sky-500/22 hover:border-sky-500/50 active:scale-95"
+            >
+              {loadingDraw ? '…' : '🤝 Empata'}
+            </button>
+            <button onClick={onSelect} className="text-[10px] text-white/25 hover:text-white/50 transition-colors mt-0.5">
+              ✕ cancelar
+            </button>
+          </div>
+        ) : (
+          <div className={`flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
+            <span className="flex items-center gap-1 text-[11px] font-black text-amber-400">
+              <Shield className="w-3 h-3" /> Tu pick
+            </span>
+            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold
+              ${myPickType === 'WIN_OR_DRAW'
+                ? 'text-sky-400 bg-sky-500/15'
+                : 'text-amber-400 bg-amber-500/15'}`}
+            >
+              {myPickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
+            </span>
+            {canPick && (
+              <button
+                onClick={onSelect}
+                className="text-[10px] text-white/25 hover:text-amber-400/60 transition-colors mt-0.5 font-semibold"
+              >
+                Cambiar tipo
+              </button>
+            )}
+          </div>
+        )
       ) : used ? (
-        <span className="text-[10px] text-muted-foreground/40">Ya usado</span>
-      ) : canPick ? (
-        <div className={`flex flex-col xs:flex-row gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
+        <span className="text-[10px] font-medium text-white/20">Usado</span>
+      ) : canPick && isSelected ? (
+        // Step 2: team selected → choose pick type
+        <div className={`flex flex-col gap-1.5 ${isRight ? 'items-end' : 'items-start'}`}>
           <button
             onClick={onPickWin}
             disabled={loadingWin || loadingDraw}
-            title="Tu equipo debe ganar"
-            className="text-[10px] sm:text-[11px] px-2 py-1 rounded-full bg-[hsl(var(--wc-gold))]/15 border border-[hsl(var(--wc-gold))]/30 text-[hsl(var(--wc-gold))] hover:bg-[hsl(var(--wc-gold))]/30 transition-colors disabled:opacity-40 font-medium whitespace-nowrap"
+            className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
+              text-amber-400 bg-amber-500/15 border border-amber-500/35
+              hover:bg-amber-500/25 hover:border-amber-500/55 active:scale-95"
           >
             {loadingWin ? '…' : '🏆 Gana'}
           </button>
           <button
             onClick={onPickDraw}
             disabled={loadingWin || loadingDraw}
-            title="Tu equipo puede ganar o empatar"
-            className="text-[10px] sm:text-[11px] px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 transition-colors disabled:opacity-40 font-medium whitespace-nowrap"
+            className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
+              text-sky-400 bg-sky-500/12 border border-sky-500/30
+              hover:bg-sky-500/22 hover:border-sky-500/50 active:scale-95"
           >
-            {loadingDraw ? '…' : '🤝 No pierde'}
+            {loadingDraw ? '…' : '🤝 Empata'}
+          </button>
+          <button
+            onClick={onSelect}
+            className="text-[10px] text-white/25 hover:text-white/50 transition-colors mt-0.5"
+          >
+            ✕ cancelar
           </button>
         </div>
+      ) : canPick && !isOtherSelected ? (
+        // Step 1 hint: tap the team to select it
+        <span className="text-[10px] text-white/20 font-medium">Toca para elegir</span>
       ) : null}
     </div>
   );

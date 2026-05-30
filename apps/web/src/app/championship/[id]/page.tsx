@@ -22,7 +22,7 @@ type Edition = {
 type Championship = {
   id: string;
   name: string;
-  mode: 'TOURNAMENT' | 'LEAGUE';
+  mode: 'TOURNAMENT' | 'LEAGUE' | 'WORLD_CUP';
   adminId: string;
   pickResetAtMidseason: boolean;
   footballLeague: { id: string; name: string; country: string };
@@ -30,7 +30,7 @@ type Championship = {
   admin: { id: string; alias: string };
 };
 
-const MODE_LABEL: Record<string, string> = { TOURNAMENT: 'Torneo', LEAGUE: 'Liga' };
+const MODE_LABEL: Record<string, string> = { TOURNAMENT: 'Torneo', LEAGUE: 'Liga', WORLD_CUP: 'World Cup' };
 const EDITION_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Borrador', OPEN: 'Abierta', ACTIVE: 'Activa', FINISHED: 'Finalizada', CANCELLED: 'Cancelada',
 };
@@ -205,13 +205,16 @@ export default function ChampionshipDetailPage() {
     }
   };
 
+  const isWcMode = championship?.mode === 'WORLD_CUP';
+
   const shellBg = (
     <>
       <div
         className="absolute inset-0 bg-cover bg-center opacity-60"
         style={{ backgroundImage: `url('/dashboard-hero.jpeg')` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/65 to-slate-950/95" />
+      <div className={`absolute inset-0 bg-gradient-to-b ${isWcMode ? 'from-amber-950/85 via-slate-950/65 to-slate-950/95' : 'from-slate-950/90 via-slate-950/65 to-slate-950/95'}`} />
+      {isWcMode && <div className="absolute inset-0 bg-gradient-to-br from-amber-900/30 via-transparent to-amber-900/20 pointer-events-none" />}
     </>
   );
 
@@ -276,7 +279,10 @@ export default function ChampionshipDetailPage() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-slate-50 mb-1">{championship.name}</h1>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className={`text-2xl font-bold ${isWcMode ? 'text-amber-100' : 'text-slate-50'}`}>{championship.name}</h1>
+                {isWcMode && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">WC 2026</span>}
+              </div>
               <p className="text-sm text-slate-300">
                 {championship.footballLeague.name} · {championship.footballLeague.country} ·{' '}
                 {MODE_LABEL[championship.mode]}
@@ -286,8 +292,17 @@ export default function ChampionshipDetailPage() {
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
               {pickEdition && (
-                <Button size="sm" variant="success" onClick={() => router.push(`/edition/${pickEdition.id}`)}>
-                  Elegir pick
+                <Button
+                  size="sm"
+                  variant={isWcMode ? 'outline' : 'success'}
+                  className={isWcMode ? 'border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:text-amber-100' : ''}
+                  onClick={() => router.push(
+                    isWcMode
+                      ? `/world-cup/${pickEdition.id}`
+                      : `/edition/${pickEdition.id}`
+                  )}
+                >
+                  {isWcMode ? '⚽ Elegir pick' : 'Elegir pick'}
                 </Button>
               )}
               {standingsEdition && (
@@ -327,7 +342,7 @@ export default function ChampionshipDetailPage() {
           </div>
 
           {standingsEdition && (
-            <Card className="mb-8 rounded-2xl border-white/10 bg-slate-950/35 text-white md:hidden">
+            <Card className={`mb-8 rounded-2xl text-white md:hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/30' : 'border-white/10 bg-slate-950/35'}`}>
               <CardContent className="py-4 sm:py-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Trophy className="h-5 w-5 text-amber-400 shrink-0" />
@@ -364,7 +379,7 @@ export default function ChampionshipDetailPage() {
           )}
 
           {pickEdition && (
-            <Card className="mb-6 rounded-2xl border-white/10 bg-slate-950/35 text-white md:hidden">
+            <Card className={`mb-6 rounded-2xl text-white md:hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/30' : 'border-white/10 bg-slate-950/35'}`}>
               <CardContent className="py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -414,7 +429,7 @@ export default function ChampionshipDetailPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {championship.editions.map((edition) => (
-                <Card key={edition.id} className="rounded-2xl border-white/10 bg-slate-950/35 text-white">
+                <Card key={edition.id} className={`rounded-2xl text-white ${isWcMode ? 'border-amber-500/20 bg-amber-950/25' : 'border-white/10 bg-slate-950/35'}`}>
                   <CardContent className="py-4 flex justify-between items-center gap-4">
                     <div>
                       <span className="font-semibold text-slate-50 text-sm">
@@ -474,7 +489,11 @@ export default function ChampionshipDetailPage() {
                           size="sm"
                           variant="outline"
                           className={btnOutlineLight}
-                          onClick={() => router.push(`/edition/${edition.id}`)}
+                          onClick={() => router.push(
+                            championship.mode === 'WORLD_CUP'
+                              ? `/world-cup/${edition.id}`
+                              : `/edition/${edition.id}`
+                          )}
                         >
                           Ver →
                         </Button>

@@ -26,6 +26,7 @@ type Match = {
 type Pick = {
   id: string;
   status: string;
+  pickType?: 'WIN' | 'WIN_OR_DRAW';
   team: { id: string; name: string; logoUrl: string } | null;
   participant: { user: { alias: string } };
   matchday: { number: number; status: string };
@@ -60,6 +61,7 @@ export default function EditionPage() {
   const [participantStatusLoading, setParticipantStatusLoading] = useState(false);
   const [matchdayFirstKickoff, setMatchdayFirstKickoff] = useState<string | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 1000 * 30);
@@ -184,7 +186,13 @@ export default function EditionPage() {
     if (!authLoading) run();
   }, [editionId, user?.alias, authLoading]);
 
-  const handlePick = async (teamId: string) => {
+  const handleSelectTeam = (teamId: string) => {
+    setSelectedTeamId((prev) => (prev === teamId ? null : teamId));
+    setError('');
+    setSuccess('');
+  };
+
+  const handlePick = async (teamId: string, pickType: 'WIN' | 'WIN_OR_DRAW') => {
     if (participantEliminated) {
       setError('Estás eliminado de esta edición y no puedes elegir picks.');
       return;
@@ -199,7 +207,7 @@ export default function EditionPage() {
       const res = await fetch(`/api/editions/${editionId}/picks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, matchdayNumber: currentMatchday }),
+        body: JSON.stringify({ teamId, matchdayNumber: currentMatchday, pickType }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -208,6 +216,7 @@ export default function EditionPage() {
         return;
       }
       setSuccess('¡Pick registrado!');
+      setSelectedTeamId(null);
       await loadData(currentMatchday);
     } catch {
       setError('Error de red');
@@ -316,7 +325,14 @@ export default function EditionPage() {
                   <span className="font-semibold text-foreground flex-1">
                     {myPick.team?.name ?? 'Sin pick'}
                   </span>
-                  <Badge variant={PICK_STATUS_BADGE[myPick.status] ?? 'muted'}>{myPick.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    {myPick.pickType && (
+                      <Badge variant="outline" className="text-xs">
+                        {myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
+                      </Badge>
+                    )}
+                    <Badge variant={PICK_STATUS_BADGE[myPick.status] ?? 'muted'}>{myPick.status}</Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -333,16 +349,22 @@ export default function EditionPage() {
               {matches.map((match) => {
                 const homeLocked = match.homeUsed && myPick?.team?.id !== match.homeTeam.id;
                 const awayLocked = match.awayUsed && myPick?.team?.id !== match.awayTeam.id;
+                const canAct = !submitting && !participantEliminated && !deadlinePassed;
+                const isHomeSelected = selectedTeamId === match.homeTeam.id;
+                const isAwaySelected = selectedTeamId === match.awayTeam.id;
+                const someSelected = isHomeSelected || isAwaySelected;
+
                 return (
                 <div
                   key={match.id}
                   className="flex items-stretch justify-between gap-4 bg-card border border-border rounded-xl px-4 py-3"
                 >
+                  {/* ── Home team ── */}
                   <div
                     className={cn(
-                      'flex flex-1 items-center justify-center flex-col rounded-lg px-1 py-1 transition-colors',
-                      homeLocked &&
-                        'bg-muted/50 ring-1 ring-border/80 ring-inset opacity-[0.88]',
+                      'flex flex-1 items-center justify-center flex-col rounded-lg px-1 py-1 transition-all',
+                      homeLocked && 'bg-muted/50 ring-1 ring-border/80 ring-inset opacity-[0.88]',
+                      someSelected && !isHomeSelected && !homeLocked && 'opacity-40',
                     )}
                   >
                     {homeLocked ? (
@@ -354,40 +376,66 @@ export default function EditionPage() {
                       <img
                         src={match.homeTeam.logoUrl}
                         alt={match.homeTeam.name}
-                        className={cn(
-                          'w-10 h-10 object-contain',
-                          homeLocked && 'grayscale contrast-[1.12] opacity-90',
-                        )}
+                        className={cn('w-10 h-10 object-contain', homeLocked && 'grayscale contrast-[1.12] opacity-90')}
                       />
                     )}
-                    <span
-                      className={cn(
-                        'text-xs text-center',
-                        homeLocked ? 'text-muted-foreground' : 'text-foreground',
-                      )}
-                    >
+                    <span className={cn('text-xs text-center mt-1', homeLocked ? 'text-muted-foreground' : 'text-foreground')}>
                       {match.homeTeam.name}
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn('mt-2 w-full', homeLocked && 'opacity-60')}
-                      disabled={
-                        submitting ||
-                        participantEliminated ||
-                        deadlinePassed ||
-                        homeLocked
-                      }
-                      onClick={() => handlePick(match.homeTeam.id)}
-                    >
-                      {myPick?.team?.id === match.homeTeam.id
-                        ? 'Tu pick'
-                        : match.homeUsed
-                          ? 'Usado'
-                          : 'Elegir'}
-                    </Button>
+
+                    {myPick?.team?.id === match.homeTeam.id ? (
+                      /* Already picked this team */
+                      <div className="mt-2 flex flex-col items-center gap-1 w-full">
+                        <span className="text-xs font-semibold text-primary">✓ Tu pick</span>
+                        {canAct && (
+                          <Button size="sm" variant="ghost" className="h-6 text-[11px] text-muted-foreground px-2"
+                            onClick={() => handleSelectTeam(match.homeTeam.id)}>
+                            Cambiar tipo
+                          </Button>
+                        )}
+                        {isHomeSelected && (
+                          <div className="flex flex-col gap-1 w-full mt-1">
+                            <Button size="sm" variant="outline" className="w-full text-xs"
+                              disabled={submitting} onClick={() => handlePick(match.homeTeam.id, 'WIN')}>
+                              🏆 Gana
+                            </Button>
+                            <Button size="sm" variant="outline" className="w-full text-xs"
+                              disabled={submitting} onClick={() => handlePick(match.homeTeam.id, 'WIN_OR_DRAW')}>
+                              🤝 Empata
+                            </Button>
+                            <button className="text-[11px] text-muted-foreground hover:text-foreground mt-0.5"
+                              onClick={() => setSelectedTeamId(null)}>✕ cancelar</button>
+                          </div>
+                        )}
+                      </div>
+                    ) : homeLocked ? (
+                      <span className="mt-2 text-[11px] text-muted-foreground">Usado</span>
+                    ) : canAct ? (
+                      isHomeSelected ? (
+                        /* Step 2: pick type */
+                        <div className="flex flex-col gap-1 w-full mt-2">
+                          <Button size="sm" variant="outline" className="w-full text-xs"
+                            disabled={submitting} onClick={() => handlePick(match.homeTeam.id, 'WIN')}>
+                            🏆 Gana
+                          </Button>
+                          <Button size="sm" variant="outline" className="w-full text-xs"
+                            disabled={submitting} onClick={() => handlePick(match.homeTeam.id, 'WIN_OR_DRAW')}>
+                            🤝 Empata
+                          </Button>
+                          <button className="text-[11px] text-muted-foreground hover:text-foreground mt-0.5"
+                            onClick={() => setSelectedTeamId(null)}>✕ cancelar</button>
+                        </div>
+                      ) : (
+                        /* Step 1: select team */
+                        <Button size="sm" variant="outline" className="mt-2 w-full"
+                          onClick={() => handleSelectTeam(match.homeTeam.id)}>
+                          Elegir
+                        </Button>
+                      )
+                    ) : null}
                   </div>
 
+                  {/* ── VS ── */}
                   <div className="flex flex-col items-center justify-center w-10">
                     <span className="text-muted-foreground font-semibold">VS</span>
                     {match.homeScore !== null && match.awayScore !== null && (
@@ -397,11 +445,12 @@ export default function EditionPage() {
                     )}
                   </div>
 
+                  {/* ── Away team ── */}
                   <div
                     className={cn(
-                      'flex flex-1 items-center justify-center flex-col rounded-lg px-1 py-1 transition-colors',
-                      awayLocked &&
-                        'bg-muted/50 ring-1 ring-border/80 ring-inset opacity-[0.88]',
+                      'flex flex-1 items-center justify-center flex-col rounded-lg px-1 py-1 transition-all',
+                      awayLocked && 'bg-muted/50 ring-1 ring-border/80 ring-inset opacity-[0.88]',
+                      someSelected && !isAwaySelected && !awayLocked && 'opacity-40',
                     )}
                   >
                     {awayLocked ? (
@@ -413,38 +462,63 @@ export default function EditionPage() {
                       <img
                         src={match.awayTeam.logoUrl}
                         alt={match.awayTeam.name}
-                        className={cn(
-                          'w-10 h-10 object-contain',
-                          awayLocked && 'grayscale contrast-[1.12] opacity-90',
-                        )}
+                        className={cn('w-10 h-10 object-contain', awayLocked && 'grayscale contrast-[1.12] opacity-90')}
                       />
                     )}
-                    <span
-                      className={cn(
-                        'text-xs text-center',
-                        awayLocked ? 'text-muted-foreground' : 'text-foreground',
-                      )}
-                    >
+                    <span className={cn('text-xs text-center mt-1', awayLocked ? 'text-muted-foreground' : 'text-foreground')}>
                       {match.awayTeam.name}
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn('mt-2 w-full', awayLocked && 'opacity-60')}
-                      disabled={
-                        submitting ||
-                        participantEliminated ||
-                        deadlinePassed ||
-                        awayLocked
-                      }
-                      onClick={() => handlePick(match.awayTeam.id)}
-                    >
-                      {myPick?.team?.id === match.awayTeam.id
-                        ? 'Tu pick'
-                        : match.awayUsed
-                          ? 'Usado'
-                          : 'Elegir'}
-                    </Button>
+
+                    {myPick?.team?.id === match.awayTeam.id ? (
+                      /* Already picked this team */
+                      <div className="mt-2 flex flex-col items-center gap-1 w-full">
+                        <span className="text-xs font-semibold text-primary">✓ Tu pick</span>
+                        {canAct && (
+                          <Button size="sm" variant="ghost" className="h-6 text-[11px] text-muted-foreground px-2"
+                            onClick={() => handleSelectTeam(match.awayTeam.id)}>
+                            Cambiar tipo
+                          </Button>
+                        )}
+                        {isAwaySelected && (
+                          <div className="flex flex-col gap-1 w-full mt-1">
+                            <Button size="sm" variant="outline" className="w-full text-xs"
+                              disabled={submitting} onClick={() => handlePick(match.awayTeam.id, 'WIN')}>
+                              🏆 Gana
+                            </Button>
+                            <Button size="sm" variant="outline" className="w-full text-xs"
+                              disabled={submitting} onClick={() => handlePick(match.awayTeam.id, 'WIN_OR_DRAW')}>
+                              🤝 Empata
+                            </Button>
+                            <button className="text-[11px] text-muted-foreground hover:text-foreground mt-0.5"
+                              onClick={() => setSelectedTeamId(null)}>✕ cancelar</button>
+                          </div>
+                        )}
+                      </div>
+                    ) : awayLocked ? (
+                      <span className="mt-2 text-[11px] text-muted-foreground">Usado</span>
+                    ) : canAct ? (
+                      isAwaySelected ? (
+                        /* Step 2: pick type */
+                        <div className="flex flex-col gap-1 w-full mt-2">
+                          <Button size="sm" variant="outline" className="w-full text-xs"
+                            disabled={submitting} onClick={() => handlePick(match.awayTeam.id, 'WIN')}>
+                            🏆 Gana
+                          </Button>
+                          <Button size="sm" variant="outline" className="w-full text-xs"
+                            disabled={submitting} onClick={() => handlePick(match.awayTeam.id, 'WIN_OR_DRAW')}>
+                            🤝 Empata
+                          </Button>
+                          <button className="text-[11px] text-muted-foreground hover:text-foreground mt-0.5"
+                            onClick={() => setSelectedTeamId(null)}>✕ cancelar</button>
+                        </div>
+                      ) : (
+                        /* Step 1: select team */
+                        <Button size="sm" variant="outline" className="mt-2 w-full"
+                          onClick={() => handleSelectTeam(match.awayTeam.id)}>
+                          Elegir
+                        </Button>
+                      )
+                    ) : null}
                   </div>
                 </div>
               );

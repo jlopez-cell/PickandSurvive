@@ -31,19 +31,25 @@ export default function NewChampionshipPage() {
       .catch(() => setLeagues([]));
   }, []);
 
+  const isWc = form.mode === 'WORLD_CUP';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.footballLeagueId) {
-      setError('Nombre y liga son obligatorios.');
+    if (!form.name.trim() || (!isWc && !form.footballLeagueId)) {
+      setError(isWc ? 'El nombre es obligatorio.' : 'Nombre y liga son obligatorios.');
       return;
     }
     setLoading(true);
     setError('');
     try {
+      const payload = isWc
+        ? { name: form.name, mode: form.mode }
+        : form;
+
       const res = await fetch('/api/championships', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -82,29 +88,10 @@ export default function NewChampionshipPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>Liga de fútbol</Label>
-              <Select
-                value={form.footballLeagueId}
-                onValueChange={(v) => setForm({ ...form, footballLeagueId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una liga..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {leagues.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name} ({l.country})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
               <Label>Modo de juego</Label>
               <Select
                 value={form.mode}
-                onValueChange={(v) => setForm({ ...form, mode: v })}
+                onValueChange={(v) => setForm({ ...form, mode: v, footballLeagueId: '' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -112,25 +99,55 @@ export default function NewChampionshipPage() {
                 <SelectContent>
                   <SelectItem value="TOURNAMENT">Torneo (supervivencia)</SelectItem>
                   <SelectItem value="LEAGUE">Liga (puntos)</SelectItem>
+                  <SelectItem value="WORLD_CUP">🏆 World Cup 2026</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="flex items-start gap-3 cursor-pointer">
-              <Checkbox
-                id="midseason"
-                checked={form.pickResetAtMidseason}
-                onCheckedChange={(checked) => setForm({ ...form, pickResetAtMidseason: !!checked })}
-              />
-              <div className="flex flex-col gap-0.5">
-                <Label htmlFor="midseason" className="cursor-pointer text-foreground">
-                  Reiniciar picks a media vuelta
-                </Label>
-                <p className="text-xs text-muted-foreground/60">
-                  Permite volver a elegir equipos usados en la primera vuelta
-                </p>
+            {isWc && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                La liga del Mundial se asigna automáticamente. Solo tienes que ponerle nombre al campeonato.
               </div>
-            </div>
+            )}
+
+            {!isWc && (
+              <div className="flex flex-col gap-1.5">
+                <Label>Liga de fútbol</Label>
+                <Select
+                  value={form.footballLeagueId}
+                  onValueChange={(v) => setForm({ ...form, footballLeagueId: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una liga..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leagues.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name} ({l.country})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {!isWc && (
+              <div className="flex items-start gap-3 cursor-pointer">
+                <Checkbox
+                  id="midseason"
+                  checked={form.pickResetAtMidseason}
+                  onCheckedChange={(checked) => setForm({ ...form, pickResetAtMidseason: !!checked })}
+                />
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="midseason" className="cursor-pointer text-foreground">
+                    Reiniciar picks a media vuelta
+                  </Label>
+                  <p className="text-xs text-muted-foreground/60">
+                    Permite volver a elegir equipos usados en la primera vuelta
+                  </p>
+                </div>
+              </div>
+            )}
 
             {error && (
               <Alert variant="destructive">
