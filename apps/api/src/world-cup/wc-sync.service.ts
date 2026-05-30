@@ -174,6 +174,14 @@ export class WcSyncService {
           },
         });
 
+        // Keep firstKickoff as the earliest match of the day (API may not return matches in order)
+        if (!matchday.firstKickoff || kickoff < matchday.firstKickoff) {
+          await this.prisma.matchday.update({
+            where: { id: matchday.id },
+            data: { firstKickoff: kickoff },
+          });
+        }
+
         const homeApiId = WC_API_FOOTBALL_ID * WC_TEAM_ID_FACTOR + m.homeTeam.id;
         const awayApiId = WC_API_FOOTBALL_ID * WC_TEAM_ID_FACTOR + m.awayTeam.id;
         const [home, away] = await Promise.all([

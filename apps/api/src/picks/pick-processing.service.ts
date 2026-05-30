@@ -149,7 +149,11 @@ export class PickProcessingService {
         // Already has a pick
         if (participant.picks.length > 0) continue;
 
-        if (edition.championship.mode === ChampionshipMode.TOURNAMENT) {
+        const isSurvivalMode =
+          edition.championship.mode === ChampionshipMode.TOURNAMENT ||
+          edition.championship.mode === ChampionshipMode.WORLD_CUP;
+
+        if (isSurvivalMode) {
           await this.prisma.$transaction([
             this.prisma.pick.create({
               data: {
@@ -164,6 +168,9 @@ export class PickProcessingService {
               data: {
                 status: ParticipantStatus.ELIMINATED,
                 eliminatedAtMatchday: matchday.number,
+                ...(edition.championship.mode === ChampionshipMode.WORLD_CUP && {
+                  eliminatedAtPhase: matchday.tournamentPhase ?? undefined,
+                }),
               },
             }),
           ]);

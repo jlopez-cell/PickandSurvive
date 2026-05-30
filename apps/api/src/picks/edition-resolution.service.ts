@@ -39,7 +39,7 @@ export class EditionResolutionService {
 
     const mode = edition.championship.mode;
 
-    if (mode === ChampionshipMode.TOURNAMENT) {
+    if (mode === ChampionshipMode.TOURNAMENT || mode === ChampionshipMode.WORLD_CUP) {
       await this.checkTournamentEnd(edition);
     } else {
       await this.checkLeagueEnd(edition);
