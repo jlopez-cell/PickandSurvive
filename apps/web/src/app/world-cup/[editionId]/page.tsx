@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Trophy, Clock, Shield, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users } from 'lucide-react';
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -262,10 +263,10 @@ export default function WcPickPage() {
   // ── Page ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0d0b08]">
+    <div className="min-h-screen bg-[#0d0b08] pb-24 lg:pb-0">
 
       {/* ══ HERO HEADER ═══════════════════════════════════════════════════ */}
-      <header className="relative overflow-hidden">
+      <header className="relative overflow-hidden pt-[env(safe-area-inset-top,0px)]">
         {/* Layered backgrounds */}
         <div className="absolute inset-0 bg-gradient-to-b from-amber-950/70 via-stone-950/95 to-[#0d0b08]" />
         {/* Stadium spotlight from top */}
@@ -709,6 +710,8 @@ export default function WcPickPage() {
           </aside>
         )}
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 }

@@ -758,7 +758,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="relative min-h-screen text-white overflow-hidden">
+    <div className="relative min-h-screen text-white overflow-x-hidden">
       <Suspense fallback={null}>
         <SyncTabFromUrl onTab={setMobileTab} />
       </Suspense>
@@ -1069,7 +1069,7 @@ export default function DashboardPage() {
                   <img
                     src="/Logo_WorldCup.png"
                     alt="Pick & Survive"
-                    className="w-full aspect-square object-contain"
+                    className="w-full h-44 object-contain"
                   />
                   <div className="p-3">
                     <div className="text-sm font-semibold text-slate-100">Próxima deadline</div>
