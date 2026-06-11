@@ -239,18 +239,18 @@ export default function EditionPage() {
       <main className="px-4 pb-24 pt-3 sm:p-6 sm:pt-6">
       <div className="max-w-3xl mx-auto">
         {/* Top bar */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-6 min-w-0">
           <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground shrink-0" onClick={() => router.back()}>
             ← Volver
           </Button>
-          <div className="flex flex-wrap gap-2 ml-auto">
-            <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/standings`)}>
+          <div className="flex gap-1.5 ml-auto overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push(`/edition/${editionId}/standings`)}>
               Clasificación
             </Button>
-            <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/history`)}>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push(`/edition/${editionId}/history`)}>
               Historial
             </Button>
-            <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/all-picks`)}>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push(`/edition/${editionId}/all-picks`)}>
               Picks
             </Button>
           </div>
@@ -270,17 +270,17 @@ export default function EditionPage() {
             <Button
               size="icon"
               variant="outline"
-              className="h-8 w-8"
+              className="h-10 w-10 sm:h-8 sm:w-8"
               onClick={() => setCurrentMatchday((m) => Math.max(1, m - 1))}
               disabled={currentMatchday <= 1}
             >
               ‹
             </Button>
-            <span className="text-sm text-muted-foreground w-6 text-center">J{currentMatchday}</span>
+            <span className="text-sm text-muted-foreground w-8 text-center">J{currentMatchday}</span>
             <Button
               size="icon"
               variant="outline"
-              className="h-8 w-8"
+              className="h-10 w-10 sm:h-8 sm:w-8"
               onClick={() => setCurrentMatchday((m) => m + 1)}
             >
               ›
@@ -357,7 +357,7 @@ export default function EditionPage() {
                 return (
                 <div
                   key={match.id}
-                  className="flex items-stretch justify-between gap-4 bg-card border border-border rounded-xl px-4 py-3"
+                  className="flex items-stretch justify-between gap-2 sm:gap-4 bg-card border border-border rounded-xl px-3 sm:px-4 py-3"
                 >
                   {/* ── Home team ── */}
                   <div
@@ -388,7 +388,7 @@ export default function EditionPage() {
                       <div className="mt-2 flex flex-col items-center gap-1 w-full">
                         <span className="text-xs font-semibold text-primary">✓ Tu pick</span>
                         {canAct && (
-                          <Button size="sm" variant="ghost" className="h-6 text-[11px] text-muted-foreground px-2"
+                          <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground px-2"
                             onClick={() => handleSelectTeam(match.homeTeam.id)}>
                             Cambiar tipo
                           </Button>
@@ -474,7 +474,7 @@ export default function EditionPage() {
                       <div className="mt-2 flex flex-col items-center gap-1 w-full">
                         <span className="text-xs font-semibold text-primary">✓ Tu pick</span>
                         {canAct && (
-                          <Button size="sm" variant="ghost" className="h-6 text-[11px] text-muted-foreground px-2"
+                          <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground px-2"
                             onClick={() => handleSelectTeam(match.awayTeam.id)}>
                             Cambiar tipo
                           </Button>

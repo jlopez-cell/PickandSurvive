@@ -290,12 +290,12 @@ export default function ChampionshipDetailPage() {
               </p>
               <p className="text-xs text-slate-400 mt-1">Admin: @{championship.admin.alias}</p>
             </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2">
               {pickEdition && (
                 <Button
                   size="sm"
                   variant={isWcMode ? 'outline' : 'success'}
-                  className={isWcMode ? 'border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:text-amber-100' : ''}
+                  className={`w-full sm:w-auto ${isWcMode ? 'border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 hover:text-amber-100' : ''}`}
                   onClick={() => router.push(
                     isWcMode
                       ? `/world-cup/${pickEdition.id}`
@@ -309,7 +309,7 @@ export default function ChampionshipDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className={`gap-1.5 md:hidden ${btnOutlineLight}`}
+                  className={`gap-1.5 w-full sm:w-auto md:hidden ${btnOutlineLight}`}
                   onClick={() => router.push(`/edition/${standingsEdition.id}/standings`)}
                 >
                   <Trophy className="h-4 w-4" />
@@ -320,7 +320,7 @@ export default function ChampionshipDetailPage() {
                 <>
                   <Button
                     size="sm"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={() => router.push(`/championship/${id}/invite`)}
                   >
                     Invitaciones
@@ -328,12 +328,12 @@ export default function ChampionshipDetailPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className={btnOutlineLight}
+                    className={`w-full sm:w-auto ${btnOutlineLight}`}
                     onClick={() => router.push(`/championship/${id}/edition/new`)}
                   >
                     + Nueva edición
                   </Button>
-                  <Button size="sm" variant="outline" className={btnOutlineLight} onClick={() => setSettingsOpen(true)}>
+                  <Button size="sm" variant="outline" className={`w-full sm:w-auto ${btnOutlineLight}`} onClick={() => setSettingsOpen(true)}>
                     Ajustes
                   </Button>
                 </>
@@ -430,7 +430,7 @@ export default function ChampionshipDetailPage() {
             <div className="flex flex-col gap-3">
               {championship.editions.map((edition) => (
                 <Card key={edition.id} className={`rounded-2xl text-white ${isWcMode ? 'border-amber-500/20 bg-amber-950/25' : 'border-white/10 bg-slate-950/35'}`}>
-                  <CardContent className="py-4 flex flex-wrap justify-between items-center gap-3">
+                  <CardContent className="py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                     <div className="min-w-0">
                       <span className="font-semibold text-slate-50 text-sm">
                         Jornada {edition.startMatchday}
@@ -442,7 +442,7 @@ export default function ChampionshipDetailPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                       <Badge
                         variant={STATUS_BADGE[edition.status] ?? 'muted'}
                         className="border border-white/10 bg-white/5"
@@ -481,7 +481,7 @@ export default function ChampionshipDetailPage() {
                             onClick={() => handleSyncMembers(edition.id)}
                             disabled={syncingMembers === edition.id}
                           >
-                            {syncingMembers === edition.id ? 'Sincronizando…' : 'Sincronizar jugadores'}
+                            {syncingMembers === edition.id ? 'Sincronizando…' : <><span className="sm:hidden">Sincronizar</span><span className="hidden sm:inline">Sincronizar jugadores</span></>}
                           </Button>
                         )}
                       {(edition.status === 'ACTIVE' || edition.status === 'OPEN') && (
