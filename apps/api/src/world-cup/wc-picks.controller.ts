@@ -38,4 +38,9 @@ export class WcPicksController {
   getParticipants(@Param('editionId') editionId: string) {
     return this.service.getParticipants(editionId);
   }
+
+  @Get('editions/:editionId/history')
+  getHistory(@Param('editionId') editionId: string) {
+    return this.service.getEditionHistory(editionId);
+  }
 }

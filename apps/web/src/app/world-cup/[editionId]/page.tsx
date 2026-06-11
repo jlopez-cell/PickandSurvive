@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Trophy, Clock, Shield, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users } from 'lucide-react';
+import { Trophy, Clock, Shield, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users, History } from 'lucide-react';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -57,6 +57,14 @@ type Participant = {
   status: string;
   eliminatedAtPhase: string | null;
   lastPick: { team: { name: string; logoUrl: string }; pickStatus: string } | null;
+};
+
+type EditionHistoryEntry = {
+  id: string;
+  name: string;
+  finishedAt: string | null;
+  winnerAlias: string | null;
+  participantCount: number;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -162,10 +170,13 @@ export default function WcPickPage() {
   const [countdown, setCountdown] = useState('');
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores'>('picks');
+  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores' | 'historico'>('picks');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [participantsFetched, setParticipantsFetched] = useState(false);
+  const [history, setHistory] = useState<EditionHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFetched, setHistoryFetched] = useState(false);
   const [selectedMatchday, setSelectedMatchday] = useState<number | null>(null);
 
   const loadData = useCallback(async (matchdayNum?: number) => {
@@ -235,6 +246,16 @@ export default function WcPickPage() {
       .catch(() => setParticipantsFetched(true))
       .finally(() => setParticipantsLoading(false));
   }, [activeTab, editionId, participantsFetched]);
+
+  useEffect(() => {
+    if (activeTab !== 'historico' || historyFetched) return;
+    setHistoryLoading(true);
+    fetch(`/api/wc/editions/${editionId}/history`)
+      .then((r) => r.json())
+      .then((data) => { setHistory(Array.isArray(data) ? data : []); setHistoryFetched(true); })
+      .catch(() => setHistoryFetched(true))
+      .finally(() => setHistoryLoading(false));
+  }, [activeTab, editionId, historyFetched]);
 
   const matchesByGroup = ctx?.matches.reduce<Record<string, WcMatch[]>>((acc, m) => {
     const key = m.wcGroup ?? m.tournamentPhase ?? 'knockout';
@@ -408,16 +429,20 @@ export default function WcPickPage() {
       {/* ══ TAB NAV ════════════════════════════════════════════════════════ */}
       <div className="border-b border-amber-500/15">
         <div className="max-w-6xl mx-auto px-4 flex">
-          {(['picks', 'jugadores'] as const).map((tab) => (
+          {([
+            { key: 'picks',     label: '⚽ Picks' },
+            { key: 'jugadores', label: '👥 Jugadores' },
+            { key: 'historico', label: '🏅 Historial' },
+          ] as const).map(({ key, label }) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3 text-[11px] font-black uppercase tracking-widest transition-all border-b-2
-                ${activeTab === tab
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`px-4 sm:px-5 py-3 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap
+                ${activeTab === key
                   ? 'border-amber-400 text-amber-400'
                   : 'border-transparent text-white/30 hover:text-white/55'}`}
             >
-              {tab === 'picks' ? '⚽ Picks' : '👥 Jugadores'}
+              {label}
             </button>
           ))}
         </div>
@@ -642,6 +667,11 @@ export default function WcPickPage() {
             <ParticipantsList participants={participants} loading={participantsLoading} phaseLabels={PHASE_LABELS} />
           )}
 
+          {/* ── HISTORIAL TAB ─────────────────────────────────────────── */}
+          {activeTab === 'historico' && (
+            <EditionHistoryList entries={history} loading={historyLoading} />
+          )}
+
           {/* ── GRUPOS MOBILE ─────────────────────────────────────────── */}
           {activeTab === 'picks' && groups.length > 0 && (
             <div className="lg:hidden space-y-4 pt-3">
@@ -819,6 +849,90 @@ function ParticipantsList({ participants, loading, phaseLabels }: {
           No hay jugadores en esta edición todavía.
         </div>
       )}
+    </div>
+  );
+}
+
+// ── EditionHistoryList ─────────────────────────────────────────────────────
+
+function EditionHistoryList({ entries, loading }: { entries: EditionHistoryEntry[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-white/30 text-xs font-black tracking-widest uppercase">
+        Cargando historial…
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="text-center py-10 text-white/25 text-sm">
+        Todavía no hay ediciones finalizadas en este campeonato.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-0.5 h-5 rounded-full bg-gradient-to-b from-amber-400 to-transparent shrink-0" />
+        <span className="text-xs font-black tracking-widest uppercase text-amber-400">
+          Historial de campeones
+        </span>
+        <div className="flex-1 h-px bg-amber-500/15" />
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-white/10">
+        {entries.map((e, i) => {
+          const date = e.finishedAt
+            ? new Date(e.finishedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '—';
+          const isFirst = i === 0;
+
+          return (
+            <div
+              key={e.id}
+              className={`flex items-center gap-3 px-4 py-3.5 border-b border-white/5 last:border-0
+                ${isFirst ? 'bg-amber-500/5' : ''}`}
+            >
+              {/* Position badge */}
+              <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black
+                ${isFirst
+                  ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                  : 'bg-white/5 text-white/20 border border-white/8'}`}
+              >
+                {entries.length - i}
+              </span>
+
+              {/* Edition name */}
+              <div className="flex-1 min-w-0">
+                <span className={`text-xs font-black uppercase tracking-widest
+                  ${isFirst ? 'text-amber-300' : 'text-white/50'}`}
+                >
+                  {e.name}
+                </span>
+                <div className="text-[10px] text-white/25 mt-0.5">
+                  {e.participantCount} jugadores · {date}
+                </div>
+              </div>
+
+              {/* Winner */}
+              <div className="shrink-0 flex items-center gap-1.5">
+                {e.winnerAlias ? (
+                  <>
+                    <Trophy className={`w-3.5 h-3.5 shrink-0 ${isFirst ? 'text-amber-400' : 'text-white/30'}`} />
+                    <span className={`text-xs font-bold ${isFirst ? 'text-amber-200' : 'text-white/60'}`}>
+                      {e.winnerAlias}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-white/20 italic">Sin ganador</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -242,6 +242,36 @@ export class WcPicksService {
       }));
   }
 
+  // ── GET /wc/editions/:id/history ──────────────────────────────────────────
+  // Historial de ediciones finalizadas del mismo campeonato
+  async getEditionHistory(editionId: string) {
+    const edition = await this.prisma.edition.findUnique({
+      where: { id: editionId },
+      select: { championshipId: true },
+    });
+    if (!edition) throw new NotFoundException('Edición no encontrada');
+
+    const finished = await this.prisma.edition.findMany({
+      where: { championshipId: edition.championshipId, status: 'FINISHED' },
+      select: {
+        id: true,
+        name: true,
+        finishedAt: true,
+        winner: { select: { alias: true } },
+        _count: { select: { participants: true } },
+      },
+      orderBy: { finishedAt: 'desc' },
+    });
+
+    return finished.map((e) => ({
+      id: e.id,
+      name: e.name ?? `edicion_??`,
+      finishedAt: e.finishedAt,
+      winnerAlias: e.winner?.alias ?? null,
+      participantCount: e._count.participants,
+    }));
+  }
+
   // ── GET /wc/editions/:id/participants ──────────────────────────────────────
   // Estado de todos los participantes (para ranking WC)
   async getParticipants(editionId: string) {
