@@ -720,10 +720,9 @@ export default function DashboardPage() {
   }, [championships]);
 
   const wcEditionId = useMemo(() => {
-    if (!isWcMode) return null;
     const wc = championships.find((c) => c.mode === 'WORLD_CUP');
     return wc?.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN')?.id ?? null;
-  }, [championships, isWcMode]);
+  }, [championships]);
 
   const contextualAlerts = useMemo(() => {
     const alerts: { id: string; text: string; tone: 'warning' | 'info' }[] = [];
@@ -1056,7 +1055,7 @@ export default function DashboardPage() {
       )}
 
       <div className="relative z-10 lg:hidden px-4 pb-24 pt-5">
-        <div className={`rounded-3xl border shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/35' : 'border-white/10 bg-slate-950/35'}`}>
+        <div className="rounded-3xl border shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden border-amber-500/20 bg-amber-950/35">
           <div className="p-4 border-b border-white/10">
             <div className="text-xs text-slate-300">Hola,</div>
             <div className="text-lg font-extrabold text-slate-50">@{user?.alias ?? 'usuario'}</div>
@@ -1066,7 +1065,7 @@ export default function DashboardPage() {
           <div className="p-4">
             {mobileTab === 'home' ? (
               <div className="space-y-4">
-                <div className={`rounded-2xl border overflow-hidden ${isWcMode ? 'border-amber-500/20 bg-amber-950/25' : 'border-white/10 bg-slate-950/25'}`}>
+                <div className="rounded-2xl border overflow-hidden border-amber-500/20 bg-amber-950/25">
                   <img
                     src="/Logo_WorldCup.png"
                     alt="Pick & Survive"
@@ -1081,24 +1080,24 @@ export default function DashboardPage() {
                           ? `J${nextDeadline.matchdayNumber} · ${formatDeadline(nextDeadline.firstKickoff)}`
                           : formatDeadline(nextDeadline?.firstKickoff ?? null)}
                     </div>
-                    <div className={`text-xs mt-1 ${isWcMode ? 'text-amber-200' : 'text-emerald-200'}`}>
+                    <div className="text-xs mt-1 text-amber-200">
                       {nextDeadlineLoading ? '—' : formatCountdown(nextDeadline?.firstKickoff ?? null)}
                     </div>
                   </div>
                 </div>
 
                 <Button
-                  className={`w-full h-12 text-base font-extrabold ${isWcMode ? 'bg-amber-500 hover:bg-amber-400 text-black' : 'bg-emerald-500 hover:bg-emerald-500/90 text-slate-950'}`}
+                  className="w-full h-12 text-base font-extrabold bg-amber-500 hover:bg-amber-400 text-black"
                   onClick={() =>
-                    isWcMode && wcEditionId
+                    wcEditionId
                       ? router.push(`/world-cup/${wcEditionId}`)
                       : router.push('/dashboard?tab=leagues')
                   }
                 >
-                  {isWcMode ? '⚽ Ir al Mundial' : 'Elegir pick'}
+                  ⚽ Ir al Mundial
                 </Button>
 
-                {isWcMode && wcEditionId && (
+                {wcEditionId && (
                   <button
                     onClick={() => router.push(`/world-cup/${wcEditionId}`)}
                     className="relative w-full rounded-2xl overflow-hidden text-left"
@@ -1111,12 +1110,12 @@ export default function DashboardPage() {
                         <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">FIFA World Cup 2026</div>
                         <div className="text-sm font-black text-amber-100 leading-tight">¡Hacé tu pick del día!</div>
                       </div>
-                      <span className="ml-auto text-amber-300 text-sm font-bold">→</span>
+                      <span className="ml-auto text-amber-300 text-sm font-bold shrink-0">→</span>
                     </div>
                   </button>
                 )}
 
-                <div className={`rounded-2xl border p-3 ${isWcMode ? 'border-amber-500/15 bg-amber-950/20' : 'border-white/10 bg-slate-950/30'}`}>
+                <div className="rounded-2xl border p-3 border-amber-500/15 bg-amber-950/20">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold text-slate-100">Resumen de campeonatos</div>
                     <Button
@@ -1216,26 +1215,24 @@ export default function DashboardPage() {
 
             {mobileTab === 'leagues' ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-100">Mis ligas</div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                      onClick={() => router.push('/join-code')}
-                    >
-                      Unirme por código
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                      onClick={() => router.push('/championship/new')}
-                    >
-                      + Nueva
-                    </Button>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-semibold text-slate-100 mr-auto">Mis ligas</div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10 shrink-0"
+                    onClick={() => router.push('/join-code')}
+                  >
+                    Unirme por código
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10 shrink-0"
+                    onClick={() => router.push('/championship/new')}
+                  >
+                    + Nueva
+                  </Button>
                 </div>
 
                 {championships.length === 0 ? (

@@ -348,7 +348,7 @@ export default function WcPickPage() {
 
             {/* Deadline pill */}
             {ctx?.matchday && (
-              <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full text-sm border
+              <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full text-sm border max-w-full flex-wrap justify-center
                 ${ctx.matchday.deadlinePassed
                   ? 'border-red-500/30 bg-red-500/10 text-red-400'
                   : 'border-amber-500/25 bg-amber-500/8 text-white/70'}`}
@@ -869,10 +869,9 @@ function TeamSection({
             <span className="absolute inset-0 rounded-xl ring-1 ring-white/10 group-hover:ring-amber-400/30 transition-all" />
           )}
         </div>
-        <span className={`text-xs sm:text-sm font-bold leading-tight max-w-[60px] sm:max-w-[85px]
+        <span className={`text-xs sm:text-sm font-bold leading-tight max-w-[72px] sm:max-w-[95px] break-words
           ${isRight ? 'text-right' : 'text-left'}
           ${used && !isMyPick ? 'text-white/20' : isSelected ? 'text-sky-200' : 'text-white/90'}`}
-          style={{ wordBreak: 'break-word' }}
         >
           {team.name}
         </span>

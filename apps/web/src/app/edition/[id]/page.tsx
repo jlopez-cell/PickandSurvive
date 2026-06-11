@@ -239,11 +239,11 @@ export default function EditionPage() {
       <main className="px-4 pb-24 pt-3 sm:p-6 sm:pt-6">
       <div className="max-w-3xl mx-auto">
         {/* Top bar */}
-        <div className="flex justify-between items-center mb-6">
-          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => router.back()}>
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground shrink-0" onClick={() => router.back()}>
             ← Volver
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 ml-auto">
             <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/standings`)}>
               Clasificación
             </Button>
@@ -251,22 +251,22 @@ export default function EditionPage() {
               Historial
             </Button>
             <Button size="sm" variant="outline" onClick={() => router.push(`/edition/${editionId}/all-picks`)}>
-              Picks de todos
+              Picks
             </Button>
           </div>
         </div>
 
         {/* Matchday header */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Jornada {currentMatchday}</h1>
+        <div className="flex items-center justify-between gap-2 mb-6 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-foreground truncate">Jornada {currentMatchday}</h1>
             {leagueSeason !== null && (
               <p className="text-xs text-muted-foreground/60">
                 Temporada: {leagueSeason}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               size="icon"
               variant="outline"

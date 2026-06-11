@@ -279,11 +279,11 @@ export default function ChampionshipDetailPage() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className={`text-2xl font-bold ${isWcMode ? 'text-amber-100' : 'text-slate-50'}`}>{championship.name}</h1>
-                {isWcMode && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">WC 2026</span>}
+              <div className="flex items-center gap-2 mb-1 min-w-0">
+                <h1 className={`text-2xl font-bold break-words min-w-0 ${isWcMode ? 'text-amber-100' : 'text-slate-50'}`}>{championship.name}</h1>
+                {isWcMode && <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">WC 2026</span>}
               </div>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-slate-300 break-words">
                 {championship.footballLeague.name} · {championship.footballLeague.country} ·{' '}
                 {MODE_LABEL[championship.mode]}
                 {championship.pickResetAtMidseason && ' · Reset media vuelta'}
@@ -430,8 +430,8 @@ export default function ChampionshipDetailPage() {
             <div className="flex flex-col gap-3">
               {championship.editions.map((edition) => (
                 <Card key={edition.id} className={`rounded-2xl text-white ${isWcMode ? 'border-amber-500/20 bg-amber-950/25' : 'border-white/10 bg-slate-950/35'}`}>
-                  <CardContent className="py-4 flex justify-between items-center gap-4">
-                    <div>
+                  <CardContent className="py-4 flex flex-wrap justify-between items-center gap-3">
+                    <div className="min-w-0">
                       <span className="font-semibold text-slate-50 text-sm">
                         Jornada {edition.startMatchday}
                         {edition.endMatchday ? ` → ${edition.endMatchday}` : ''}
@@ -442,7 +442,7 @@ export default function ChampionshipDetailPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <Badge
                         variant={STATUS_BADGE[edition.status] ?? 'muted'}
                         className="border border-white/10 bg-white/5"
