@@ -122,6 +122,7 @@ model User {
   notifications        Notification[]
   notificationPrefs    UserNotificationPrefs?
   potLedgerEntries     PotLedger[]
+  wonEditions          Edition[]      @relation("EditionWinner")
 }
 
 model Championship {
@@ -152,10 +153,13 @@ model Edition {
   status              EditionStatus @default(DRAFT)
   createdAt           DateTime      @default(now())
   finishedAt          DateTime?
+  name                String?
+  winnerUserId        String?
 
   championship Championship  @relation(fields: [championshipId], references: [id])
   participants Participant[]
   potLedger    PotLedger[]
+  winner       User?         @relation("EditionWinner", fields: [winnerUserId], references: [id])
 }
 
 model Participant {

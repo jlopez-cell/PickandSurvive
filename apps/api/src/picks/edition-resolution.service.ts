@@ -49,46 +49,106 @@ export class EditionResolutionService {
   private async checkTournamentEnd(edition: any) {
     const activeParticipants = edition.participants;
 
-    if (activeParticipants.length <= 1) {
-      const winnerIds = activeParticipants.map((p: any) => p.id);
+    if (activeParticipants.length > 1) return;
 
-      await this.prisma.edition.update({
-        where: { id: edition.id },
-        data: { status: EditionStatus.FINISHED, finishedAt: new Date() },
-      });
+    const winnerIds = activeParticipants.map((p: any) => p.id);
+    // Single survivor → winner; 0 survivors → no winner (all eliminated same round)
+    const winnerUserId: string | null =
+      activeParticipants.length === 1 ? activeParticipants[0].userId : null;
 
-      // If no one survived (all eliminated same round) → accumulate pot
-      await this.potDistribution.distribute(edition.id, winnerIds);
+    // Count already-finished editions for sequential naming (before marking this one)
+    const finishedCount = await this.prisma.edition.count({
+      where: { championshipId: edition.championshipId, status: EditionStatus.FINISHED },
+    });
+    const editionName = `edicion_${String(finishedCount + 1).padStart(2, '0')}`;
 
-      // Notify all participants
-      const allParticipants = await this.prisma.participant.findMany({
-        where: { editionId: edition.id },
-        select: { userId: true },
-      });
+    await this.prisma.edition.update({
+      where: { id: edition.id },
+      data: {
+        status: EditionStatus.FINISHED,
+        finishedAt: new Date(),
+        name: editionName,
+        winnerUserId,
+      },
+    });
 
-      for (const p of allParticipants) {
-        await this.prisma.notification.create({
-          data: {
-            userId: p.userId,
-            type: 'EDITION_FINISHED',
-            payload: {
-              editionId: edition.id,
-              winnerParticipantIds: winnerIds,
-            },
+    await this.potDistribution.distribute(edition.id, winnerIds);
+
+    const allParticipants = await this.prisma.participant.findMany({
+      where: { editionId: edition.id },
+      select: { userId: true },
+    });
+
+    for (const p of allParticipants) {
+      await this.prisma.notification.create({
+        data: {
+          userId: p.userId,
+          type: 'EDITION_FINISHED',
+          payload: {
+            editionId: edition.id,
+            editionName,
+            winnerUserId,
+            winnerParticipantIds: winnerIds,
           },
-        });
-      }
+        },
+      });
+    }
 
-      this.logger.log(
-        `Edition ${edition.id} FINISHED (TOURNAMENT). Winners: ${winnerIds.length}`,
+    this.logger.log(
+      `Edition ${edition.id} "${editionName}" FINISHED. Winner: ${winnerUserId ?? 'none'}`,
+    );
+
+    // WORLD_CUP: auto-create next edition so the game continues without admin action
+    if (edition.championship.mode === ChampionshipMode.WORLD_CUP) {
+      await this.createNextWcEdition(
+        edition,
+        allParticipants.map((p) => p.userId),
       );
     }
+  }
+
+  /**
+   * Finds the next unfinished WC matchday and creates an ACTIVE edition with
+   * all participants from the finished one. Admin intervention not required.
+   */
+  private async createNextWcEdition(edition: any, userIds: string[]) {
+    const leagueId = edition.championship.footballLeague.id;
+
+    const nextMatchday = await this.prisma.matchday.findFirst({
+      where: { leagueId, status: { not: MatchdayStatus.FINISHED } },
+      orderBy: { number: 'asc' },
+    });
+
+    if (!nextMatchday) {
+      this.logger.log(
+        `WC championship ${edition.championshipId}: no more matchdays — skipping auto-next edition.`,
+      );
+      return;
+    }
+
+    const newEdition = await this.prisma.edition.create({
+      data: {
+        championshipId: edition.championshipId,
+        startMatchday: nextMatchday.number,
+        status: EditionStatus.ACTIVE,
+      },
+    });
+
+    if (userIds.length > 0) {
+      await this.prisma.participant.createMany({
+        data: userIds.map((userId) => ({ userId, editionId: newEdition.id })),
+        skipDuplicates: true,
+      });
+    }
+
+    this.logger.log(
+      `WC auto-next edition ${newEdition.id} created (startMatchday ${nextMatchday.number}, ${userIds.length} participants).`,
+    );
   }
 
   private async checkLeagueEnd(edition: any) {
     if (!edition.endMatchday) return;
 
-    // Check if the last matchday is done
     const lastMatchday = await this.prisma.matchday.findUnique({
       where: {
         leagueId_season_number: {
@@ -101,7 +161,6 @@ export class EditionResolutionService {
 
     if (!lastMatchday || lastMatchday.status !== MatchdayStatus.FINISHED) return;
 
-    // Find winner(s): participants with highest points
     const allParticipants = await this.prisma.participant.findMany({
       where: { editionId: edition.id },
       orderBy: { totalPoints: 'desc' },
@@ -114,9 +173,19 @@ export class EditionResolutionService {
       .filter((p) => p.totalPoints === topScore)
       .map((p) => p.id);
 
+    // Count already-finished editions for sequential naming
+    const finishedCount = await this.prisma.edition.count({
+      where: { championshipId: edition.championshipId, status: EditionStatus.FINISHED },
+    });
+    const editionName = `edicion_${String(finishedCount + 1).padStart(2, '0')}`;
+
     await this.prisma.edition.update({
       where: { id: edition.id },
-      data: { status: EditionStatus.FINISHED, finishedAt: new Date() },
+      data: {
+        status: EditionStatus.FINISHED,
+        finishedAt: new Date(),
+        name: editionName,
+      },
     });
 
     await this.potDistribution.distribute(edition.id, winnerIds);
@@ -126,13 +195,13 @@ export class EditionResolutionService {
         data: {
           userId: p.userId,
           type: 'EDITION_FINISHED',
-          payload: { editionId: edition.id, winnerParticipantIds: winnerIds },
+          payload: { editionId: edition.id, editionName, winnerParticipantIds: winnerIds },
         },
       });
     }
 
     this.logger.log(
-      `Edition ${edition.id} FINISHED (LEAGUE). Top score: ${topScore}, Winners: ${winnerIds.length}`,
+      `Edition ${edition.id} "${editionName}" FINISHED (LEAGUE). Top score: ${topScore}, Winners: ${winnerIds.length}`,
     );
   }
 }
