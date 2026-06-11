@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   appName: 'Pick & Survive',
   webDir: 'out',
   server: {
-    url: isProd ? 'https://pickandsurvive.com' : 'http://localhost:3000',
+    url: isProd ? 'https://pickandsurvive.com' : 'http://10.0.2.2:3000',
     cleartext: true,
     androidScheme: 'https',
   },
