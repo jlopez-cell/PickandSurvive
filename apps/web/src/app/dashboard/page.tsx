@@ -1,2064 +1,1669 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import {
-  Activity,
-  AlertTriangle,
-  ArrowRight,
-  BarChart3,
-  Bell,
-  Clock3,
-  LayoutDashboard,
-  Mail,
-  Menu,
-  Settings2,
-  Trash2,
-  Trophy,
-  UserPlus,
-  UserRound,
-  Users,
-  X,
-} from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Bell, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe, LayoutGrid, Moon, Plus, Shield, Sun, Trophy, Users, X, XCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type Edition = { id: string; status: string; startMatchday: number };
 type Championship = {
   id: string;
   name: string;
   mode: 'TOURNAMENT' | 'LEAGUE' | 'WORLD_CUP';
   adminId: string;
-  footballLeague: { id: string; name: string; country: string };
-  editions: { id: string; status: string; startMatchday: number }[];
-  _count: { joinRequests: number };
+  editions: Edition[];
 };
 
-type StandingsEntry = {
-  participantId: string;
-  alias: string;
-  status?: string;
-  eliminatedAtMatchday?: number | null;
-  totalPoints?: number;
+type ActiveEdition = {
+  editionId: string;
+  championshipId: string;
+  championshipName: string;
+  mode: 'TOURNAMENT' | 'LEAGUE' | 'WORLD_CUP';
+  adminId: string;
 };
 
-type Pick = {
+// WC types
+type Team = { id: string; name: string; logoUrl: string };
+type WcMatch = {
+  id: string; status: string; kickoffTime: string | null;
+  homeScore: number | null; awayScore: number | null;
+  wcGroup: string | null; tournamentPhase: string | null;
+  homeTeam: Team; awayTeam: Team;
+  homeUsed: boolean; awayUsed: boolean;
+};
+type WcTodayCtx = {
+  championshipName: string;
+  matchday: {
+    id: string; number: number; status: string;
+    tournamentPhase: string | null; wcGroupDay: number | null;
+    firstKickoff: string | null; deadlinePassed: boolean;
+    prevNumber: number | null; nextNumber: number | null;
+  } | null;
+  matches: WcMatch[];
+  myPick: { id: string; status: string; pickType: 'WIN' | 'WIN_OR_DRAW'; team: Team | null } | null;
+  participant: { status: string; eliminatedAtPhase: string | null };
+};
+
+// League / Tournament types
+type LeagueMatch = {
+  id: string; status: string; kickoffTime: string | null;
+  homeScore: number | null; awayScore: number | null;
+  homeTeam: Team; awayTeam: Team;
+};
+type LeagueDeadline = {
+  matchdayNumber: number | null;
+  firstKickoff: string | null;
+  matchdayStatus: string | null;
+};
+type LeaguePick = {
   status: string;
   team: { id: string; name: string; logoUrl: string } | null;
   participant: { user: { alias: string } };
   matchday: { number: number; status: string };
 };
 
-type MatchItem = {
-  id: string;
-  status: string;
-  kickoffTime: string | null;
-  homeScore: number | null;
-  awayScore: number | null;
-  homeTeam: { id: string; name: string; logoUrl: string };
-  awayTeam: { id: string; name: string; logoUrl: string };
+// Participants
+type WcParticipant = {
+  alias: string; status: string;
+  eliminatedAtPhase: string | null;
+  lastPick: { team: { name: string; logoUrl: string }; pickStatus: string } | null;
+};
+type LeagueStanding = {
+  participantId: string; alias: string; status: string;
+  eliminatedAtMatchday: number | null; totalPoints: number;
 };
 
-type EditionMeta = {
-  startMatchday: number;
-  endMatchday: number | null;
-  status: string;
-  season: number | null;
+// History
+type EditionHistoryEntry = {
+  id: string; name: string; finishedAt: string | null;
+  winnerAlias: string | null; participantCount: number;
+};
+type EditionPickDetail = {
+  matchdayNumber: number;
+  team: { name: string; logoUrl: string } | null;
+  pickStatus: string;
+};
+type EditionDetail = {
+  edition: { id: string; name: string; finishedAt: string | null; winnerAlias: string | null };
+  participants: { alias: string; status: string; picks: EditionPickDetail[] }[];
 };
 
-type EditionDeadline = {
-  matchdayNumber: number | null;
+// Calendar
+type CalMatch = {
+  id: string; status: string; kickoffTime: string | null;
+  homeScore: number | null; awayScore: number | null;
+  wcGroup: string | null; tournamentPhase: string | null;
+  homeTeam: Team; awayTeam: Team;
+};
+type CalMatchday = {
+  number: number; status: string;
+  tournamentPhase: string | null; wcGroupDay: number | null;
   firstKickoff: string | null;
-  matchdayStatus?: string | null;
+  matches: CalMatch[];
 };
 
-type NotificationItem = {
-  id: string;
-  type: string;
-  createdAt: string;
-  read: boolean;
-  payload?: Record<string, unknown>;
+// Notifications
+type NotifItem = { id: string; type: string; createdAt: string; read: boolean; payload?: Record<string, unknown> };
+
+// ── Theme context ──────────────────────────────────────────────────────────
+
+const IsLightCtx = createContext(false);
+const useIsLight = () => useContext(IsLightCtx);
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const PHASE_LABELS: Record<string, string> = {
+  GROUP_STAGE: 'Fase de Grupos', ROUND_OF_32: 'Ronda de 32',
+  ROUND_OF_16: 'Octavos', QUARTER_FINALS: 'Cuartos',
+  SEMI_FINALS: 'Semifinales', THIRD_PLACE: 'Tercer Puesto', FINAL: 'Final',
 };
 
-const BG_IMAGE =
-  "https://images.unsplash.com/photo-1508098682722-e99c43a1c5e8?auto=format&fit=crop&w=1600&q=80";
-
-const PICK_STATUS_BADGE: Record<string, 'muted' | 'success' | 'warning' | 'destructive' | 'default'> = {
-  PENDING: 'muted',
-  SURVIVED: 'success',
-  DRAW_ELIMINATED: 'warning',
-  LOSS_ELIMINATED: 'destructive',
-  NO_PICK_ELIMINATED: 'destructive',
-  POSTPONED_PENDING: 'default',
+const PICK_STATUS_COMPACT: Record<string, { label: string; cls: string; icon?: React.ReactNode }> = {
+  SURVIVED:           { label: 'Sobrevivió', cls: 'text-emerald-400', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  DRAW_ELIMINATED:    { label: 'Empate · elim.', cls: 'text-red-400', icon: <XCircle className="w-3.5 h-3.5" /> },
+  LOSS_ELIMINATED:    { label: 'Derrota · elim.', cls: 'text-red-400', icon: <XCircle className="w-3.5 h-3.5" /> },
+  NO_PICK_ELIMINATED: { label: 'Sin pick', cls: 'text-red-400/70', icon: <XCircle className="w-3.5 h-3.5" /> },
+  PENDING:            { label: 'Pendiente', cls: 'text-amber-400', icon: <Clock className="w-3.5 h-3.5" /> },
+  POSTPONED_PENDING:  { label: 'Aplazado', cls: 'text-sky-400', icon: <AlertCircle className="w-3.5 h-3.5" /> },
 };
 
-const MODE_LABEL: Record<string, string> = { TOURNAMENT: 'Torneo', LEAGUE: 'Liga', WORLD_CUP: 'World Cup' };
-const EDITION_STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Borrador',
-  OPEN: 'Abierta',
-  ACTIVE: 'Activa',
-  FINISHED: 'Finalizada',
-  CANCELLED: 'Cancelada',
-};
+function formatCountdown(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return 'Cerrado';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function formatKickoff(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
 
-  const [mobileTab, setMobileTab] = useState<'home' | 'leagues' | 'notifications' | 'profile'>('home');
+  // Editions
+  const [activeEditions, setActiveEditions] = useState<ActiveEdition[]>([]);
+  const [selectedEdition, setSelectedEdition] = useState<ActiveEdition | null>(null);
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const [fetchingEditions, setFetchingEditions] = useState(true);
 
-  const [championships, setChampionships] = useState<Championship[]>([]);
-  const [fetching, setFetching] = useState(true);
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'pick' | 'jugadores' | 'historial' | 'calendario'>('pick');
 
-  const [activeEditionId, setActiveEditionId] = useState<string | null>(null);
-  const [activeEditionMatchday, setActiveEditionMatchday] = useState<number>(1);
-  const [activeEditionName, setActiveEditionName] = useState<string>('Mi Liga');
-  const [leagueSeason, setLeagueSeason] = useState<number | null>(null);
+  // WC pick tab
+  const [wcCtx, setWcCtx] = useState<WcTodayCtx | null>(null);
+  const [wcLoading, setWcLoading] = useState(false);
+  const [selectedMatchday, setSelectedMatchday] = useState<number | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState('');
 
-  const [myPick, setMyPick] = useState<Pick | null>(null);
-  const [standings, setStandings] = useState<StandingsEntry[]>([]);
+  // League/Tournament pick tab
+  const [leagueDeadline, setLeagueDeadline] = useState<LeagueDeadline | null>(null);
+  const [leagueMatches, setLeagueMatches] = useState<LeagueMatch[]>([]);
+  const [leagueMyPick, setLeagueMyPick] = useState<LeaguePick | null>(null);
+  const [leaguePickLoading, setLeaguePickLoading] = useState(false);
+  const [leaguePickingTeamId, setLeaguePickingTeamId] = useState<string | null>(null);
+  const [leagueSelectedTeamId, setLeagueSelectedTeamId] = useState<string | null>(null);
 
-  const [sidebarLoading, setSidebarLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [deletingChampionshipId, setDeletingChampionshipId] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Players tab
+  const [wcParticipants, setWcParticipants] = useState<WcParticipant[]>([]);
+  const [leagueStandings, setLeagueStandings] = useState<LeagueStanding[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantsFetched, setParticipantsFetched] = useState(false);
 
-  const [editionDeadlines, setEditionDeadlines] = useState<Record<string, EditionDeadline>>({});
-  const [deadlinesLoading, setDeadlinesLoading] = useState(false);
-  const [championshipMyPicks, setChampionshipMyPicks] = useState<Record<string, Pick | null>>({});
-  const [myPicksLoading, setMyPicksLoading] = useState(false);
+  // Calendar tab
+  const [calendar, setCalendar] = useState<CalMatchday[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarFetched, setCalendarFetched] = useState(false);
 
-  const [nextDeadline, setNextDeadline] = useState<EditionDeadline | null>(null);
-  const [nextDeadlineLoading, setNextDeadlineLoading] = useState(false);
-  const [sidebarMatches, setSidebarMatches] = useState<MatchItem[]>([]);
-  const [sidebarMatchesLoading, setSidebarMatchesLoading] = useState(false);
-  const [recentActivity, setRecentActivity] = useState<NotificationItem[]>([]);
-  const [activityLoading, setActivityLoading] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [markingNotificationId, setMarkingNotificationId] = useState<string | null>(null);
-  const [deletingNotificationId, setDeletingNotificationId] = useState<string | null>(null);
-  const [nowTs, setNowTs] = useState(() => Date.now());
+  // History tab
+  const [history, setHistory] = useState<EditionHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFetched, setHistoryFetched] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [editionDetails, setEditionDetails] = useState<Record<string, EditionDetail>>({});
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+
+  // Notifications
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
+  const [notifsOpen, setNotifsOpen] = useState(false);
+  const [notifsLoading, setNotifsLoading] = useState(false);
+  const [deletingNotifId, setDeletingNotifId] = useState<string | null>(null);
+  const notifPanelRef = useRef<HTMLDivElement>(null);
+
+  // Theme
+  const [isLight, setIsLight] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem('ps-theme') === 'light') setIsLight(true);
+  }, []);
+  function toggleTheme() {
+    setIsLight((prev) => {
+      const next = !prev;
+      localStorage.setItem('ps-theme', next ? 'light' : 'dark');
+      return next;
+    });
+  }
+
+  // ── Load active editions ──────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!loading && user) {
-      fetch('/api/championships')
-        .then((r) => r.json())
-        .then((data) => setChampionships(Array.isArray(data) ? data : []))
-        .catch(() => setChampionships([]))
-        .finally(() => setFetching(false));
-    } else if (!loading) {
-      setFetching(false);
-    }
+    if (loading || !user) return;
+    fetch('/api/championships')
+      .then((r) => r.json())
+      .then((data: Championship[]) => {
+        if (!Array.isArray(data)) return;
+        const active: ActiveEdition[] = [];
+        for (const c of data) {
+          const e = c.editions?.find((e) => e.status === 'ACTIVE');
+          if (e) active.push({ editionId: e.id, championshipId: c.id, championshipName: c.name, mode: c.mode, adminId: c.adminId });
+        }
+        setActiveEditions(active);
+        // Auto-enter if only one active edition
+        if (active.length === 1) setSelectedEdition(active[0]);
+      })
+      .catch(() => {})
+      .finally(() => setFetchingEditions(false));
   }, [loading, user]);
 
-  useEffect(() => {
-    if (loading || fetching) return;
-    if (!user) return;
+  const selected = selectedEdition;
+  const isWc = selected?.mode === 'WORLD_CUP';
+  const isLeague = selected?.mode === 'LEAGUE' || selected?.mode === 'TOURNAMENT';
 
-    const run = async () => {
-      setError('');
-      try {
-        if (championships.length === 0) return;
+  // ── WC pick data ──────────────────────────────────────────────────────────
 
-        // 1) Intentamos con la edición que ya viene en /api/championships (solo trae 1).
-        let candidate:
-          | { championshipName: string; editionId: string; startMatchday: number }
-          | null = null;
-
-        for (const c of championships) {
-          const e = c.editions?.[0];
-          if (e?.status === 'ACTIVE') {
-            candidate = { championshipName: c.name, editionId: e.id, startMatchday: e.startMatchday };
-            break;
-          }
-        }
-
-        // 2) Si no hay ACTIVE ahí, pedimos el detalle de cada campeonato y buscamos la edición activa.
-        if (!candidate) {
-          const full = await Promise.all(
-            championships.map(async (c) => {
-              const r = await fetch(`/api/championships/${c.id}`);
-              const data = await r.json();
-              return { champ: c, data };
-            }),
-          );
-
-          for (const item of full) {
-            const active = (item.data?.editions ?? []).find((e: any) => e.status === 'ACTIVE');
-            if (active?.id) {
-              candidate = {
-                championshipName: item.champ.name,
-                editionId: active.id,
-                startMatchday: active.startMatchday,
-              };
-              break;
-            }
-          }
-        }
-
-        // 3) Fallback: primera edición disponible.
-        if (!candidate) {
-          const fallback = championships[0];
-          const e = fallback.editions?.[0];
-          if (!e?.id) return;
-          candidate = { championshipName: fallback.name, editionId: e.id, startMatchday: e.startMatchday };
-        }
-
-        setActiveEditionId(candidate.editionId);
-        setActiveEditionName(candidate.championshipName);
-        setActiveEditionMatchday(candidate.startMatchday);
-
-        setSidebarLoading(true);
-        const [metaRes, standingsRes] = await Promise.all([
-          fetch(`/api/editions/${candidate.editionId}/meta`),
-          fetch(`/api/editions/${candidate.editionId}/standings`),
-        ]);
-
-        const meta: EditionMeta = await metaRes.json();
-        setLeagueSeason(meta.season ?? null);
-        setActiveEditionMatchday(meta.startMatchday ?? candidate.startMatchday);
-
-        const standingsData = await standingsRes.json();
-        setStandings(Array.isArray(standingsData) ? standingsData : []);
-      } catch {
-        setError('Error al cargar tu dashboard');
-      } finally {
-        setSidebarLoading(false);
-      }
-    };
-
-    run();
-  }, [loading, fetching, user, championships]);
-
-  const { activePlayers, eliminatedPlayers, topRank } = useMemo(() => {
-    const active = standings.filter((s) => s.status === 'ACTIVE').length;
-    const eliminated = Math.max(0, standings.length - active);
-    return { activePlayers: active, eliminatedPlayers: eliminated, topRank: standings.slice(0, 5) };
-  }, [standings]);
-
-  const createdChampionships = useMemo(() => {
-    if (!user?.id) return [];
-    return championships.filter((c) => c.adminId === user.id);
-  }, [championships, user?.id]);
-
-  const editionStartMatchdayById = useMemo(() => {
-    const next: Record<string, number> = {};
-    for (const c of championships) {
-      const e = c.editions?.[0];
-      if (e?.id && typeof e.startMatchday === 'number') next[e.id] = e.startMatchday;
-    }
-    return next;
-  }, [championships]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNowTs(Date.now()), 1000);
-    return () => clearInterval(t);
+  const loadWcData = useCallback(async (editionId: string, matchdayNum?: number) => {
+    setWcLoading(true);
+    const q = matchdayNum ? `?matchday=${matchdayNum}` : '';
+    try {
+      const res = await fetch(`/api/wc/editions/${editionId}/today${q}`);
+      if (res.ok) setWcCtx(await res.json());
+    } finally { setWcLoading(false); }
   }, []);
 
+  // Reset and reload when selected edition changes
   useEffect(() => {
-    const run = async () => {
-      if (!user?.id) {
-        setEditionDeadlines({});
-        return;
-      }
+    if (!selected) return;
+    setActiveTab('pick');
+    setParticipantsFetched(false);
+    setHistoryFetched(false);
+    setHistory([]);
+    setCalendarFetched(false);
+    setCalendar([]);
+    setWcCtx(null);
+    setLeagueDeadline(null);
+    setLeagueMatches([]);
+    setLeagueMyPick(null);
+    setSelectedMatchday(null);
+    setSelectedTeamId(null);
+    setLeagueSelectedTeamId(null);
 
-      const editionIds = championships
-        .map((c) => c.editions?.[0]?.id)
-        .filter((id): id is string => Boolean(id));
-
-      if (editionIds.length === 0) {
-        setEditionDeadlines({});
-        return;
-      }
-
-      setDeadlinesLoading(true);
-      try {
-        const results = await Promise.all(
-          editionIds.map(async (editionId) => {
-            try {
-              const res = await fetch(`/api/editions/${editionId}/deadline`);
-              const data = await res.json();
-              return { editionId, data };
-            } catch {
-              return { editionId, data: null };
-            }
-          }),
-        );
-
-        const next: Record<string, EditionDeadline> = {};
-        for (const r of results) {
-          next[r.editionId] = {
-            matchdayNumber: r.data?.matchdayNumber ?? null,
-            firstKickoff: r.data?.firstKickoff ?? null,
-            matchdayStatus: r.data?.matchdayStatus ?? null,
-          };
-        }
-        setEditionDeadlines(next);
-      } finally {
-        setDeadlinesLoading(false);
-      }
-    };
-
-    run();
-  }, [user?.id, championships]);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!activeEditionId) {
-        setNextDeadline(null);
-        return;
-      }
-
-      setNextDeadlineLoading(true);
-      try {
-        const res = await fetch(`/api/editions/${activeEditionId}/deadline`);
-        const data = await res.json();
-        setNextDeadline({
-          matchdayNumber: data?.matchdayNumber ?? null,
-          firstKickoff: data?.firstKickoff ?? null,
-          matchdayStatus: data?.matchdayStatus ?? null,
-        });
-        if (typeof data?.matchdayNumber === 'number') {
-          setActiveEditionMatchday(data.matchdayNumber);
-        }
-      } catch {
-        setNextDeadline(null);
-      } finally {
-        setNextDeadlineLoading(false);
-      }
-    };
-
-    if (loading || fetching) return;
-    run();
-    const intervalId = setInterval(run, 30 * 60 * 1000);
-    return () => clearInterval(intervalId);
-  }, [activeEditionId, loading, fetching]);
-
-  const fetchSidebarMatches = useCallback(async () => {
-    if (loading || fetching || nextDeadlineLoading) return;
-    if (!activeEditionId) {
-      setSidebarMatches([]);
-      return;
+    if (isWc) {
+      loadWcData(selected.editionId);
+    } else {
+      loadLeaguePickTab(selected.editionId);
     }
-    const md = nextDeadline?.matchdayNumber ?? activeEditionMatchday;
-    if (!md) {
-      setSidebarMatches([]);
-      return;
-    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.editionId]);
 
-    setSidebarMatchesLoading(true);
+  // ── League pick data ──────────────────────────────────────────────────────
+
+  async function loadLeaguePickTab(editionId: string) {
+    setLeaguePickLoading(true);
     try {
-      const res = await fetch(`/api/editions/${activeEditionId}/matches?matchday=${md}`);
-      const data = await res.json();
-      setSidebarMatches(Array.isArray(data) ? data : []);
-    } catch {
-      setSidebarMatches([]);
-    } finally {
-      setSidebarMatchesLoading(false);
+      const deadlineRes = await fetch(`/api/editions/${editionId}/deadline`);
+      const deadline: LeagueDeadline = await deadlineRes.json();
+      setLeagueDeadline(deadline);
+      const md = deadline.matchdayNumber;
+      if (!md) return;
+      const [matchesRes, pickRes] = await Promise.all([
+        fetch(`/api/editions/${editionId}/matches?matchday=${md}`),
+        fetch(`/api/editions/${editionId}/picks?matchday=${md}`),
+      ]);
+      if (matchesRes.ok) setLeagueMatches(await matchesRes.json());
+      if (pickRes.ok) { const d = await pickRes.json(); setLeagueMyPick(d?.myPick ?? null); }
+    } catch { /* ignore */ }
+    finally { setLeaguePickLoading(false); }
+  }
+
+  // ── WC countdown ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!wcCtx?.matchday?.firstKickoff) return;
+    const kickoff = wcCtx.matchday.firstKickoff;
+    setCountdown(formatCountdown(kickoff));
+    const id = setInterval(() => setCountdown(formatCountdown(kickoff)), 1000);
+    return () => clearInterval(id);
+  }, [wcCtx?.matchday?.firstKickoff]);
+
+  // ── Players tab ───────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!selected || activeTab !== 'jugadores' || participantsFetched) return;
+    setParticipantsLoading(true);
+    const url = isWc
+      ? `/api/wc/editions/${selected.editionId}/participants`
+      : `/api/editions/${selected.editionId}/standings`;
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (isWc) setWcParticipants(Array.isArray(data) ? data : []);
+        else setLeagueStandings(Array.isArray(data) ? data : []);
+        setParticipantsFetched(true);
+      })
+      .catch(() => setParticipantsFetched(true))
+      .finally(() => setParticipantsLoading(false));
+  }, [activeTab, selected, isWc, participantsFetched]);
+
+  // ── Calendar tab ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!selected || activeTab !== 'calendario' || calendarFetched || !isWc) return;
+    setCalendarLoading(true);
+    fetch(`/api/wc/editions/${selected.editionId}/calendar`)
+      .then((r) => r.json())
+      .then((data) => { setCalendar(Array.isArray(data) ? data : []); setCalendarFetched(true); })
+      .catch(() => setCalendarFetched(true))
+      .finally(() => setCalendarLoading(false));
+  }, [activeTab, selected, isWc, calendarFetched]);
+
+  // ── History tab ───────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!selected || activeTab !== 'historial' || historyFetched) return;
+    if (!isWc) return;
+    setHistoryLoading(true);
+    fetch(`/api/wc/editions/${selected.editionId}/history`)
+      .then((r) => r.json())
+      .then((data) => { setHistory(Array.isArray(data) ? data : []); setHistoryFetched(true); })
+      .catch(() => setHistoryFetched(true))
+      .finally(() => setHistoryLoading(false));
+  }, [activeTab, selected, isWc, historyFetched]);
+
+  function handleHistoryToggle(id: string) {
+    setExpandedHistoryId((prev) => (prev === id ? null : id));
+    if (!editionDetails[id]) {
+      setDetailLoadingId(id);
+      fetch(`/api/wc/editions/${id}/detail`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => { if (data) setEditionDetails((prev) => ({ ...prev, [id]: data })); })
+        .finally(() => setDetailLoadingId(null));
     }
-  }, [
-    activeEditionId,
-    activeEditionMatchday,
-    nextDeadline?.matchdayNumber,
-    loading,
-    fetching,
-    nextDeadlineLoading,
-  ]);
+  }
 
-  useEffect(() => {
-    fetchSidebarMatches();
-    // Misma cadencia aproximada que el sync de resultados en API (solo lectura de BD).
-    const intervalId = setInterval(fetchSidebarMatches, 30 * 60 * 1000);
-    return () => clearInterval(intervalId);
-  }, [fetchSidebarMatches]);
+  // ── WC pick handlers ──────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const run = async () => {
-      if (!activeEditionId) {
-        setMyPick(null);
-        return;
-      }
-
-      const md = nextDeadline?.matchdayNumber ?? activeEditionMatchday;
-      if (!md) {
-        setMyPick(null);
-        return;
-      }
-
-      try {
-        const res = await fetch(`/api/editions/${activeEditionId}/picks?matchday=${md}`);
-        const data = await res.json();
-        setMyPick(data?.myPick ?? null);
-      } catch {
-        setMyPick(null);
-      }
-    };
-
-    if (loading || fetching || nextDeadlineLoading) return;
-    run();
-  }, [
-    activeEditionId,
-    activeEditionMatchday,
-    nextDeadline?.matchdayNumber,
-    loading,
-    fetching,
-    nextDeadlineLoading,
-  ]);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!user?.id) {
-        setChampionshipMyPicks({});
-        return;
-      }
-
-      const editionIds = Object.keys(editionDeadlines);
-      if (editionIds.length === 0) {
-        setChampionshipMyPicks({});
-        return;
-      }
-
-      setMyPicksLoading(true);
-      try {
-        const results = await Promise.all(
-          editionIds.map(async (editionId) => {
-            const md = editionDeadlines[editionId]?.matchdayNumber ?? editionStartMatchdayById[editionId];
-            if (!md) return { editionId, myPick: null };
-
-            try {
-              const res = await fetch(`/api/editions/${editionId}/picks?matchday=${md}`);
-              const data = await res.json();
-              return { editionId, myPick: data?.myPick ?? null };
-            } catch {
-              return { editionId, myPick: null };
-            }
-          }),
-        );
-
-        const next: Record<string, Pick | null> = {};
-        for (const r of results) next[r.editionId] = r.myPick;
-        setChampionshipMyPicks(next);
-      } finally {
-        setMyPicksLoading(false);
-      }
-    };
-
-    if (!deadlinesLoading) run();
-  }, [user?.id, editionDeadlines, deadlinesLoading]);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!user?.id) {
-        setRecentActivity([]);
-        return;
-      }
-      setActivityLoading(true);
-      try {
-        const res = await fetch('/api/notifications?limit=5');
-        const data = await res.json();
-        setRecentActivity(Array.isArray(data?.notifications) ? data.notifications : []);
-      } catch {
-        setRecentActivity([]);
-      } finally {
-        setActivityLoading(false);
-      }
-    };
-
-    if (!loading && !fetching) run();
-  }, [user?.id, loading, fetching]);
-
-  const reloadChampionships = async () => {
-    setError('');
-    setFetching(true);
+  async function handleWcPick(teamId: string, pickType: 'WIN' | 'WIN_OR_DRAW') {
+    if (!wcCtx?.matchday || wcCtx.matchday.deadlinePassed || !selected) return;
+    setPicking(`${teamId}-${pickType}`);
     try {
-      const res = await fetch('/api/championships');
-      const data = await res.json();
-      setChampionships(Array.isArray(data) ? data : []);
-    } catch {
-      setChampionships([]);
-      setError('Error al recargar los campeonatos');
-    } finally {
-      setFetching(false);
-    }
-  };
-
-  const handleDeleteChampionship = async (championshipId: string) => {
-    if (deletingChampionshipId) return;
-    const ok = window.confirm('¿Seguro que quieres eliminar este campeonato? Esta acción no se puede deshacer.');
-    if (!ok) return;
-
-    setDeletingChampionshipId(championshipId);
-    setError('');
-    try {
-      const res = await fetch(`/api/championships/${championshipId}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message ?? 'No se pudo eliminar el campeonato');
-      }
-      await reloadChampionships();
-    } catch (e: any) {
-      setError(e?.message ?? 'No se pudo eliminar el campeonato');
-    } finally {
-      setDeletingChampionshipId(null);
-    }
-  };
-
-  const formatDeadline = (iso: string | null) => {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('es-ES', {
-      weekday: undefined,
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getChampionshipHref = (c: Championship): string => {
-    if (c.mode === 'WORLD_CUP') {
-      const ed = c.editions?.find((e) => e.status === 'ACTIVE') ?? c.editions?.find((e) => e.status === 'OPEN');
-      if (ed) return `/world-cup/${ed.id}`;
-    }
-    return `/championship/${c.id}`;
-  };
-
-  const handleViewLeague = () => {
-    if (activeEditionId) {
-      router.push(isWcMode ? `/world-cup/${activeEditionId}` : `/edition/${activeEditionId}/standings`);
-      return;
-    }
-    if (championships[0]?.id) {
-      router.push(`/championship/${championships[0].id}`);
-      return;
-    }
-    setError('No tienes una liga disponible todavía.');
-  };
-
-  const handleManageLeague = () => {
-    if (createdChampionships[0]?.id) {
-      router.push(`/championship/${createdChampionships[0].id}`);
-      return;
-    }
-    router.push('/championship/new');
-  };
-
-  const formatCountdown = (iso: string | null) => {
-    if (!iso) return '—';
-    const diffMs = new Date(iso).getTime() - nowTs;
-    if (Number.isNaN(diffMs)) return '—';
-    if (diffMs <= 0) return 'Cerrada';
-    const totalMinutes = Math.floor(diffMs / 60000);
-    const days = Math.floor(totalMinutes / (60 * 24));
-    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-    const minutes = totalMinutes % 60;
-    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-    return `${hours}h ${minutes}m`;
-  };
-
-  const formatMatchKickoff = (iso: string | null) => {
-    if (!iso) return '--:--';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '--:--';
-    return d.toLocaleString('es-ES', {
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatNotificationLabel = (n: NotificationItem) => {
-    switch (n.type) {
-      case 'JOIN_APPROVED':
-        return 'Tu solicitud fue aprobada';
-      case 'JOIN_REJECTED':
-        return 'Tu solicitud fue rechazada';
-      case 'PICK_REMINDER':
-        return 'Recordatorio de pick';
-      case 'NEW_JOIN_REQUEST':
-        return 'Nueva solicitud para un campeonato';
-      case 'EDITION_FINISHED':
-        return 'Una edición ha finalizado';
-      case 'INVITATION':
-        return 'Has recibido una invitación';
-      default:
-        return n.type;
-    }
-  };
-
-  const fetchNotifications = useCallback(async () => {
-    setNotificationsLoading(true);
-    try {
-      const res = await fetch('/api/notifications?limit=20');
-      const data = await res.json();
-      setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
-    } catch {
-      setNotifications([]);
-    } finally {
-      setNotificationsLoading(false);
-    }
-  }, []);
-
-  const markNotificationAsRead = useCallback(async (id: string) => {
-    setMarkingNotificationId(id);
-    try {
-      await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-      setRecentActivity((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    } finally {
-      setMarkingNotificationId(null);
-    }
-  }, []);
-
-  const deleteNotification = useCallback(async (id: string) => {
-    setDeletingNotificationId(id);
-    try {
-      const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
-        setRecentActivity((prev) => prev.filter((n) => n.id !== id));
-      }
-    } finally {
-      setDeletingNotificationId(null);
-    }
-  }, []);
-
-  const getNotificationPrimaryAction = useCallback(
-    (n: NotificationItem): { label: string; action: () => void } | null => {
-      const payload = n.payload as Record<string, unknown> | undefined;
-      const championshipId = typeof payload?.championshipId === 'string' ? payload.championshipId : null;
-      const editionId = typeof payload?.editionId === 'string' ? payload.editionId : null;
-      const inviteToken =
-        typeof payload?.token === 'string'
-          ? payload.token
-          : typeof payload?.inviteToken === 'string'
-            ? payload.inviteToken
-            : typeof payload?.invitationToken === 'string'
-              ? payload.invitationToken
-              : null;
-
-      if (n.type === 'NEW_JOIN_REQUEST' && championshipId) {
-        return {
-          label: 'Ver y aprobar',
-          action: () => {
-            router.push(`/championship/${championshipId}/invite`);
-            setNotificationsOpen(false);
-          },
-        };
-      }
-      if (n.type === 'INVITATION' && championshipId) {
-        return {
-          label: 'Ver invitación',
-          action: () => {
-            if (inviteToken) {
-              router.push(`/join/${inviteToken}`);
-            } else {
-              router.push(`/championship/${championshipId}`);
-            }
-            setNotificationsOpen(false);
-          },
-        };
-      }
-      if (n.type === 'PICK_REMINDER' && editionId) {
-        return {
-          label: 'Ir a elegir pick',
-          action: () => {
-            router.push(`/edition/${editionId}`);
-            setNotificationsOpen(false);
-          },
-        };
-      }
-      return null;
-    },
-    [router],
-  );
-
-  const unreadNotificationsCount = useMemo(() => {
-    const source = notifications.length > 0 ? notifications : recentActivity;
-    return source.filter((n) => !n.read).length;
-  }, [notifications, recentActivity]);
-
-  useEffect(() => {
-    if (!notificationsOpen || !user?.id) return;
-    void fetchNotifications();
-  }, [notificationsOpen, user?.id, fetchNotifications]);
-
-  useEffect(() => {
-    if (mobileTab !== 'notifications' || !user?.id) return;
-    void fetchNotifications();
-  }, [mobileTab, user?.id, fetchNotifications]);
-
-  const SyncTabFromUrl = ({ onTab }: { onTab: (tab: 'home' | 'leagues' | 'notifications' | 'profile') => void }) => {
-    const sp = useSearchParams();
-    useEffect(() => {
-      const raw = (sp.get('tab') || '').toLowerCase();
-      if (raw === 'notifications' || raw === 'leagues' || raw === 'profile' || raw === 'home') {
-        onTab(raw as any);
-      }
-    }, [sp, onTab]);
-    return null;
-  };
-
-  const pendingJoinRequests = useMemo(
-    () => createdChampionships.reduce((sum, c) => sum + (c._count?.joinRequests ?? 0), 0),
-    [createdChampionships],
-  );
-
-  // Vía de escape: WC_END_DATE pasada o sin edición activa/abierta → estilo normal
-  const isWcMode = useMemo(() => {
-    if (Date.now() >= new Date('2026-07-20T00:00:00Z').getTime()) return false;
-    return championships.some(
-      (c) => c.mode === 'WORLD_CUP' && c.editions.some((e) => e.status === 'ACTIVE' || e.status === 'OPEN'),
-    );
-  }, [championships]);
-
-  const wcEditionId = useMemo(() => {
-    const wc = championships.find((c) => c.mode === 'WORLD_CUP');
-    return wc?.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN')?.id ?? null;
-  }, [championships]);
-
-  const contextualAlerts = useMemo(() => {
-    const alerts: { id: string; text: string; tone: 'warning' | 'info' }[] = [];
-    if (activeEditionId && !myPick) {
-      alerts.push({ id: 'no-pick', tone: 'warning', text: 'Todavía no has hecho tu pick para la jornada actual.' });
-    }
-    if (nextDeadline?.firstKickoff) {
-      const diffMs = new Date(nextDeadline.firstKickoff).getTime() - nowTs;
-      if (!Number.isNaN(diffMs) && diffMs > 0 && diffMs <= 1000 * 60 * 60 * 24) {
-        alerts.push({
-          id: 'deadline-close',
-          tone: 'warning',
-          text: `La deadline está cerca: ${formatCountdown(nextDeadline.firstKickoff)} restantes.`,
-        });
-      }
-    }
-    if (pendingJoinRequests > 0) {
-      alerts.push({
-        id: 'admin-pending',
-        tone: 'info',
-        text: `Tienes ${pendingJoinRequests} solicitud(es) pendiente(s) de aprobación.`,
+      const res = await fetch(`/api/editions/${selected.editionId}/picks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, matchdayNumber: wcCtx.matchday.number, pickType }),
       });
-    }
-    return alerts;
-  }, [activeEditionId, myPick, nextDeadline?.firstKickoff, nowTs, pendingJoinRequests]);
+      if (res.ok) {
+        setSelectedTeamId(null);
+        await loadWcData(selected.editionId, selectedMatchday ?? undefined);
+      }
+    } finally { setPicking(null); }
+  }
 
-  if (loading || fetching) {
+  function handleWcNav(dir: 'prev' | 'next') {
+    const target = dir === 'prev' ? wcCtx?.matchday?.prevNumber : wcCtx?.matchday?.nextNumber;
+    if (!target || !selected) return;
+    setSelectedMatchday(target);
+    setSelectedTeamId(null);
+    loadWcData(selected.editionId, target);
+  }
+
+  // ── League pick handler ───────────────────────────────────────────────────
+
+  async function handleLeaguePick(teamId: string) {
+    if (!selected || !leagueDeadline?.matchdayNumber) return;
+    const firstKickoff = leagueDeadline.firstKickoff;
+    if (firstKickoff && new Date(firstKickoff).getTime() <= Date.now()) return;
+    setLeaguePickingTeamId(teamId);
+    try {
+      const res = await fetch(`/api/editions/${selected.editionId}/picks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, matchdayNumber: leagueDeadline.matchdayNumber }),
+      });
+      if (res.ok) {
+        setLeagueSelectedTeamId(null);
+        await loadLeaguePickTab(selected.editionId);
+      }
+    } finally { setLeaguePickingTeamId(null); }
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/notifications')
+      .then((r) => r.json())
+      .then((data) => setNotifs(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [user]);
+
+  async function openNotifications() {
+    setNotifsOpen(true);
+    setNotifsLoading(true);
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) setNotifs(await res.json());
+    } finally { setNotifsLoading(false); }
+    // mark all read
+    fetch('/api/notifications/mark-all-read', { method: 'POST' }).then(() => {
+      setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+    }).catch(() => {});
+  }
+
+  async function deleteNotif(id: string) {
+    setDeletingNotifId(id);
+    try {
+      await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+      setNotifs((prev) => prev.filter((n) => n.id !== id));
+    } finally { setDeletingNotifId(null); }
+  }
+
+  const unreadCount = notifs.filter((n) => !n.read).length;
+
+  // ── Auth redirect ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!loading && !user) router.replace('/login');
+  }, [loading, user, router]);
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+
+  // Derived: team name for the fixed pick confirmation panel
+  const selectedWcTeamName = selectedTeamId && wcCtx?.matches
+    ? (wcCtx.matches.find(m => m.homeTeam.id === selectedTeamId)?.homeTeam.name
+       ?? wcCtx.matches.find(m => m.awayTeam.id === selectedTeamId)?.awayTeam.name ?? '')
+    : '';
+  const selectedLeagueTeamName = leagueSelectedTeamId
+    ? (leagueMatches.find(m => m.homeTeam.id === leagueSelectedTeamId)?.homeTeam.name
+       ?? leagueMatches.find(m => m.awayTeam.id === leagueSelectedTeamId)?.awayTeam.name ?? '')
+    : '';
+
+  if (loading || fetchingEditions) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
-        Cargando...
+      <IsLightCtx.Provider value={isLight}>
+        <div className={`flex items-center justify-center min-h-screen ${isLight ? 'bg-slate-100' : 'bg-[#0d0b08]'}`}>
+          <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+        </div>
+      </IsLightCtx.Provider>
+    );
+  }
+
+  // ── Welcome (no selected edition) ─────────────────────────────────────────
+
+  if (!selectedEdition) {
+    return (
+      <IsLightCtx.Provider value={isLight}>
+        <WelcomeScreen
+          editions={activeEditions}
+          onSelect={setSelectedEdition}
+          user={user}
+          onLogout={() => { logout(); router.replace('/login'); }}
+          toggleTheme={toggleTheme}
+        />
+      </IsLightCtx.Provider>
+    );
+  }
+
+  // ── Competition view ──────────────────────────────────────────────────────
+
+  const isEliminated = isWc
+    ? wcCtx?.participant?.status === 'ELIMINATED'
+    : false;
+
+  return (
+    <IsLightCtx.Provider value={isLight}>
+    <div className={`h-[100dvh] flex flex-col overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-[#0d0b08]'}`}>
+
+      {/* ══ STICKY HEADER ══════════════════════════════════════════════════ */}
+      <header className={`sticky top-0 z-30 backdrop-blur-md border-b ${isLight ? 'bg-white/95 border-slate-200' : 'bg-[#0d0b08]/95 border-white/5'}`}>
+        <div className="pt-[env(safe-area-inset-top,0px)]">
+
+          {/* Top bar: nombre campeonato + otros campeonatos + icons */}
+          <div className="flex items-center gap-2 px-4 h-12">
+            {/* Otros campeonatos — solo si hay más de 1 */}
+            {activeEditions.length > 1 && (
+              <button
+                onClick={() => setShowSwitcher(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border shrink-0 ${isLight ? 'bg-slate-100 border-slate-200 active:bg-slate-200' : 'bg-white/5 border-white/10 active:bg-white/10'}`}
+              >
+                <LayoutGrid className={`w-3.5 h-3.5 ${isLight ? 'text-slate-400' : 'text-white/50'}`} />
+                <span className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Otros</span>
+              </button>
+            )}
+
+            {/* Nombre del campeonato */}
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+              {selected?.mode === 'WORLD_CUP' && (
+                <Globe className={`w-3.5 h-3.5 shrink-0 ${isLight ? 'text-amber-600' : 'text-amber-400/60'}`} />
+              )}
+              <p className={`text-xs font-black uppercase tracking-widest truncate ${isLight ? 'text-slate-600' : 'text-white/60'}`}>
+                {selected?.championshipName}
+              </p>
+            </div>
+
+            {/* Invite - solo para admin */}
+            {selected?.adminId === user?.id && (
+              <button
+                onClick={() => router.push(`/championship/${selected!.championshipId}/invite`)}
+                className={`w-9 h-9 flex items-center justify-center rounded-xl shrink-0 ${isLight ? 'bg-amber-100 border border-amber-300' : 'bg-amber-500/15 border border-amber-500/30'}`}
+              >
+                <Users className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+              </button>
+            )}
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`w-9 h-9 flex items-center justify-center rounded-xl shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/5'}`}
+            >
+              {isLight ? <Moon className="w-4 h-4 text-slate-600" /> : <Sun className="w-4 h-4 text-amber-400/70" />}
+            </button>
+
+            {/* Profile */}
+            <button
+              onClick={() => router.push('/profile')}
+              className={`w-9 h-9 flex items-center justify-center rounded-xl shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/5'}`}
+            >
+              <span className={`text-[11px] font-black uppercase ${isLight ? 'text-slate-500' : 'text-white/50'}`}>
+                {user?.alias?.slice(0, 2) ?? 'P'}
+              </span>
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className={`flex border-t ${isLight ? 'border-slate-200' : 'border-white/5'}`}>
+            {(isWc
+              ? ['pick', 'jugadores', 'historial', 'calendario'] as const
+              : ['pick', 'jugadores', 'historial'] as const
+            ).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 ${
+                  activeTab === tab
+                    ? 'text-amber-400 border-amber-400'
+                    : isLight ? 'text-slate-400 border-transparent' : 'text-white/25 border-transparent'
+                }`}
+              >
+                {tab === 'pick' ? '🎯 Pick' : tab === 'jugadores' ? '👥 Jugadores' : tab === 'historial' ? '🏅 Historial' : '📅 Cal.'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* ══ CONTENT ════════════════════════════════════════════════════════ */}
+      <main className="flex-1 overflow-y-auto overscroll-contain">
+
+        {/* PICK TAB */}
+        {activeTab === 'pick' && isWc && (
+          <WcPickTab
+            ctx={wcCtx}
+            loading={wcLoading}
+            selectedTeamId={selectedTeamId}
+            picking={picking}
+            countdown={countdown}
+            isEliminated={isEliminated}
+            onSelectTeam={(id) => setSelectedTeamId((p) => (p === id ? null : id))}
+            onPick={handleWcPick}
+            onNav={handleWcNav}
+          />
+        )}
+        {activeTab === 'pick' && isLeague && (
+          <LeaguePickTab
+            deadline={leagueDeadline}
+            matches={leagueMatches}
+            myPick={leagueMyPick}
+            loading={leaguePickLoading}
+            selectedTeamId={leagueSelectedTeamId}
+            pickingTeamId={leaguePickingTeamId}
+            onSelectTeam={(id) => setLeagueSelectedTeamId((p) => (p === id ? null : id))}
+            onPick={handleLeaguePick}
+          />
+        )}
+
+        {/* JUGADORES TAB */}
+        {activeTab === 'jugadores' && (
+          <PlayersTab
+            isWc={isWc}
+            wcParticipants={wcParticipants}
+            leagueStandings={leagueStandings}
+            loading={participantsLoading}
+            isAdmin={selected?.adminId === user?.id}
+            championshipId={selected?.championshipId}
+          />
+        )}
+
+        {/* CALENDARIO TAB */}
+        {activeTab === 'calendario' && (
+          <CalendarioTab
+            matchdays={calendar}
+            loading={calendarLoading}
+          />
+        )}
+
+        {/* HISTORIAL TAB */}
+        {activeTab === 'historial' && (
+          <HistorialTab
+            isWc={isWc}
+            entries={history}
+            loading={historyLoading}
+            expandedId={expandedHistoryId}
+            onToggle={handleHistoryToggle}
+            details={editionDetails}
+            detailLoadingId={detailLoadingId}
+          />
+        )}
+      </main>
+
+      {/* ══ NOTIFICATIONS PANEL ════════════════════════════════════════════ */}
+      {notifsOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col" onClick={(e) => { if (e.target === e.currentTarget) setNotifsOpen(false); }}>
+          <div className="absolute inset-0 bg-black/60" onClick={() => setNotifsOpen(false)} />
+          <div ref={notifPanelRef} className={`relative mt-auto rounded-t-3xl border-t max-h-[70vh] flex flex-col ${isLight ? 'bg-white border-slate-200' : 'bg-[#111] border-white/10'}`}>
+            <div className={`px-4 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-3 flex items-center gap-3 border-b ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
+              <button onClick={() => setNotifsOpen(false)} className={isLight ? 'text-slate-400' : 'text-white/40'}>
+                <X className="w-5 h-5" />
+              </button>
+              <span className={`text-sm font-black uppercase tracking-widest ${isLight ? 'text-slate-600' : 'text-white/70'}`}>Notificaciones</span>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {notifsLoading && <div className={`py-8 text-center text-xs ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Cargando…</div>}
+              {!notifsLoading && notifs.length === 0 && (
+                <div className={`py-10 text-center text-sm ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin notificaciones</div>
+              )}
+              {notifs.map((n) => (
+                <div key={n.id} className={`flex items-start gap-3 px-4 py-3.5 border-b ${isLight ? 'border-slate-100' : 'border-white/5'} ${!n.read ? 'bg-amber-500/5' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs truncate ${isLight ? 'text-slate-600' : 'text-white/70'}`}>{(n.payload as any)?.message ?? n.type}</p>
+                    <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-white/25'}`}>
+                      {new Date(n.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => deleteNotif(n.id)}
+                    disabled={deletingNotifId === n.id}
+                    className={`shrink-0 transition-colors ${isLight ? 'text-slate-300 hover:text-slate-500' : 'text-white/20 hover:text-white/50'}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ EDITION SWITCHER SHEET ═════════════════════════════════════════ */}
+      {showSwitcher && (
+        <div className="fixed inset-0 z-50 flex flex-col" onClick={() => setShowSwitcher(false)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            className={`relative mt-auto rounded-t-3xl border-t ${isLight ? 'bg-white border-slate-200' : 'bg-[#111] border-white/10'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`px-4 pt-5 pb-3 flex items-center gap-3 border-b ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
+              <button onClick={() => setShowSwitcher(false)} className={isLight ? 'text-slate-400' : 'text-white/40'}>
+                <X className="w-5 h-5" />
+              </button>
+              <span className={`text-sm font-black uppercase tracking-widest ${isLight ? 'text-slate-600' : 'text-white/60'}`}>Mis competiciones</span>
+            </div>
+            <div className="px-4 py-3 space-y-2 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+              {activeEditions.map((e) => (
+                <button
+                  key={e.editionId}
+                  onClick={() => { setSelectedEdition(e); setShowSwitcher(false); }}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                    e.editionId === selected?.editionId
+                      ? 'bg-amber-500/10 border-amber-500/30'
+                      : isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/3 border-white/8'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    e.mode === 'WORLD_CUP' ? 'bg-amber-500/15' : (isLight ? 'bg-slate-100' : 'bg-white/8')
+                  }`}>
+                    {e.mode === 'WORLD_CUP'
+                      ? <Globe className="w-5 h-5 text-amber-400" />
+                      : <Trophy className={`w-5 h-5 ${isLight ? 'text-slate-400' : 'text-white/40'}`} />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-black uppercase tracking-wider truncate ${
+                      e.mode === 'WORLD_CUP' ? (isLight ? 'text-amber-700' : 'text-amber-200') : (isLight ? 'text-slate-700' : 'text-white/80')
+                    }`}>{e.championshipName}</p>
+                    <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
+                      {e.mode === 'WORLD_CUP' ? 'Mundial 2026' : e.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · Activo
+                    </p>
+                  </div>
+                  {e.editionId === selected?.editionId && (
+                    <span className={`text-[10px] font-black uppercase tracking-wider shrink-0 ${isLight ? 'text-amber-600' : 'text-amber-400/70'}`}>Actual</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ PICK BOTTOM SHEET — WC ═════════════════════════════════════════ */}
+      {isWc && selectedTeamId && wcCtx && !wcCtx.matchday?.deadlinePassed && (() => {
+        const selTeam = wcCtx.matches?.find(m => m.homeTeam.id === selectedTeamId)?.homeTeam
+          ?? wcCtx.matches?.find(m => m.awayTeam.id === selectedTeamId)?.awayTeam ?? null;
+        return (
+          <>
+            <div className="fixed inset-x-0 top-0 z-[60] bg-black/60"
+              style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
+              onClick={() => setSelectedTeamId(null)} />
+            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#13151a] rounded-t-3xl shadow-2xl"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/15" />
+              </div>
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-white/8">
+                {selTeam?.logoUrl && <img src={selTeam.logoUrl} alt={selTeam.name} className="w-10 h-10 object-contain shrink-0" />}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Tu pick</p>
+                  <p className="text-lg font-black text-white leading-tight">{selectedWcTeamName}</p>
+                </div>
+                <button onClick={() => setSelectedTeamId(null)}
+                  className="ml-auto w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/40">✕</button>
+              </div>
+              <div className="px-6 pt-5 pb-2 space-y-3">
+                <p className="text-xs font-black uppercase tracking-widest text-white/30 text-center">¿Cómo va a quedar?</p>
+                <button onClick={() => handleWcPick(selectedTeamId, 'WIN')} disabled={!!picking}
+                  className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-base text-amber-400 bg-amber-500/12 border border-amber-500/35 active:scale-[0.98] disabled:opacity-40 transition-all">
+                  <span className="text-xl">🏆</span>
+                  <span>{picking === `${selectedTeamId}-WIN` ? 'Guardando…' : 'Gana'}</span>
+                </button>
+                <button onClick={() => handleWcPick(selectedTeamId, 'WIN_OR_DRAW')} disabled={!!picking}
+                  className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-base text-sky-400 bg-sky-500/10 border border-sky-500/30 active:scale-[0.98] disabled:opacity-40 transition-all">
+                  <span className="text-xl">🤝</span>
+                  <span>{picking === `${selectedTeamId}-WIN_OR_DRAW` ? 'Guardando…' : 'Empata'}</span>
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ══ PICK BOTTOM SHEET — LEAGUE ══════════════════════════════════════ */}
+      {isLeague && leagueSelectedTeamId && leagueDeadline?.firstKickoff
+        && new Date(leagueDeadline.firstKickoff).getTime() > Date.now() && (
+        <>
+          <div className="fixed inset-x-0 top-0 z-[60] bg-black/60"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
+            onClick={() => setLeagueSelectedTeamId(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#13151a] rounded-t-3xl shadow-2xl"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}
+          >
+            <div className="flex justify-center pt-3 pb-4">
+              <div className="w-10 h-1 rounded-full bg-white/15" />
+            </div>
+            <div className="px-6 pb-3">
+              <button
+                onClick={() => handleLeaguePick(leagueSelectedTeamId)}
+                disabled={!!leaguePickingTeamId}
+                className="w-full py-4 rounded-2xl bg-amber-500 text-black font-black text-base uppercase tracking-widest disabled:opacity-50 active:scale-[0.98] transition-all"
+              >
+                {leaguePickingTeamId ? 'Guardando…' : `Elegir ${selectedLeagueTeamName}`}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <MobileBottomNav />
+    </div>
+    </IsLightCtx.Provider>
+  );
+}
+
+// ── WcPickTab ──────────────────────────────────────────────────────────────
+
+function WcPickTab({
+  ctx, loading, selectedTeamId, picking, countdown, isEliminated,
+  onSelectTeam, onPick, onNav,
+}: {
+  ctx: WcTodayCtx | null;
+  loading: boolean;
+  selectedTeamId: string | null;
+  picking: string | null;
+  countdown: string;
+  isEliminated: boolean;
+  onSelectTeam: (id: string) => void;
+  onPick: (teamId: string, pickType: 'WIN' | 'WIN_OR_DRAW') => void;
+  onNav: (dir: 'prev' | 'next') => void;
+}) {
+  const isLight = useIsLight();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-7 h-7 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!ctx?.matchday) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 px-6">
+        <Trophy className={`w-10 h-10 ${isLight ? 'text-amber-500' : 'text-amber-400/40'}`} />
+        <p className={`text-sm text-center ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
+          {ctx ? 'No hay partidos disponibles por ahora.' : 'No hay información de la jornada.'}
+        </p>
+      </div>
+    );
+  }
+
+  const { matchday, matches, myPick, participant } = ctx;
+  const isPicked = !!myPick?.team;
+  const deadlinePassed = matchday.deadlinePassed;
+  const eliminated = participant.status === 'ELIMINATED';
+  const phase = matchday.tournamentPhase;
+
+  // Group matches
+  const groups = matches.reduce<Record<string, typeof matches>>((acc, m) => {
+    const key = m.wcGroup ? `Grupo ${m.wcGroup}` : (phase ? (PHASE_LABELS[phase] ?? phase) : 'Partidos');
+    (acc[key] ??= []).push(m);
+    return acc;
+  }, {});
+
+  return (
+    <div className="px-4 py-4 space-y-4 pb-[140px]">
+
+      {/* Day header */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => onNav('prev')}
+          disabled={!matchday.prevNumber}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-20 disabled:cursor-not-allowed ${isLight ? 'bg-slate-200' : 'bg-white/5'}`}
+        >
+          <ChevronLeft className={`w-4 h-4 ${isLight ? 'text-slate-500' : 'text-white/60'}`} />
+        </button>
+
+        <div className="text-center">
+          <p className={`text-xs font-black uppercase tracking-widest ${isLight ? 'text-amber-700' : 'text-amber-400/80'}`}>
+            {phase ? PHASE_LABELS[phase] ?? phase : 'Mundial 2026'}
+          </p>
+          <p className={`text-lg font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>Día {matchday.number}</p>
+          {matchday.firstKickoff && (
+            <div className={`flex items-center justify-center gap-1 mt-0.5 ${deadlinePassed ? (isLight ? 'text-slate-400' : 'text-white/25') : (isLight ? 'text-amber-600' : 'text-amber-400/70')}`}>
+              <Clock className="w-3 h-3" />
+              <span className="text-[11px] font-semibold">
+                {deadlinePassed ? 'Cerrado' : countdown}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => onNav('next')}
+          disabled={!matchday.nextNumber}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-20 disabled:cursor-not-allowed ${isLight ? 'bg-slate-200' : 'bg-white/5'}`}
+        >
+          <ChevronRight className={`w-4 h-4 ${isLight ? 'text-slate-500' : 'text-white/60'}`} />
+        </button>
+      </div>
+
+      {/* Current pick banner */}
+      {isPicked && (
+        <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${
+          myPick!.status === 'SURVIVED'
+            ? 'bg-emerald-500/10 border-emerald-500/30'
+            : myPick!.status === 'PENDING'
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : 'bg-red-500/10 border-red-500/25'
+        }`}>
+          <img src={myPick!.team!.logoUrl} alt={myPick!.team!.name} className="w-10 h-10 object-contain" />
+          <div className="flex-1 min-w-0">
+            <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Tu pick</p>
+            <p className={`text-base font-black truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>{myPick!.team!.name}</p>
+          </div>
+          <div className={`flex items-center gap-1 ${PICK_STATUS_COMPACT[myPick!.status]?.cls ?? 'text-white/40'}`}>
+            {PICK_STATUS_COMPACT[myPick!.status]?.icon}
+            <span className="text-[11px] font-bold">{PICK_STATUS_COMPACT[myPick!.status]?.label ?? myPick!.status}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Eliminated banner */}
+      {eliminated && (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/8 px-4 py-3 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-red-400/60 shrink-0" />
+          <p className="text-xs text-red-300/60">
+            Eliminado
+            {ctx.participant.eliminatedAtPhase ? ` · ${PHASE_LABELS[ctx.participant.eliminatedAtPhase] ?? ctx.participant.eliminatedAtPhase}` : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Matches grouped */}
+      {Object.entries(groups).map(([groupName, groupMatches]) => (
+        <div key={groupName} className="space-y-2">
+          {Object.keys(groups).length > 1 && (
+            <p className={`text-[10px] font-black uppercase tracking-widest px-1 ${isLight ? 'text-slate-400' : 'text-white/25'}`}>{groupName}</p>
+          )}
+          {groupMatches.map((m) => {
+            const isHomeMyPick = myPick?.team?.id === m.homeTeam.id;
+            const isAwayMyPick = myPick?.team?.id === m.awayTeam.id;
+            const isHomeSelected = selectedTeamId === m.homeTeam.id;
+            const isAwaySelected = selectedTeamId === m.awayTeam.id;
+            const canPick = !deadlinePassed && !eliminated && m.status === 'SCHEDULED';
+            const isFinished = m.status === 'FINISHED' || m.status === 'LIVE';
+
+            return (
+              <div key={m.id} className={`rounded-2xl border overflow-hidden transition-all ${
+                isHomeMyPick || isAwayMyPick
+                  ? 'border-amber-500/30 bg-amber-500/5'
+                  : isLight ? 'border-slate-200 bg-white' : 'border-white/8 bg-white/3'
+              }`}>
+                <div className="flex items-stretch min-h-[72px]">
+                  {/* Local */}
+                  <button
+                    onClick={() => canPick && onSelectTeam(m.homeTeam.id)}
+                    disabled={!canPick || (m.homeUsed && !isHomeMyPick)}
+                    className={`flex-1 flex items-center gap-3 px-4 py-3 transition-all ${
+                      isHomeSelected ? 'bg-amber-500/20' :
+                      isHomeMyPick ? 'bg-amber-500/10' :
+                      canPick && !(m.homeUsed && !isHomeMyPick) ? 'active:bg-white/5' : ''
+                    } ${(m.homeUsed && !isHomeMyPick && !isHomeSelected) ? 'opacity-30' : ''}`}
+                  >
+                    <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-10 h-10 object-contain shrink-0" />
+                    <div className="min-w-0">
+                      <p className={`text-sm font-bold leading-tight line-clamp-2 text-left ${
+                        isHomeMyPick || isHomeSelected ? 'text-amber-300' : (isLight ? 'text-slate-700' : 'text-white/80')
+                      }`}>{m.homeTeam.name}</p>
+                      {m.homeUsed && !isHomeMyPick && (
+                        <p className="text-[9px] font-black text-red-400/60 uppercase tracking-wider">Usado</p>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Centro: marcador o hora */}
+                  <div className={`w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 border-x ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+                    {(m.status === 'FINISHED' || m.status === 'LIVE') && m.homeScore !== null ? (
+                      <>
+                        <div className="flex items-center gap-1">
+                          <span className={`text-base font-black ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.homeScore}</span>
+                          <span className={`text-sm font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>-</span>
+                          <span className={`text-base font-black ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.awayScore}</span>
+                        </div>
+                        {m.status === 'LIVE' && (
+                          <span className="text-[9px] font-black text-emerald-400 animate-pulse">EN VIVO</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-white/50'}`}>{formatKickoff(m.kickoffTime)}</span>
+                        <span className={`text-[10px] font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>vs</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Visitante */}
+                  <button
+                    onClick={() => canPick && onSelectTeam(m.awayTeam.id)}
+                    disabled={!canPick || (m.awayUsed && !isAwayMyPick)}
+                    className={`flex-1 flex items-center gap-3 px-4 py-3 flex-row-reverse transition-all ${
+                      isAwaySelected ? 'bg-amber-500/20' :
+                      isAwayMyPick ? 'bg-amber-500/10' :
+                      canPick && !(m.awayUsed && !isAwayMyPick) ? 'active:bg-white/5' : ''
+                    } ${(m.awayUsed && !isAwayMyPick && !isAwaySelected) ? 'opacity-30' : ''}`}
+                  >
+                    <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-10 h-10 object-contain shrink-0" />
+                    <div className="min-w-0">
+                      <p className={`text-sm font-bold leading-tight line-clamp-2 text-right ${
+                        isAwayMyPick || isAwaySelected ? 'text-amber-300' : (isLight ? 'text-slate-700' : 'text-white/80')
+                      }`}>{m.awayTeam.name}</p>
+                      {m.awayUsed && !isAwayMyPick && (
+                        <p className="text-[9px] font-black text-red-400/60 uppercase tracking-wider text-right">Usado</p>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {matches.length === 0 && (
+        <p className={`text-center text-sm py-8 ${isLight ? 'text-slate-400' : 'text-white/25'}`}>Sin partidos en este día.</p>
+      )}
+    </div>
+  );
+}
+
+// ── LeaguePickTab ──────────────────────────────────────────────────────────
+
+function LeaguePickTab({
+  deadline, matches, myPick, loading, selectedTeamId, pickingTeamId, onSelectTeam, onPick,
+}: {
+  deadline: LeagueDeadline | null;
+  matches: LeagueMatch[];
+  myPick: LeaguePick | null;
+  loading: boolean;
+  selectedTeamId: string | null;
+  pickingTeamId: string | null;
+  onSelectTeam: (id: string) => void;
+  onPick: (teamId: string) => void;
+}) {
+  const isLight = useIsLight();
+  if (loading) {
+    return <div className="flex items-center justify-center py-20"><div className="w-7 h-7 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" /></div>;
+  }
+
+  if (!deadline?.matchdayNumber) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 px-6">
+        <Trophy className={`w-10 h-10 ${isLight ? 'text-slate-300' : 'text-white/20'}`} />
+        <p className={`text-sm text-center ${isLight ? 'text-slate-400' : 'text-white/30'}`}>No hay jornada disponible.</p>
+      </div>
+    );
+  }
+
+  const deadlinePassed = deadline.firstKickoff
+    ? new Date(deadline.firstKickoff).getTime() <= Date.now()
+    : false;
+
+  return (
+    <div className="px-4 py-4 space-y-4 pb-[140px]">
+      {/* Matchday header */}
+      <div className="text-center space-y-0.5">
+        <p className={`text-xs font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Jornada actual</p>
+        <p className={`text-2xl font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>J{deadline.matchdayNumber}</p>
+        {deadline.firstKickoff && (
+          <p className={`text-xs font-semibold ${deadlinePassed ? (isLight ? 'text-slate-400' : 'text-white/25') : (isLight ? 'text-amber-700' : 'text-amber-400/80')}`}>
+            {deadlinePassed ? 'Cerrada' : `Cierra a las ${formatKickoff(deadline.firstKickoff)}`}
+          </p>
+        )}
+      </div>
+
+      {/* My pick */}
+      {myPick?.team && (
+        <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${
+          myPick.status === 'SURVIVED' ? 'bg-emerald-500/10 border-emerald-500/30' :
+          myPick.status === 'PENDING' ? 'bg-amber-500/10 border-amber-500/30' :
+          'bg-red-500/10 border-red-500/25'
+        }`}>
+          <img src={myPick.team.logoUrl} alt={myPick.team.name} className="w-10 h-10 object-contain" />
+          <div className="flex-1 min-w-0">
+            <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Tu pick</p>
+            <p className={`text-base font-black truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>{myPick.team.name}</p>
+          </div>
+          <div className={`flex items-center gap-1 ${PICK_STATUS_COMPACT[myPick.status]?.cls ?? 'text-white/40'}`}>
+            {PICK_STATUS_COMPACT[myPick.status]?.icon}
+          </div>
+        </div>
+      )}
+
+      {/* Matches */}
+      {matches.map((m) => {
+        const isHomeSelected = selectedTeamId === m.homeTeam.id;
+        const isAwaySelected = selectedTeamId === m.awayTeam.id;
+        const isHomeMyPick = myPick?.team?.id === m.homeTeam.id;
+        const isAwayMyPick = myPick?.team?.id === m.awayTeam.id;
+        const canPick = !deadlinePassed && m.status === 'SCHEDULED';
+        const isFinished = m.status === 'FINISHED' || m.status === 'LIVE';
+        return (
+          <div key={m.id} className={`rounded-2xl border overflow-hidden ${
+            isHomeMyPick || isAwayMyPick ? 'border-amber-500/30 bg-amber-500/5' : (isLight ? 'border-slate-200 bg-white' : 'border-white/8 bg-white/3')
+          }`}>
+            <div className="flex items-stretch min-h-[72px]">
+              {/* Local */}
+              <button
+                onClick={() => canPick && onSelectTeam(m.homeTeam.id)}
+                disabled={!canPick}
+                className={`flex-1 flex items-center gap-3 px-4 py-3 transition-all ${
+                  isHomeSelected ? 'bg-amber-500/20' :
+                  isHomeMyPick ? 'bg-amber-500/10' :
+                  canPick ? 'active:bg-white/5' : ''
+                }`}
+              >
+                <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-10 h-10 object-contain shrink-0" />
+                <p className={`text-sm font-bold leading-tight line-clamp-2 ${
+                  isHomeMyPick || isHomeSelected ? 'text-amber-300' : (isLight ? 'text-slate-700' : 'text-white/80')
+                }`}>{m.homeTeam.name}</p>
+              </button>
+
+              {/* Centro */}
+              <div className={`w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 border-x ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+                {isFinished && m.homeScore !== null ? (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-base font-black ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.homeScore}</span>
+                    <span className={`text-sm font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>-</span>
+                    <span className={`text-base font-black ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.awayScore}</span>
+                  </div>
+                ) : (
+                  <>
+                    <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-white/50'}`}>{formatKickoff(m.kickoffTime)}</span>
+                    <span className={`text-[10px] font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>vs</span>
+                  </>
+                )}
+              </div>
+
+              {/* Visitante */}
+              <button
+                onClick={() => canPick && onSelectTeam(m.awayTeam.id)}
+                disabled={!canPick}
+                className={`flex-1 flex items-center gap-3 px-4 py-3 flex-row-reverse transition-all ${
+                  isAwaySelected ? 'bg-amber-500/20' :
+                  isAwayMyPick ? 'bg-amber-500/10' :
+                  canPick ? 'active:bg-white/5' : ''
+                }`}
+              >
+                <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-10 h-10 object-contain shrink-0" />
+                <p className={`text-sm font-bold leading-tight line-clamp-2 text-right ${
+                  isAwayMyPick || isAwaySelected ? 'text-amber-300' : (isLight ? 'text-slate-700' : 'text-white/80')
+                }`}>{m.awayTeam.name}</p>
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── PlayersTab ─────────────────────────────────────────────────────────────
+
+function PlayersTab({
+  isWc, wcParticipants, leagueStandings, loading, isAdmin, championshipId,
+}: {
+  isWc: boolean;
+  wcParticipants: WcParticipant[];
+  leagueStandings: LeagueStanding[];
+  loading: boolean;
+  isAdmin?: boolean;
+  championshipId?: string;
+}) {
+  const isLight = useIsLight();
+  const router = useRouter();
+  if (loading) return <div className="flex items-center justify-center py-20"><div className="w-7 h-7 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" /></div>;
+
+  if (isWc) {
+    const active = wcParticipants.filter(p => p.status === 'ACTIVE');
+    const eliminated = wcParticipants.filter(p => p.status !== 'ACTIVE');
+    return (
+      <div className="px-4 py-4 space-y-4 pb-[80px]">
+        {isAdmin && championshipId && (
+          <button
+            onClick={() => router.push(`/championship/${championshipId}/invite`)}
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl border font-black text-sm uppercase tracking-wider ${
+              isLight ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Invitar jugadores
+          </button>
+        )}
+        {active.length > 0 && (
+          <div className="space-y-2">
+            <p className={`text-[10px] font-black uppercase tracking-widest px-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>En juego — {active.length}</p>
+            <div className={`rounded-2xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
+              {active.map((p, i) => <WcPlayerRow key={p.alias} p={p} i={i} total={active.length} />)}
+            </div>
+          </div>
+        )}
+        {eliminated.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-red-400/40 px-1">Eliminados — {eliminated.length}</p>
+            <div className={`rounded-2xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/5'}`}>
+              {eliminated.map((p, i) => <WcPlayerRow key={p.alias} p={p} i={i} total={eliminated.length} />)}
+            </div>
+          </div>
+        )}
+        {wcParticipants.length === 0 && <p className={`text-center text-sm py-10 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin jugadores todavía.</p>}
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden">
-      <Suspense fallback={null}>
-        <SyncTabFromUrl onTab={setMobileTab} />
-      </Suspense>
-      <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${BG_IMAGE}')` }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/65 to-slate-950/95" />
-      {isWcMode && (
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/40 via-transparent to-amber-900/30 pointer-events-none" />
-      )}
-
-      <header className={`relative z-10 flex min-h-[3.25rem] items-center justify-between border-b px-6 pb-2 pt-[max(0.75rem,env(safe-area-inset-top,0px))] bg-gradient-to-b to-transparent ${isWcMode ? 'border-amber-500/30 from-amber-950/60' : 'border-white/10 from-black/40'}`}>
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg border flex items-center justify-center bg-gradient-to-b ${isWcMode ? 'from-amber-400/40 to-amber-600/20 border-amber-400/40' : 'from-yellow-400/30 to-yellow-600/15 border-yellow-300/30'}`}>
-            <Trophy className={`h-5 w-5 ${isWcMode ? 'text-amber-300' : 'text-yellow-200'}`} />
+    <div className="px-4 py-4 pb-[80px]">
+      <div className={`rounded-2xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
+        {leagueStandings.map((s, i) => (
+          <div key={s.participantId} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+            <span className={`w-5 text-xs font-black shrink-0 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{s.alias}</p>
+              {s.eliminatedAtMatchday && <p className="text-[10px] text-red-400/60">Elim. J{s.eliminatedAtMatchday}</p>}
+            </div>
+            {s.status === 'ACTIVE'
+              ? <span className={`text-[11px] font-black ${isLight ? 'text-slate-500' : 'text-white/60'}`}>{s.totalPoints} pts</span>
+              : <span className="text-[10px] text-red-400/50 font-bold uppercase">Eliminado</span>
+            }
           </div>
-          <div className="font-extrabold tracking-wide">Pick &amp; Survive</div>
-          {isWcMode && (
-            <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-1.5 py-0.5">
-              WC 2026
-            </span>
+        ))}
+        {leagueStandings.length === 0 && <p className={`text-center text-sm py-10 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin datos.</p>}
+      </div>
+    </div>
+  );
+}
+
+function WcPlayerRow({ p, i, total }: { p: WcParticipant; i: number; total: number }) {
+  const isLight = useIsLight();
+  const cfg = p.lastPick ? (PICK_STATUS_COMPACT[p.lastPick.pickStatus] ?? null) : null;
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 border-b ${i === total - 1 ? 'border-0' : (isLight ? 'border-slate-100' : 'border-white/5')}`}>
+      <div className={`w-2 h-2 rounded-full shrink-0 ${p.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-red-400/40'}`} />
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{p.alias}</p>
+        {p.eliminatedAtPhase && (
+          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-white/25'}`}>{PHASE_LABELS[p.eliminatedAtPhase] ?? p.eliminatedAtPhase}</p>
+        )}
+      </div>
+      {p.lastPick && (
+        <div className="shrink-0 flex items-center gap-1.5">
+          {p.lastPick.team && (
+            <img src={p.lastPick.team.logoUrl} alt={p.lastPick.team.name} className="w-5 h-5 object-contain" />
           )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="sm:hidden text-white/90 hover:text-white hover:bg-white/10"
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label="Abrir menú"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-white/80 hover:text-white"
-            onClick={() => setNotificationsOpen(true)}
-            aria-label="Abrir notificaciones"
-          >
-            <Bell className="h-4 w-4" />
-            {unreadNotificationsCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[10px] leading-4 text-white text-center">
-                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
-              </span>
-            )}
-          </Button>
-          <div className="hidden sm:flex items-center gap-2 text-sm text-slate-200/90">
-            <UserRound className="h-4 w-4" />
-            {user?.alias}
-          </div>
-          <Button
-            variant="outline"
-            className="hidden sm:inline-flex border-white/15 bg-white/5 text-white hover:bg-white/10"
-            onClick={logout}
-          >
-            Cerrar sesión
-          </Button>
-        </div>
-      </header>
-
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-[1px]">
-          <div className="absolute right-0 top-0 h-full w-[88%] max-w-sm bg-slate-950 border-l border-white/10 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold text-slate-100">Menú</div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:text-white hover:bg-white/10"
-                onClick={() => setMobileMenuOpen(false)}
-                aria-label="Cerrar menú"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  router.push('/championship/new');
-                }}
-              >
-                <Trophy className="h-4 w-4" /> + Nuevo campeonato
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleViewLeague();
-                }}
-              >
-                <LayoutDashboard className="h-4 w-4" /> Ver Liga
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  router.push('/profile');
-                }}
-              >
-                <UserRound className="h-4 w-4" /> Mi Perfil
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleManageLeague();
-                }}
-              >
-                <Settings2 className="h-4 w-4" /> Gestionar Liga
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-red-200 hover:text-red-100 hover:bg-red-500/10"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  logout();
-                }}
-              >
-                <UserRound className="h-4 w-4" /> Cerrar sesión
-              </Button>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-              <div className="text-sm font-semibold text-slate-100 mb-2">Resumen de campeonatos</div>
-              {createdChampionships.length === 0 ? (
-                <div className="text-xs text-slate-400">Aún no has creado ninguno.</div>
-              ) : (
-                <div className="space-y-2">
-                  {createdChampionships.slice(0, 4).map((c) => (
-                    <button
-                      key={c.id}
-                      className="w-full text-left rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        router.push(getChampionshipHref(c));
-                      }}
-                    >
-                      <div className="text-xs font-semibold text-slate-100 truncate">{c.name}</div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        {c.footballLeague.name} · {MODE_LABEL[c.mode] ?? c.mode}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-slate-100">
-                  Calendario actual (J{nextDeadline?.matchdayNumber ?? activeEditionMatchday})
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-[11px] border-white/15 bg-white/5 text-white hover:bg-white/10"
-                  onClick={() => void fetchSidebarMatches()}
-                  disabled={sidebarMatchesLoading}
-                >
-                  {sidebarMatchesLoading ? '…' : 'Actualizar'}
-                </Button>
-              </div>
-              <div className="mt-3 space-y-2 max-h-64 overflow-auto pr-1">
-                {sidebarMatchesLoading ? (
-                  <div className="text-xs text-slate-400">Cargando partidos...</div>
-                ) : sidebarMatches.length === 0 ? (
-                  <div className="text-xs text-slate-400">Sin partidos para mostrar.</div>
-                ) : (
-                  sidebarMatches.slice(0, 8).map((m) => (
-                    <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-cyan-200 font-semibold">{formatMatchKickoff(m.kickoffTime)}</span>
-                        <span className="text-[11px] text-slate-400">{m.status}</span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-center gap-2">
-                        <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-5 h-5 object-contain" />
-                        <span className="text-[11px] text-slate-300">vs</span>
-                        <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-5 h-5 object-contain" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+          {cfg && <span className={`${cfg.cls}`}>{cfg.icon}</span>}
         </div>
       )}
+    </div>
+  );
+}
 
-      {notificationsOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[1px]">
-          <div className="absolute right-0 top-0 h-full w-[92%] max-w-md bg-slate-950 border-l border-white/10 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-sm font-semibold text-slate-100">Notificaciones</div>
-                <div className="text-xs text-slate-400">Revisa recordatorios y solicitudes</div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:text-white hover:bg-white/10"
-                onClick={() => setNotificationsOpen(false)}
-                aria-label="Cerrar notificaciones"
+// ── HistorialTab ───────────────────────────────────────────────────────────
+
+const PICK_STATUS_HIST: Record<string, { label: string; cls: string }> = {
+  SURVIVED:           { label: 'Sobrevivió', cls: 'text-emerald-400' },
+  DRAW_ELIMINATED:    { label: 'Empate · elim.', cls: 'text-red-400' },
+  LOSS_ELIMINATED:    { label: 'Derrota · elim.', cls: 'text-red-400' },
+  NO_PICK_ELIMINATED: { label: 'Sin pick · elim.', cls: 'text-red-400/60' },
+  PENDING:            { label: 'Pendiente', cls: 'text-amber-400' },
+};
+
+function HistorialTab({
+  isWc, entries, loading, expandedId, onToggle, details, detailLoadingId,
+}: {
+  isWc: boolean;
+  entries: EditionHistoryEntry[];
+  loading: boolean;
+  expandedId: string | null;
+  onToggle: (id: string) => void;
+  details: Record<string, EditionDetail>;
+  detailLoadingId: string | null;
+}) {
+  const isLight = useIsLight();
+  if (!isWc) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 px-6">
+        <p className={`text-sm text-center ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Historial disponible para ediciones World Cup.</p>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="flex items-center justify-center py-20"><div className="w-7 h-7 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" /></div>;
+  if (entries.length === 0) return <div className={`py-16 text-center text-sm ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin ediciones finalizadas.</div>;
+
+  return (
+    <div className="px-4 py-4 space-y-2 pb-[80px]">
+      <p className={`text-[10px] font-black uppercase tracking-widest px-1 ${isLight ? 'text-amber-600' : 'text-amber-400/70'}`}>Historial de campeones</p>
+      <div className={`rounded-2xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+        {entries.map((e, i) => {
+          const date = e.finishedAt
+            ? new Date(e.finishedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '—';
+          const isFirst = i === 0;
+          const isExpanded = expandedId === e.id;
+          const detail = details[e.id];
+
+          return (
+            <div key={e.id} className={`border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+              <button
+                onClick={() => onToggle(e.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${isFirst ? 'bg-amber-500/5' : ''} ${isExpanded ? (isLight ? 'bg-slate-50' : 'bg-white/4') : (isLight ? 'hover:bg-slate-50' : 'hover:bg-white/3')}`}
               >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="mb-3">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                onClick={() => void fetchNotifications()}
-                disabled={notificationsLoading}
-              >
-                {notificationsLoading ? 'Actualizando...' : 'Actualizar'}
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              {notificationsLoading ? (
-                <div className="text-sm text-slate-400">Cargando notificaciones...</div>
-              ) : notifications.length === 0 ? (
-                <div className="text-sm text-slate-400">No tienes notificaciones por ahora.</div>
-              ) : (
-                notifications.map((n) => {
-                  const primaryAction = getNotificationPrimaryAction(n);
-                  return (
-                    <div key={n.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium text-slate-100">{formatNotificationLabel(n)}</div>
-                          <div className="text-xs text-slate-400 mt-1">
-                            {new Date(n.createdAt).toLocaleString('es-ES', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </div>
-                        </div>
-                        {!n.read && <Badge variant="destructive">Nueva</Badge>}
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {primaryAction && (
-                          <Button
-                            size="sm"
-                            className="h-8 bg-cyan-500/85 hover:bg-cyan-500 text-slate-950"
-                            onClick={() => {
-                              if (!n.read) void markNotificationAsRead(n.id);
-                              primaryAction.action();
-                            }}
-                          >
-                            {primaryAction.label}
-                          </Button>
-                        )}
-                        {!n.read && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                            onClick={() => void markNotificationAsRead(n.id)}
-                            disabled={markingNotificationId === n.id}
-                          >
-                            {markingNotificationId === n.id ? 'Marcando...' : 'Marcar como leída'}
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                          onClick={() => void deleteNotification(n.id)}
-                          disabled={deletingNotificationId === n.id}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {deletingNotificationId === n.id ? 'Eliminando...' : 'Eliminar'}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="relative z-10 lg:hidden px-4 pb-24 pt-5">
-        <div className="rounded-3xl border shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden border-amber-500/20 bg-amber-950/35">
-          <div className="p-4 border-b border-white/10">
-            <div className="text-xs text-slate-300">Hola,</div>
-            <div className="text-lg font-extrabold text-slate-50">@{user?.alias ?? 'usuario'}</div>
-            <div className="text-xs text-slate-400 mt-1">Elige una liga o revisa tus notificaciones.</div>
-          </div>
-
-          <div className="p-4">
-            {mobileTab === 'home' ? (
-              <div className="space-y-4">
-                <div className="rounded-2xl border overflow-hidden border-amber-500/20 bg-amber-950/25">
-                  <img
-                    src="/Logo_WorldCup.png"
-                    alt="Pick & Survive"
-                    className="w-full h-44 object-contain"
-                  />
-                  <div className="p-3">
-                    <div className="text-sm font-semibold text-slate-100">Próxima deadline</div>
-                    <div className="text-xs text-slate-300 mt-1">
-                      {nextDeadlineLoading
-                        ? 'Cargando...'
-                        : nextDeadline?.matchdayNumber
-                          ? `J${nextDeadline.matchdayNumber} · ${formatDeadline(nextDeadline.firstKickoff)}`
-                          : formatDeadline(nextDeadline?.firstKickoff ?? null)}
-                    </div>
-                    <div className="text-xs mt-1 text-amber-200">
-                      {nextDeadlineLoading ? '—' : formatCountdown(nextDeadline?.firstKickoff ?? null)}
-                    </div>
-                  </div>
+                <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${isFirst ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : (isLight ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-white/5 text-white/20 border border-white/8')}`}>
+                  {entries.length - i}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-black uppercase tracking-widest ${isFirst ? 'text-amber-300' : (isLight ? 'text-slate-500' : 'text-white/50')}`}>{e.name}</p>
+                  <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-white/25'}`}>{e.participantCount} jugadores · {date}</p>
                 </div>
-
-                <Button
-                  className="w-full h-12 text-base font-extrabold bg-amber-500 hover:bg-amber-400 text-black"
-                  onClick={() =>
-                    wcEditionId
-                      ? router.push(`/world-cup/${wcEditionId}`)
-                      : router.push('/dashboard?tab=leagues')
-                  }
-                >
-                  ⚽ Ir al Mundial
-                </Button>
-
-                {wcEditionId && (
-                  <button
-                    onClick={() => router.push(`/world-cup/${wcEditionId}`)}
-                    className="relative w-full rounded-2xl overflow-hidden text-left"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-red-950 to-stone-950" />
-                    <div className="absolute inset-0 rounded-2xl border border-amber-400/30" />
-                    <div className="relative flex items-center gap-3 px-4 py-3">
-                      <Trophy className="w-7 h-7 text-amber-300 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">FIFA World Cup 2026</div>
-                        <div className="text-sm font-black text-amber-100 leading-tight">¡Hacé tu pick del día!</div>
-                      </div>
-                      <span className="ml-auto text-amber-300 text-sm font-bold shrink-0">→</span>
-                    </div>
-                  </button>
-                )}
-
-                <div className="rounded-2xl border p-3 border-amber-500/15 bg-amber-950/20">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-slate-100">Resumen de campeonatos</div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                      onClick={() => router.push('/dashboard?tab=leagues')}
-                    >
-                      Ver todos
-                    </Button>
-                  </div>
-
-                  {championships.length === 0 ? (
-                    <div className="mt-3 text-xs text-slate-400">Aún no tienes ligas.</div>
+                <div className="shrink-0 flex items-center gap-1.5">
+                  {e.winnerAlias ? (
+                    <>
+                      <Trophy className={`w-3.5 h-3.5 ${isFirst ? 'text-amber-400' : (isLight ? 'text-slate-400' : 'text-white/30')}`} />
+                      <span className={`text-xs font-bold ${isFirst ? 'text-amber-200' : (isLight ? 'text-slate-500' : 'text-white/60')}`}>{e.winnerAlias}</span>
+                    </>
                   ) : (
-                    <div className="mt-3 grid grid-cols-1 gap-2">
-                      {championships.slice(0, 4).map((c) => {
-                        const e = c.editions?.[0];
-                        const status = e?.status ?? '—';
-                        const joinReq = c._count?.joinRequests ?? 0;
+                    <span className={`text-[10px] italic ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin ganador</span>
+                  )}
+                </div>
+                <span className={`shrink-0 text-xs transition-transform duration-200 ${isLight ? 'text-slate-300' : 'text-white/20'} ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+              </button>
+
+              {isExpanded && (
+                <div className={`px-4 pb-4 border-t ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-black/20 border-white/5'}`}>
+                  {detailLoadingId === e.id && !detail && <div className={`py-4 text-center text-xs ${isLight ? 'text-slate-400' : 'text-white/25'}`}>Cargando…</div>}
+                  {detail && (
+                    <div className="space-y-3 pt-3">
+                      {detail.participants.map((p) => {
+                        const isWinner = p.alias === detail.edition.winnerAlias;
                         return (
-                          <button
-                            key={c.id}
-                            className="text-left rounded-xl border border-white/10 bg-slate-950/25 hover:bg-slate-950/35 transition px-3 py-2"
-                            onClick={() => router.push(getChampionshipHref(c))}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-sm font-bold text-slate-50 truncate">{c.name}</div>
-                                <div className="text-[11px] text-slate-400 mt-0.5 truncate">
-                                  {MODE_LABEL[c.mode] ?? c.mode} · {c.footballLeague?.name ?? '—'}
-                                </div>
-                              </div>
-                              <div className="shrink-0 flex flex-col items-end gap-1">
-                                <Badge variant="secondary">{status}</Badge>
-                                {joinReq > 0 && <div className="text-[10px] text-cyan-200">{joinReq} solicitud(es)</div>}
-                              </div>
+                          <div key={p.alias} className={`rounded-xl border ${isWinner ? 'border-amber-500/30 bg-amber-500/5' : (isLight ? 'border-slate-200 bg-white' : 'border-white/8 bg-white/3')}`}>
+                            <div className={`flex items-center gap-2 px-3 py-2.5 border-b ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+                              {isWinner && <Trophy className="w-3 h-3 text-amber-400 shrink-0" />}
+                              <span className={`text-xs font-black uppercase tracking-wider flex-1 ${isWinner ? 'text-amber-300' : (isLight ? 'text-slate-500' : 'text-white/60')}`}>{p.alias}</span>
+                              <span className={`text-[10px] ${p.status === 'ACTIVE' ? 'text-emerald-400' : (isLight ? 'text-slate-400' : 'text-white/25')}`}>{p.status === 'ACTIVE' ? 'Activo' : 'Eliminado'}</span>
                             </div>
-                          </button>
+                            {p.picks.length === 0
+                              ? <p className={`px-3 py-2.5 text-[11px] italic ${isLight ? 'text-slate-400' : 'text-white/25'}`}>Sin picks</p>
+                              : p.picks.map((pk) => {
+                                  const cfg = PICK_STATUS_HIST[pk.pickStatus] ?? { label: pk.pickStatus, cls: 'text-white/40' };
+                                  return (
+                                    <div key={pk.matchdayNumber} className={`flex items-center gap-2.5 px-3 py-2 border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/4'}`}>
+                                      <span className={`text-[10px] font-black w-8 shrink-0 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>D{pk.matchdayNumber}</span>
+                                      {pk.team ? (
+                                        <>
+                                          <img src={pk.team.logoUrl} alt={pk.team.name} className="w-4 h-4 object-contain shrink-0" />
+                                          <span className={`flex-1 text-xs truncate ${isLight ? 'text-slate-500' : 'text-white/60'}`}>{pk.team.name}</span>
+                                        </>
+                                      ) : (
+                                        <span className={`flex-1 text-xs italic ${isLight ? 'text-slate-400' : 'text-white/25'}`}>Sin equipo</span>
+                                      )}
+                                      <span className={`text-[10px] font-semibold shrink-0 ${cfg.cls}`}>{cfg.label}</span>
+                                    </div>
+                                  );
+                                })
+                            }
+                          </div>
                         );
                       })}
                     </div>
                   )}
                 </div>
-
-                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-slate-100">
-                      Calendario (J{nextDeadline?.matchdayNumber ?? activeEditionMatchday})
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                      onClick={() => void fetchSidebarMatches()}
-                      disabled={sidebarMatchesLoading}
-                    >
-                      {sidebarMatchesLoading ? '…' : 'Actualizar'}
-                    </Button>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {sidebarMatchesLoading ? (
-                      <div className="text-xs text-slate-400">Cargando partidos...</div>
-                    ) : sidebarMatches.length === 0 ? (
-                      <div className="text-xs text-slate-400">Sin partidos para mostrar.</div>
-                    ) : (
-                      sidebarMatches.slice(0, 8).map((m) => {
-                        const st = (m.status || '').toUpperCase();
-                        const finished = st === 'FINISHED' || st === 'FT' || st === 'AET' || st === 'PEN';
-                        return (
-                          <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/25 px-3 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] text-cyan-200 font-semibold">
-                                {formatMatchKickoff(m.kickoffTime)}
-                              </span>
-                              <span className="text-[11px] text-slate-400">{finished ? 'Final' : m.status}</span>
-                            </div>
-                            <div className="mt-2 flex items-center justify-center gap-2">
-                              <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-5 h-5 object-contain" />
-                              {finished ? (
-                                <span className="text-sm font-extrabold text-emerald-200 tabular-nums min-w-[3.5rem] text-center">
-                                  {m.homeScore ?? '—'} – {m.awayScore ?? '—'}
-                                </span>
-                              ) : (
-                                <span className="text-[11px] text-slate-300">vs</span>
-                              )}
-                              <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-5 h-5 object-contain" />
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {mobileTab === 'leagues' ? (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold text-slate-100 mr-auto">Mis ligas</div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10 shrink-0"
-                    onClick={() => router.push('/join-code')}
-                  >
-                    Unirme por código
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10 shrink-0"
-                    onClick={() => router.push('/championship/new')}
-                  >
-                    + Nueva
-                  </Button>
-                </div>
-
-                {championships.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                    Aún no tienes ligas. Crea una para empezar.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3">
-                    {championships.map((c) => {
-                      const e = c.editions?.[0];
-                      const status = e?.status ?? '—';
-                      const md = e?.startMatchday ?? null;
-                      const joinReq = c._count?.joinRequests ?? 0;
-                      const editionId = e?.id ?? null;
-                      const pick = editionId ? championshipMyPicks[editionId] : null;
-                      const hasPickTeam = Boolean(pick?.team);
-                      const deadlineMd =
-                        editionId ? (editionDeadlines[editionId]?.matchdayNumber ?? null) : null;
-                      const shouldWarnNoPick =
-                        editionId && deadlineMd !== null && !pick && !myPicksLoading;
-                      return (
-                        <button
-                          key={c.id}
-                          className="text-left rounded-2xl border border-white/10 bg-slate-950/30 hover:bg-slate-950/40 transition px-4 py-3"
-                          onClick={() => router.push(getChampionshipHref(c))}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm font-bold text-slate-50 truncate">{c.name}</div>
-                              <div className="text-xs text-slate-400 mt-1">
-                                {MODE_LABEL[c.mode] ?? c.mode} · {c.footballLeague?.name ?? '—'}
-                              </div>
-                            </div>
-                            <div className="shrink-0 flex flex-col items-end gap-1">
-                              <Badge variant="secondary">{status}</Badge>
-                              {joinReq > 0 && (
-                                <div className="text-[11px] text-cyan-200">{joinReq} solicitud(es)</div>
-                              )}
-                              {myPicksLoading ? (
-                                <div className="text-[11px] text-slate-400">Pick…</div>
-                              ) : hasPickTeam && pick?.team ? (
-                                <div className="flex items-center gap-1 text-[11px] text-emerald-200">
-                                  <img
-                                    src={pick.team.logoUrl}
-                                    alt={pick.team.name}
-                                    title={pick.team.name}
-                                    className="w-4 h-4 object-contain"
-                                  />
-                                  Pick
-                                </div>
-                              ) : pick && !pick.team ? (
-                                <div className="text-[11px] text-slate-400">Sin pick</div>
-                              ) : shouldWarnNoPick ? (
-                                <div className="flex items-center gap-1 text-[11px] text-amber-200">
-                                  <AlertTriangle className="h-3.5 w-3.5" />
-                                  Sin pick
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                          {md !== null && (
-                            <div className="mt-2 text-xs text-slate-300">
-                              Inicio: jornada {md}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {mobileTab === 'notifications' ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-100">Notificaciones</div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                    onClick={() => void fetchNotifications()}
-                    disabled={notificationsLoading}
-                  >
-                    {notificationsLoading ? 'Actualizando...' : 'Actualizar'}
-                  </Button>
-                </div>
-
-                {notificationsLoading ? (
-                  <div className="text-sm text-slate-400">Cargando notificaciones...</div>
-                ) : notifications.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                    No tienes notificaciones por ahora.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {notifications.map((n) => {
-                      const primaryAction = getNotificationPrimaryAction(n);
-                      return (
-                        <div key={n.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium text-slate-100">{formatNotificationLabel(n)}</div>
-                              <div className="text-xs text-slate-400 mt-1">
-                                {new Date(n.createdAt).toLocaleString('es-ES', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </div>
-                            </div>
-                            {!n.read && <Badge variant="destructive">Nueva</Badge>}
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {primaryAction && (
-                              <Button
-                                size="sm"
-                                className="h-8 bg-cyan-500/85 hover:bg-cyan-500 text-slate-950"
-                                onClick={() => {
-                                  if (!n.read) void markNotificationAsRead(n.id);
-                                  primaryAction.action();
-                                }}
-                              >
-                                {primaryAction.label}
-                              </Button>
-                            )}
-                            {!n.read && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                                onClick={() => void markNotificationAsRead(n.id)}
-                                disabled={markingNotificationId === n.id}
-                              >
-                                {markingNotificationId === n.id ? 'Marcando...' : 'Marcar como leída'}
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                              onClick={() => void deleteNotification(n.id)}
-                              disabled={deletingNotificationId === n.id}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              {deletingNotificationId === n.id ? 'Eliminando...' : 'Eliminar'}
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {mobileTab === 'profile' ? (
-              <div className="space-y-3">
-                <div className="text-sm font-semibold text-slate-100">Perfil</div>
-                <Button
-                  variant="outline"
-                  className="w-full border-white/15 bg-white/5 text-white hover:bg-white/10"
-                  onClick={() => router.push('/profile')}
-                >
-                  Ver mi perfil
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={logout}
-                >
-                  Cerrar sesión
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <MobileBottomNav unreadCount={unreadNotificationsCount} />
+              )}
+            </div>
+          );
+        })}
       </div>
+    </div>
+  );
+}
 
-      <div className="relative z-10 hidden lg:flex gap-6 px-6 pt-6 pb-10">
-        <aside className="hidden lg:flex w-72 flex-col gap-4">
-          <div className={`rounded-2xl border shadow-[0_25px_70px_rgba(0,0,0,0.35)] p-4 ${isWcMode ? 'border-amber-500/25 bg-amber-950/40' : 'border-white/10 bg-slate-950/40'}`}>
-            <div className="text-xs text-slate-300 font-semibold">Mi Liga</div>
-            <div className="text-base font-bold mt-1">{activeEditionName}</div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-slate-400">Jornada</span>
-              <span className={`text-xs px-2 py-1 rounded-full ${isWcMode ? 'bg-amber-500/20 border border-amber-300/20 text-amber-200' : 'bg-emerald-500/20 border border-emerald-300/20 text-emerald-200'}`}>
-                {activeEditionMatchday}
+// ── CalendarioTab ──────────────────────────────────────────────────────────
+
+function CalendarioTab({ matchdays, loading }: { matchdays: CalMatchday[]; loading: boolean }) {
+  const isLight = useIsLight();
+  const now = Date.now();
+
+  const todayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!loading && todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [loading]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-7 h-7 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (matchdays.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 px-6">
+        <p className={`text-sm text-center ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Sin partidos disponibles.</p>
+      </div>
+    );
+  }
+
+  // Encuentra el día "actual" (primer día con partidos futuros o el último día pasado)
+  let todayIndex = matchdays.findIndex((md) =>
+    md.matches.some((m) => m.kickoffTime && new Date(m.kickoffTime).getTime() > now),
+  );
+  if (todayIndex === -1) todayIndex = matchdays.length - 1;
+
+  return (
+    <div className="px-4 py-4 space-y-4 pb-[80px]">
+      {matchdays.map((md, mdIdx) => {
+        const isPast = md.status === 'FINISHED';
+        const isToday = mdIdx === todayIndex;
+        const phase = md.tournamentPhase;
+        const phaseLabel = phase ? (PHASE_LABELS[phase] ?? phase) : 'Mundial 2026';
+        const dayDate = md.firstKickoff
+          ? new Date(md.firstKickoff).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+          : null;
+
+        // Group matches by wcGroup
+        const groups = md.matches.reduce<Record<string, CalMatch[]>>((acc, m) => {
+          const key = m.wcGroup ? `Grupo ${m.wcGroup}` : phaseLabel;
+          (acc[key] ??= []).push(m);
+          return acc;
+        }, {});
+
+        return (
+          <div key={md.number} ref={isToday ? todayRef : undefined}>
+            {/* Day header */}
+            <div className={`flex items-center gap-2 mb-2 ${isToday ? 'sticky top-0 z-10 py-1' : ''}`}>
+              <div className={`flex-1 h-px ${isLight ? 'bg-slate-200' : 'bg-white/8'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-widest px-2 rounded-full shrink-0 ${
+                isToday
+                  ? (isLight ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-amber-500/20 text-amber-400 border border-amber-500/40')
+                  : isPast
+                  ? (isLight ? 'text-slate-400' : 'text-white/25')
+                  : (isLight ? 'text-slate-500' : 'text-white/40')
+              }`}>
+                Día {md.number}{dayDate ? ` · ${dayDate}` : ''}
               </span>
-            </div>
-            {leagueSeason !== null && <div className="text-xs text-slate-300 mt-3">Temporada: {leagueSeason}</div>}
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-2">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-              onClick={() => router.push('/championship/new')}
-            >
-              <Trophy className="h-4 w-4" /> + Nuevo campeonato
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-              onClick={() => router.push('/join-code')}
-            >
-              <UserPlus className="h-4 w-4" /> Unirme por código
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-              onClick={handleViewLeague}
-            >
-              <LayoutDashboard className="h-4 w-4" /> Ver Liga
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-              onClick={() => router.push('/profile')}
-            >
-              <UserRound className="h-4 w-4" /> Mi Perfil
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-white/85 hover:text-white hover:bg-white/5"
-              onClick={handleManageLeague}
-            >
-              <Settings2 className="h-4 w-4" /> Gestionar Liga
-            </Button>
-          </div>
-
-          <div className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-400/25 bg-amber-950/35' : 'border-white/10 bg-slate-950/35'}`}>
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Mail className={`h-4 w-4 ${isWcMode ? 'text-amber-300' : 'text-emerald-200'}`} />
-              Próxima Deadline
-            </div>
-            <div className="text-xs text-slate-300 mt-2">
-              {nextDeadlineLoading
-                ? 'Cargando...'
-                : nextDeadline?.matchdayNumber
-                  ? `J${nextDeadline.matchdayNumber} · ${formatDeadline(nextDeadline.firstKickoff)}`
-                  : formatDeadline(nextDeadline?.firstKickoff ?? null)}
-            </div>
-            <div className={`mt-4 text-xs rounded-lg px-3 py-2 ${isWcMode ? 'text-amber-200/95 bg-amber-500/10 border border-amber-300/20' : 'text-emerald-200/95 bg-emerald-500/10 border border-emerald-300/20'}`}>
-              ¡Haz tu pick antes del primer partido!
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-slate-100">
-                Partidos jornada {nextDeadline?.matchdayNumber ?? activeEditionMatchday}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-[11px] border-white/15 bg-white/5 text-white hover:bg-white/10"
-                onClick={() => void fetchSidebarMatches()}
-                disabled={sidebarMatchesLoading}
-              >
-                {sidebarMatchesLoading ? '…' : 'Actualizar'}
-              </Button>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1">
-              Marcadores al finalizar: vienen de tu BD (el servidor sincroniza con la API externa, p. ej. cada 30–90 min).
-            </div>
-            <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-              {sidebarMatchesLoading ? (
-                <div className="text-xs text-slate-400">Cargando partidos...</div>
-              ) : sidebarMatches.length === 0 ? (
-                <div className="text-xs text-slate-400">Sin partidos para mostrar.</div>
-              ) : (
-                sidebarMatches.map((m) => {
-                  const st = (m.status || '').toUpperCase();
-                  const finished =
-                    st === 'FINISHED' ||
-                    st === 'FT' ||
-                    st === 'AET' ||
-                    st === 'PEN';
-                  return (
-                    <div key={m.id} className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-cyan-200 font-semibold">
-                          {formatMatchKickoff(m.kickoffTime)}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {finished ? 'Final' : m.status}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-center gap-2">
-                        <img
-                          src={m.homeTeam.logoUrl}
-                          alt={m.homeTeam.name}
-                          title={m.homeTeam.name}
-                          className="w-5 h-5 object-contain"
-                        />
-                        {finished ? (
-                          <span className="text-sm font-extrabold text-emerald-200 tabular-nums min-w-[3.5rem] text-center">
-                            {m.homeScore ?? '—'} – {m.awayScore ?? '—'}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-slate-300">vs</span>
-                        )}
-                        <img
-                          src={m.awayTeam.logoUrl}
-                          alt={m.awayTeam.name}
-                          title={m.awayTeam.name}
-                          className="w-5 h-5 object-contain"
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </aside>
-
-        <main className="flex-1 min-w-0">
-          {/* ── World Cup 2026 — banner promocional siempre visible ── */}
-          {(() => {
-            const wcChamp = championships.find((c) => c.mode === 'WORLD_CUP');
-            const wcEdition = wcChamp?.editions.find((e) => e.status === 'ACTIVE' || e.status === 'OPEN');
-            const dest = wcEdition ? `/world-cup/${wcEdition.id}` : '/world-cup';
-            return (
-              <button
-                onClick={() => router.push(dest)}
-                className="relative w-full mb-5 rounded-2xl overflow-hidden group focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-              >
-                {/* Fondo animado */}
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-red-950 to-stone-950" />
-                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 via-transparent to-red-500/10 group-hover:from-amber-500/20 group-hover:to-red-500/20 transition-all duration-500" />
-                {/* Patrón sutil */}
-                <div className="absolute inset-0 opacity-[0.06]"
-                  style={{ backgroundImage: 'repeating-linear-gradient(45deg,#f59e0b 0,#f59e0b 1px,transparent 0,transparent 50%)', backgroundSize: '14px 14px' }} />
-                {/* Borde dorado */}
-                <div className="absolute inset-0 rounded-2xl border border-amber-400/30 group-hover:border-amber-400/60 transition-colors" />
-
-                <div className="relative px-5 py-5 sm:py-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                  {/* Icono trofeo */}
-                  <div className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center group-hover:bg-amber-400/25 transition-colors">
-                    <Trophy className="w-8 h-8 sm:w-9 sm:h-9 text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
-                  </div>
-
-                  {/* Texto */}
-                  <div className="flex-1 text-center sm:text-left">
-                    <div className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] text-amber-400/60 mb-1">
-                      🌍 USA · México · Canadá 2026
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-amber-100 leading-tight"
-                      style={{ textShadow: '0 0 20px rgba(251,191,36,0.3)' }}>
-                      ¡Juega la versión MUNDIAL!
-                    </div>
-                    <div className="text-xs sm:text-sm text-amber-300/60 mt-1">
-                      Picks diarios · Grupos · Eliminatorias · Pick Gana o Empata
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-                  <div className="shrink-0 px-5 py-2.5 rounded-xl bg-amber-400/20 border border-amber-400/40 group-hover:bg-amber-400/35 group-hover:border-amber-400/70 transition-all">
-                    <span className="text-sm font-extrabold text-amber-200 whitespace-nowrap">
-                      Entrar →
-                    </span>
-                  </div>
-                </div>
-              </button>
-            );
-          })()}
-
-          <div className={`rounded-3xl border shadow-[0_30px_90px_rgba(0,0,0,0.45)] overflow-hidden bg-gradient-to-b ${isWcMode ? 'border-amber-500/15 from-amber-950/45 to-amber-950/10' : 'border-white/10 from-slate-950/55 to-slate-950/20'}`}>
-            <div className="p-6 border-b border-white/10">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-xs text-slate-300 font-semibold">
-                    Edición Activa: Jornada {activeEditionMatchday}
-                  </div>
-                  <h1 className="text-xl font-extrabold mt-1">Tu pick elegido</h1>
-                  <div className="text-xs text-slate-400 mt-1">
-                    {activeEditionId ? 'Aquí tienes la selección que ya registraste.' : 'No hay edición activa.'}
-                  </div>
-                </div>
-              </div>
+              <div className={`flex-1 h-px ${isLight ? 'bg-slate-200' : 'bg-white/8'}`} />
             </div>
 
-            <div className="p-6">
-              {error && (
-                <Alert variant="destructive" className="mb-4 border border-red-400/20 bg-red-500/10 text-white">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                  <Clock3 className="h-4 w-4 text-cyan-200" />
-                  Cabecera de estado de temporada
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
-                  <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                    <div className="text-xs text-slate-300">Temporada</div>
-                    <div className="text-lg font-extrabold mt-1">{leagueSeason ?? '—'}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                    <div className="text-xs text-slate-300">Jornada actual</div>
-                    <div className="text-lg font-extrabold mt-1">
-                      {nextDeadline?.matchdayNumber ?? activeEditionMatchday}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                    <div className="text-xs text-slate-300">Próxima deadline</div>
-                    <div className="text-sm font-semibold mt-1">
-                      {nextDeadlineLoading ? 'Cargando...' : formatDeadline(nextDeadline?.firstKickoff ?? null)}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                    <div className="text-xs text-slate-300">Cuenta atrás</div>
-                    <div className={`text-sm font-semibold mt-1 ${isWcMode ? 'text-amber-200' : 'text-emerald-200'}`}>
-                      {nextDeadlineLoading ? 'Cargando...' : formatCountdown(nextDeadline?.firstKickoff ?? null)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {contextualAlerts.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  {contextualAlerts.map((a) => (
-                    <Alert
-                      key={a.id}
-                      className={
-                        a.tone === 'warning'
-                          ? 'border border-amber-300/30 bg-amber-500/10 text-amber-100'
-                          : 'border border-cyan-300/20 bg-cyan-500/10 text-cyan-100'
-                      }
-                    >
-                      <AlertDescription className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        {a.text}
-                      </AlertDescription>
-                    </Alert>
-                  ))}
-                </div>
-              )}
-
-              {!activeEditionId ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-slate-200/80">
-                  Aún no tienes una edición activa.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Card className="rounded-2xl border-white/10 bg-slate-950/35 text-white shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                    <CardHeader className="pb-2">
-                      <div className="text-sm font-semibold text-slate-200">Tu pick</div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      {sidebarLoading ? (
-                        <div className="text-xs text-slate-300">Cargando...</div>
-                      ) : myPick ? (
-                        <div className="flex items-center gap-3">
-                          {myPick.team?.logoUrl ? (
-                            <img
-                              src={myPick.team.logoUrl}
-                              alt={myPick.team.name}
-                              className="w-12 h-12 object-contain"
-                            />
-                          ) : null}
-                          <div className="min-w-0">
-                            <div className="font-semibold truncate">{myPick.team?.name ?? 'Sin pick'}</div>
-                            <div className="text-xs text-slate-300 mt-1">Estado: {myPick.status}</div>
-                          </div>
-                          <div className="ml-auto">
-                            <Badge
-                              variant={PICK_STATUS_BADGE[myPick.status] ?? 'default'}
-                              className="text-xs border-white/10 bg-white/10 text-white"
-                            >
-                              {myPick.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-slate-200/85">
-                          Todavía no has elegido tu pick para esta jornada.
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex gap-3">
-                        <Button
-                          onClick={() => router.push(
-                            isWcMode
-                              ? `/world-cup/${activeEditionId}`
-                              : `/edition/${activeEditionId}/standings`
-                          )}
-                          className="flex-1"
-                        >
-                          Abrir edición
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                        {!isWcMode && (
-                          <Button
-                            variant="outline"
-                            onClick={() => router.push(`/edition/${activeEditionId}/standings`)}
-                          >
-                            Clasificación
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                    <div className="text-sm font-semibold text-slate-200 mb-3">Estado rápido</div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                        <div className="text-xs text-slate-300 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-emerald-200" />
-                          Jugadores activos
-                        </div>
-                        <div className="text-lg font-extrabold mt-2 text-emerald-200">{activePlayers}</div>
-                      </div>
-                      <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                        <div className="text-xs text-slate-300 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-red-200" />
-                          Eliminados
-                        </div>
-                        <div className="text-lg font-extrabold mt-2 text-red-200">{eliminatedPlayers}</div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-slate-300 mt-4">
-                      Consejo: si quieres cambiar tu elección, hazlo desde la edición.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-sm font-semibold text-slate-100 mb-3">Tu estado en la edición</div>
-                  {sidebarLoading ? (
-                    <div className="text-xs text-slate-300">Cargando...</div>
-                  ) : !activeEditionId ? (
-                    <div className="text-xs text-slate-300">Sin edición activa.</div>
-                  ) : myPick ? (
-                    <div className="space-y-2 text-sm">
-                      <div className="text-slate-200">
-                        Pick actual:{' '}
-                        <span className="font-semibold text-white">{myPick.team?.name ?? 'Sin pick'}</span>
-                      </div>
-                      <div className="text-slate-300">
-                        Estado: <span className="font-semibold text-white">{myPick.status}</span>
-                      </div>
-                      <div className="text-slate-300">
-                        Jornada: <span className="font-semibold text-white">{myPick.matchday.number}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-300">Aún no has seleccionado pick para esta jornada.</div>
+            {/* Matches */}
+            <div className="space-y-1.5">
+              {Object.entries(groups).map(([groupName, groupMatches]) => (
+                <div key={groupName}>
+                  {Object.keys(groups).length > 1 && (
+                    <p className={`text-[9px] font-black uppercase tracking-widest px-1 mb-1 ${isLight ? 'text-slate-400' : 'text-white/25'}`}>{groupName}</p>
                   )}
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-sm font-semibold text-slate-100 mb-3">Resumen de participantes</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2">
-                      <div className="text-[11px] text-slate-300">Total</div>
-                      <div className="text-lg font-bold mt-1">{standings.length}</div>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2">
-                      <div className="text-[11px] text-slate-300">Activos</div>
-                      <div className="text-lg font-bold mt-1 text-emerald-200">{activePlayers}</div>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2">
-                      <div className="text-[11px] text-slate-300">Eliminados</div>
-                      <div className="text-lg font-bold mt-1 text-red-200">{eliminatedPlayers}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-100 mb-3">
-                    <Activity className="h-4 w-4 text-cyan-200" />
-                    Actividad reciente
-                  </div>
-                  {activityLoading ? (
-                    <div className="text-xs text-slate-300">Cargando actividad...</div>
-                  ) : recentActivity.length === 0 ? (
-                    <div className="text-xs text-slate-300">Aún no hay actividad reciente.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {recentActivity.slice(0, 5).map((item) => (
-                        <div key={item.id} className="rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2">
-                          <div className="text-xs text-slate-100">{formatNotificationLabel(item)}</div>
-                          <div className="text-[11px] text-slate-400 mt-1">
-                            {new Date(item.createdAt).toLocaleString('es-ES', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-                <div>
-                  <div className="text-lg font-semibold text-slate-200">Resumen de campeonatos</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    {championships.length > 0 ? `${championships.length} en los que participas` : 'Aún no participas en ninguno.'}
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                  onClick={() => router.push('/join-code')}
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Unirme por código
-                </Button>
-              </div>
-
-              {championships.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-slate-200/80">
-                  Crea tu primer campeonato desde el botón <span className="font-semibold">+ Nuevo campeonato</span>.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  {championships.map((c) => {
-                    const latestEdition = c.editions?.[0];
-                    const deadline =
-                      latestEdition?.id ? editionDeadlines[latestEdition.id] : undefined;
-                    const myPick =
-                      latestEdition?.id ? championshipMyPicks[latestEdition.id] : null;
+                  {groupMatches.map((m) => {
+                    const isFinished = m.status === 'FINISHED';
+                    const isLive = m.status === 'LIVE';
                     return (
-                      <Card
-                        key={c.id}
-                        className="rounded-2xl border border-white/10 bg-white/5 text-white cursor-pointer hover:bg-white/10 transition-colors"
-                        onClick={() => router.push(getChampionshipHref(c))}
-                      >
-                        <CardHeader className="pb-2">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-semibold truncate">{c.name}</div>
-                              <div className="text-xs text-slate-300 mt-1">
-                                {c.footballLeague.name} • {c.footballLeague.country}
-                              </div>
-                            </div>
+                      <div key={m.id} className={`rounded-xl border overflow-hidden ${
+                        isLight ? 'border-slate-200 bg-white' : 'border-white/8 bg-white/3'
+                      } ${isPast && !isLive ? 'opacity-70' : ''}`}>
+                        <div className="flex items-stretch min-h-[60px]">
+                          {/* Home */}
+                          <div className="flex-1 flex items-center gap-2.5 px-3 py-2.5">
+                            <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-8 h-8 object-contain shrink-0" />
+                            <p className={`text-sm font-bold leading-tight line-clamp-2 ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.homeTeam.name}</p>
+                          </div>
 
-                            {c.adminId === user?.id && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="shrink-0"
-                                disabled={deletingChampionshipId === c.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteChampionship(c.id);
-                                }}
-                              >
-                                {deletingChampionshipId === c.id ? 'Eliminando...' : 'Eliminar'}
-                              </Button>
-                            )}
-
-                            {c.adminId === user?.id && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/championship/${c.id}/invite`);
-                                }}
-                              >
-                                Invitar amigos
-                              </Button>
+                          {/* Centro */}
+                          <div className={`w-16 shrink-0 flex flex-col items-center justify-center border-x ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
+                            {isFinished || (isLive && m.homeScore !== null) ? (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <span className={`text-base font-black ${
+                                    m.homeScore! > m.awayScore! ? 'text-amber-400' : (isLight ? 'text-slate-600' : 'text-white/60')
+                                  }`}>{m.homeScore}</span>
+                                  <span className={`text-sm font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>-</span>
+                                  <span className={`text-base font-black ${
+                                    m.awayScore! > m.homeScore! ? 'text-amber-400' : (isLight ? 'text-slate-600' : 'text-white/60')
+                                  }`}>{m.awayScore}</span>
+                                </div>
+                                {isLive && (
+                                  <span className="text-[9px] font-black text-emerald-400 animate-pulse">EN VIVO</span>
+                                )}
+                                {isFinished && (
+                                  <span className={`text-[9px] font-semibold ${isLight ? 'text-slate-400' : 'text-white/25'}`}>Final</span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-white/50'}`}>{formatKickoff(m.kickoffTime)}</span>
+                                <span className={`text-[10px] font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>vs</span>
+                              </>
                             )}
                           </div>
-                        </CardHeader>
 
-                        <CardContent className="pt-0 pb-4">
-                          {latestEdition ? (
-                            <div className="space-y-4">
-                              <div>
-                                <div className="text-xs text-slate-300 font-semibold">
-                                  {EDITION_STATUS_LABEL[latestEdition.status] ?? latestEdition.status} • Jornada{' '}
-                                  <span className="font-extrabold text-white">
-                                    {deadline?.matchdayNumber ?? latestEdition.startMatchday}
-                                  </span>
-                                </div>
-                                <div className="mt-2 text-xs text-slate-300">
-                                  Deadline:{' '}
-                                  <span className="font-semibold text-white">
-                                    {deadlinesLoading ? 'Cargando...' : formatDeadline(deadline?.firstKickoff ?? null)}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                                <div className="text-xs text-slate-300 font-semibold mb-2">Tu pick</div>
-                                {myPicksLoading ? (
-                                  <div className="text-xs text-slate-300">Cargando...</div>
-                                ) : myPick ? (
-                                  <div className="flex items-center gap-3">
-                                    {myPick.team?.logoUrl ? (
-                                      <img
-                                        src={myPick.team.logoUrl}
-                                        alt={myPick.team.name}
-                                        className="w-10 h-10 object-contain"
-                                      />
-                                    ) : null}
-                                    <div className="min-w-0">
-                                      <div className="font-semibold truncate">{myPick.team?.name ?? 'Sin pick'}</div>
-                                      <div className="text-xs text-slate-300 mt-1">Estado: {myPick.status}</div>
-                                    </div>
-                                    <div className="ml-auto">
-                                      <Badge
-                                        variant={PICK_STATUS_BADGE[myPick.status] ?? 'default'}
-                                        className="text-xs border-white/10 bg-white/10 text-white"
-                                      >
-                                        {myPick.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="rounded-lg border border-white/10 bg-white/5 p-2 text-xs text-slate-200/85">
-                                    Todavía no has elegido tu pick para esta jornada.
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="secondary" className="bg-white/10 text-white">
-                                  {MODE_LABEL[c.mode] ?? c.mode}
-                                </Badge>
-                                <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
-                                  {EDITION_STATUS_LABEL[latestEdition.status] ?? latestEdition.status}
-                                </Badge>
-                              </div>
-
-                              <div className="flex gap-3 pt-1">
-                                <Button
-                                  size="sm"
-                                  className="flex-1"
-                                  variant="outline"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (latestEdition.id) router.push(
-                                      c.mode === 'WORLD_CUP'
-                                        ? `/world-cup/${latestEdition.id}`
-                                        : `/edition/${latestEdition.id}/standings`
-                                    );
-                                  }}
-                                >
-                                  Abrir edición
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-xs text-slate-300">Sin ediciones todavía.</div>
-                          )}
-                        </CardContent>
-                      </Card>
+                          {/* Away */}
+                          <div className="flex-1 flex items-center gap-2.5 px-3 py-2.5 flex-row-reverse">
+                            <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-8 h-8 object-contain shrink-0" />
+                            <p className={`text-sm font-bold leading-tight line-clamp-2 text-right ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.awayTeam.name}</p>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-              )}
+              ))}
             </div>
           </div>
-        </main>
-
-        <aside className="hidden xl:flex w-80 flex-col gap-4">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-100">Ranking de la Liga</div>
-              <Link
-                href={activeEditionId
-                  ? (isWcMode ? `/world-cup/${activeEditionId}` : `/edition/${activeEditionId}/standings`)
-                  : '/dashboard'}
-                className="text-slate-200/80 hover:text-white"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </Link>
-            </div>
-            <div className="mt-3 space-y-2">
-              {sidebarLoading ? (
-                <div className="text-xs text-slate-400">Cargando...</div>
-              ) : topRank.length === 0 ? (
-                <div className="text-xs text-slate-400">Sin datos todavía.</div>
-              ) : (
-                topRank.map((entry, idx) => (
-                  <div
-                    key={entry.participantId}
-                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10"
-                  >
-                    <span className="text-xs text-slate-400 w-6">#{idx + 1}</span>
-                    <span className="text-xs text-slate-200 truncate">@{entry.alias}</span>
-                    <span className="text-xs text-yellow-200 font-semibold">
-                      {entry.totalPoints ?? '—'} pts
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-            <div className="text-sm font-semibold text-slate-100">Estadísticas rápidas</div>
-            <div className="mt-3 grid grid-cols-1 gap-2">
-              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10">
-                <span className="text-xs text-slate-300">Jugadores activos</span>
-                <span className="text-xs font-semibold text-emerald-200">{activePlayers}</span>
-              </div>
-              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10">
-                <span className="text-xs text-slate-300">Eliminados</span>
-                <span className="text-xs font-semibold text-red-200">{eliminatedPlayers}</span>
-              </div>
-            </div>
-          </div>
-        </aside>
-      </div>
+        );
+      })}
     </div>
+  );
+}
+
+// ── WelcomeScreen ──────────────────────────────────────────────────────────
+
+function WelcomeScreen({
+  editions,
+  onSelect,
+  user,
+  onLogout,
+  toggleTheme,
+}: {
+  editions: ActiveEdition[];
+  onSelect: (e: ActiveEdition) => void;
+  user: { alias?: string } | null;
+  onLogout: () => void;
+  toggleTheme: () => void;
+}) {
+  const isLight = useIsLight();
+  const router = useRouter();
+  const wcEditions = editions.filter((e) => e.mode === 'WORLD_CUP');
+  const otherEditions = editions.filter((e) => e.mode !== 'WORLD_CUP');
+  const hasEditions = editions.length > 0;
+
+  return (
+    <div className={`h-[100dvh] flex flex-col overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-[#0d0b08]'}`}>
+      {/* Header */}
+      <div className="pt-[env(safe-area-inset-top,0px)] px-4">
+        <div className="h-14 flex items-center justify-between">
+          <p className={`text-xs font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/20'}`}>Pick & Survive</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center ${isLight ? 'bg-slate-200 border-slate-300' : 'bg-white/5 border-white/8'}`}
+            >
+              {isLight ? <Moon className="w-4 h-4 text-slate-600" /> : <Sun className="w-4 h-4 text-amber-400/70" />}
+            </button>
+            <button
+              onClick={() => router.push('/profile')}
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center ${isLight ? 'bg-slate-200 border-slate-300' : 'bg-white/5 border-white/8'}`}
+            >
+              <span className={`text-[11px] font-black uppercase ${isLight ? 'text-slate-500' : 'text-white/40'}`}>
+                {user?.alias?.slice(0, 2) ?? 'P'}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        {/* WC Hero */}
+        {wcEditions.length > 0 && (
+          <div className="w-full">
+            <img
+              src="/Logo_WorldCup.png"
+              alt="Pick & Survive"
+              className="w-full aspect-square object-cover"
+            />
+          </div>
+        )}
+
+        {/* Sin ediciones */}
+        {!hasEditions && (
+          <div className="flex flex-col items-center py-16 px-6 gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-amber-500/8 border border-amber-500/15 flex items-center justify-center">
+              <Trophy className={`w-10 h-10 ${isLight ? 'text-amber-500' : 'text-amber-400/50'}`} />
+            </div>
+            <div className="text-center space-y-1">
+              <p className={`text-base font-black ${isLight ? 'text-slate-500' : 'text-white/50'}`}>Sin competiciones activas</p>
+              <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-white/25'}`}>Únete a un campeonato o crea uno nuevo</p>
+            </div>
+          </div>
+        )}
+
+        <div className="px-5 pb-[calc(env(safe-area-inset-bottom,0px)+88px)] space-y-5">
+          {/* Ediciones WC */}
+          {wcEditions.length > 0 && (
+            <div className="space-y-2.5">
+              <p className={`text-[10px] font-black uppercase tracking-widest px-1 ${isLight ? 'text-amber-500' : 'text-amber-400/50'}`}>
+                {wcEditions.length === 1 ? 'Tu edición activa' : 'Ediciones activas'}
+              </p>
+              {wcEditions.map((e) => (
+                <WelcomeEditionCard key={e.editionId} edition={e} onSelect={onSelect} />
+              ))}
+            </div>
+          )}
+
+          {/* Otras ediciones */}
+          {otherEditions.length > 0 && (
+            <div className="space-y-2.5">
+              <p className={`text-[10px] font-black uppercase tracking-widest px-1 ${isLight ? 'text-slate-400' : 'text-white/25'}`}>
+                Ligas y torneos
+              </p>
+              {otherEditions.map((e) => (
+                <WelcomeEditionCard key={e.editionId} edition={e} onSelect={onSelect} />
+              ))}
+            </div>
+          )}
+
+          {/* CTAs */}
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={() => router.push('/join-code')}
+              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-bold text-sm ${isLight ? 'bg-slate-200 border-slate-300 text-slate-500' : 'bg-white/5 border-white/10 text-white/40'}`}
+            >
+              <Users className="w-4 h-4" />
+              Unirse por código
+            </button>
+            <button
+              onClick={() => router.push('/championship/new')}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm ${isLight ? 'text-slate-400' : 'text-white/25'}`}
+            >
+              <Plus className="w-4 h-4" />
+              Crear campeonato
+            </button>
+            <button onClick={onLogout} className={`w-full py-2 text-xs font-bold ${isLight ? 'text-slate-300' : 'text-white/15'}`}>
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <MobileBottomNav />
+    </div>
+  );
+}
+
+// ── WelcomeEditionCard ─────────────────────────────────────────────────────
+
+function WelcomeEditionCard({ edition, onSelect }: { edition: ActiveEdition; onSelect: (e: ActiveEdition) => void }) {
+  const isWc = edition.mode === 'WORLD_CUP';
+  const isLight = useIsLight();
+  return (
+    <button
+      onClick={() => onSelect(edition)}
+      className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+        isWc
+          ? 'bg-amber-500/8 border-amber-500/25 active:bg-amber-500/12'
+          : (isLight ? 'bg-white border-slate-200 active:bg-slate-50' : 'bg-white/4 border-white/10 active:bg-white/8')
+      }`}
+    >
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+        isWc ? 'bg-amber-500/15' : (isLight ? 'bg-slate-100' : 'bg-white/8')
+      }`}>
+        {isWc
+          ? <Globe className="w-7 h-7 text-amber-400" />
+          : <Trophy className={`w-7 h-7 ${isLight ? 'text-slate-400' : 'text-white/40'}`} />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-base font-black uppercase tracking-wide truncate leading-tight ${
+          isWc ? (isLight ? 'text-amber-700' : 'text-amber-100') : (isLight ? 'text-slate-700' : 'text-white/80')
+        }`}>
+          {edition.championshipName}
+        </p>
+        <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
+          {isWc ? 'Mundial 2026 · Activo' : `${edition.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · Activo`}
+        </p>
+      </div>
+      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+        isWc ? 'bg-amber-500/20' : (isLight ? 'bg-slate-100' : 'bg-white/8')
+      }`}>
+        <ChevronRight className={`w-4 h-4 ${isWc ? 'text-amber-400' : (isLight ? 'text-slate-400' : 'text-white/30')}`} />
+      </div>
+    </button>
   );
 }

@@ -360,6 +360,7 @@ model Notification {
   type      NotificationType
   payload   Json
   read      Boolean          @default(false)
+  dismissed Boolean          @default(false)
   sentEmail Boolean          @default(false)
   sentPush  Boolean          @default(false)
   createdAt DateTime         @default(now())

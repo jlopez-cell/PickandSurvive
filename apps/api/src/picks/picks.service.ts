@@ -56,11 +56,7 @@ export class PicksService {
 
     if (!edition) throw new NotFoundException('Edición no encontrada');
 
-    if (
-      edition.status !== EditionStatus.ACTIVE &&
-      edition.status !== EditionStatus.OPEN &&
-      edition.status !== EditionStatus.FINISHED
-    ) {
+    if (edition.status !== EditionStatus.ACTIVE && edition.status !== EditionStatus.OPEN) {
       throw new ForbiddenException('La edición no está disponible para picks');
     }
 
@@ -342,32 +338,6 @@ export class PicksService {
     const leagueId = edition.championship.footballLeagueId;
     const season = edition.championship.footballLeague.currentSeason;
 
-    let canRevealPicks = true;
-
-    try {
-      const deadlineMatchday = await findNextOpenMatchdayByCalendar(this.prisma, {
-        leagueId,
-        season,
-        number: matchdayNumberFilter,
-      });
-
-      let firstKickoff = deadlineMatchday?.firstKickoff ?? null;
-      if (deadlineMatchday && !firstKickoff) {
-        const firstMatch = await this.prisma.match.findFirst({
-          where: { matchdayId: deadlineMatchday.id },
-          orderBy: { kickoffTime: 'asc' },
-          select: { kickoffTime: true },
-        });
-        firstKickoff = firstMatch?.kickoffTime ?? null;
-      }
-
-      if (firstKickoff) {
-        canRevealPicks = new Date(firstKickoff).getTime() <= Date.now();
-      }
-    } catch {
-      canRevealPicks = true;
-    }
-
     const picks = await this.prisma.pick.findMany({
       where: {
         participant: { editionId },
@@ -382,14 +352,16 @@ export class PicksService {
           include: { user: { select: { alias: true } } },
         },
         team: { select: { id: true, name: true, logoUrl: true } },
-        matchday: { select: { number: true, status: true } },
+        matchday: { select: { number: true, status: true, firstKickoff: true } },
       },
       orderBy: [{ matchday: { number: 'desc' } }, { participant: { user: { alias: 'asc' } } }],
     });
 
+    const now = Date.now();
     const visible = picks.filter((p) => {
       if (p.matchday.status === MatchdayStatus.FINISHED) return true;
-      if (canRevealPicks) return true;
+      if (p.matchday.status === MatchdayStatus.ONGOING) return true;
+      if (p.matchday.firstKickoff && new Date(p.matchday.firstKickoff).getTime() <= now) return true;
       return p.participant.userId === userId;
     });
 

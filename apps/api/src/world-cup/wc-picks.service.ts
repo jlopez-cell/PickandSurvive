@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { MatchStatus, ParticipantStatus } from '@prisma/client';
+import { MatchStatus, MatchdayStatus, ParticipantStatus } from '@prisma/client';
 
 const WC_API_FOOTBALL_ID = 2000;
 const WC_TEAM_ID_FACTOR = 1000000;
@@ -65,11 +65,25 @@ export class WcPicksService {
     });
     if (!participant) throw new ForbiddenException('No eres participante de esta edición');
 
-    const matchday = matchdayNumber
+    let matchday = matchdayNumber
       ? await this.prisma.matchday.findFirst({
           where: { leagueId: league.id, season: WC_SEASON, number: matchdayNumber },
         })
       : await this.getCurrentMatchday(league.id);
+
+    // If the resolved matchday is before this edition's startMatchday, jump to the first
+    // matchday of this edition so users can pick today for a future edition start.
+    if (!matchdayNumber && matchday && matchday.number < edition.startMatchday) {
+      matchday = await this.prisma.matchday.findFirst({
+        where: {
+          leagueId: league.id,
+          season: WC_SEASON,
+          number: { gte: edition.startMatchday },
+          matches: { some: {} },
+        },
+        orderBy: { number: 'asc' },
+      });
+    }
 
     if (!matchday) {
       return {
@@ -106,12 +120,24 @@ export class WcPicksService {
       include: { team: { select: { id: true, name: true, logoUrl: true } } },
     });
 
+    // Si no hay pick para hoy, buscar el siguiente pick futuro (para mostrar en el card de bienvenida)
+    const nextPick = pick
+      ? null
+      : await this.prisma.pick.findFirst({
+          where: {
+            participantId: participant.id,
+            matchday: { leagueId: league.id, season: WC_SEASON, number: { gt: matchday.number } },
+          },
+          include: { team: { select: { id: true, name: true, logoUrl: true } } },
+          orderBy: { matchday: { number: 'asc' } },
+        });
+
     const deadline = matchday.firstKickoff ?? matches[0]?.kickoffTime ?? null;
     const deadlinePassed = deadline ? new Date() >= deadline : false;
 
     const [prev, next] = await Promise.all([
       this.prisma.matchday.findFirst({
-        where: { leagueId: league.id, season: WC_SEASON, number: { lt: matchday.number } },
+        where: { leagueId: league.id, season: WC_SEASON, number: { lt: matchday.number, gte: edition.startMatchday } },
         orderBy: { number: 'desc' },
         select: { number: true },
       }),
@@ -149,12 +175,10 @@ export class WcPicksService {
         awayUsed: usedTeamIds.has(m.awayTeamId),
       })),
       myPick: pick
-        ? {
-            id: pick.id,
-            status: pick.status,
-            pickType: pick.pickType,
-            team: pick.team,
-          }
+        ? { id: pick.id, status: pick.status, pickType: pick.pickType, team: pick.team }
+        : null,
+      nextPick: nextPick
+        ? { id: nextPick.id, status: nextPick.status, pickType: nextPick.pickType, team: nextPick.team }
         : null,
       participant: {
         status: participant.status,
@@ -242,6 +266,115 @@ export class WcPicksService {
       }));
   }
 
+  // ── GET /wc/editions/:id/detail ───────────────────────────────────────────
+  // Detalle de una edición finalizada: participantes y sus picks por día
+  async getEditionDetail(editionId: string) {
+    const edition = await this.prisma.edition.findUnique({
+      where: { id: editionId },
+      select: {
+        id: true,
+        name: true,
+        finishedAt: true,
+        winner: { select: { alias: true } },
+      },
+    });
+    if (!edition) throw new NotFoundException('Edición no encontrada');
+
+    const participants = await this.prisma.participant.findMany({
+      where: { editionId },
+      include: {
+        user: { select: { alias: true } },
+        picks: {
+          include: {
+            team: { select: { name: true, logoUrl: true } },
+            matchday: { select: { number: true, status: true, firstKickoff: true } },
+          },
+          orderBy: { matchday: { number: 'asc' } },
+        },
+      },
+      orderBy: [{ status: 'asc' }, { joinedAt: 'asc' }],
+    });
+
+    const now = Date.now();
+
+    return {
+      edition: {
+        id: edition.id,
+        name: edition.name ?? '—',
+        finishedAt: edition.finishedAt,
+        winnerAlias: edition.winner?.alias ?? null,
+      },
+      participants: participants.map((p) => ({
+        alias: p.user.alias,
+        status: p.status,
+        picks: p.picks
+          .filter((pk) =>
+            pk.matchday.status === MatchdayStatus.FINISHED ||
+            pk.matchday.status === MatchdayStatus.ONGOING ||
+            (pk.matchday.firstKickoff !== null &&
+              new Date(pk.matchday.firstKickoff).getTime() <= now),
+          )
+          .map((pk) => ({
+            matchdayNumber: pk.matchday.number,
+            team: pk.team ?? null,
+            pickStatus: pk.status,
+          })),
+      })),
+    };
+  }
+
+  // ── GET /wc/editions/:id/calendar ─────────────────────────────────────────
+  // Todos los días del torneo desde startMatchday con sus partidos y resultados
+  async getCalendar(editionId: string) {
+    const edition = await this.prisma.edition.findUnique({
+      where: { id: editionId },
+      include: { championship: { include: { footballLeague: true } } },
+    });
+    if (!edition) throw new NotFoundException('Edición no encontrada');
+
+    const league = edition.championship.footballLeague;
+    if (league.apiFootballId !== WC_API_FOOTBALL_ID) {
+      throw new ForbiddenException('Esta edición no es del Mundial');
+    }
+
+    const matchdays = await this.prisma.matchday.findMany({
+      where: {
+        leagueId: league.id,
+        season: WC_SEASON,
+        matches: { some: {} },
+      },
+      include: {
+        matches: {
+          include: {
+            homeTeam: { select: { id: true, name: true, logoUrl: true } },
+            awayTeam: { select: { id: true, name: true, logoUrl: true } },
+          },
+          orderBy: { kickoffTime: 'asc' },
+        },
+      },
+      orderBy: { number: 'asc' },
+    });
+
+    return matchdays.map((md) => ({
+      number: md.number,
+      status: md.status,
+      tournamentPhase: md.tournamentPhase,
+      wcGroupDay: md.wcGroupDay,
+      firstKickoff: md.firstKickoff,
+      matches: md.matches.map((m) => ({
+        id: m.id,
+        status: m.status,
+        kickoffTime: m.kickoffTime,
+        homeScore: m.homeScore,
+        awayScore: m.awayScore,
+        wcGroup: m.wcGroup,
+        tournamentPhase: m.tournamentPhase,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+      })),
+    }));
+  }
+
   // ── GET /wc/editions/:id/history ──────────────────────────────────────────
   // Historial de ediciones finalizadas del mismo campeonato
   async getEditionHistory(editionId: string) {
@@ -281,20 +414,32 @@ export class WcPicksService {
         user: { select: { alias: true } },
         picks: {
           orderBy: { matchday: { number: 'desc' } },
-          take: 1,
-          include: { team: { select: { name: true, logoUrl: true } } },
+          include: {
+            team: { select: { name: true, logoUrl: true } },
+            matchday: { select: { status: true, firstKickoff: true } },
+          },
         },
       },
       orderBy: [{ status: 'asc' }, { joinedAt: 'asc' }],
     });
 
-    return participants.map((p) => ({
-      alias: p.user.alias,
-      status: p.status,
-      eliminatedAtPhase: p.eliminatedAtPhase,
-      lastPick: p.picks[0]
-        ? { team: p.picks[0].team, pickStatus: p.picks[0].status }
-        : null,
-    }));
+    const now = Date.now();
+    return participants.map((p) => {
+      // Find the most recent pick whose matchday deadline has already passed
+      const revealedPick = p.picks.find(
+        (pick) =>
+          pick.matchday.status === MatchdayStatus.FINISHED ||
+          pick.matchday.status === MatchdayStatus.ONGOING ||
+          (pick.matchday.firstKickoff !== null &&
+            new Date(pick.matchday.firstKickoff).getTime() <= now),
+      );
+
+      return {
+        alias: p.user.alias,
+        status: p.status,
+        eliminatedAtPhase: p.eliminatedAtPhase,
+        lastPick: revealedPick ? { team: revealedPick.team, pickStatus: revealedPick.status } : null,
+      };
+    });
   }
 }

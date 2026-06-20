@@ -39,8 +39,18 @@ export class WcPicksController {
     return this.service.getParticipants(editionId);
   }
 
+  @Get('editions/:editionId/calendar')
+  getCalendar(@Param('editionId') editionId: string) {
+    return this.service.getCalendar(editionId);
+  }
+
   @Get('editions/:editionId/history')
   getHistory(@Param('editionId') editionId: string) {
     return this.service.getEditionHistory(editionId);
+  }
+
+  @Get('editions/:editionId/detail')
+  getDetail(@Param('editionId') editionId: string) {
+    return this.service.getEditionDetail(editionId);
   }
 }

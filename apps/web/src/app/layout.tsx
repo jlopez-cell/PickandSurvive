@@ -20,7 +20,6 @@ export const metadata: Metadata = {
   },
 };
 
-/** Mejor integración con la barra de estado en móvil (menos “modo web” brusco al cambiar de ruta). */
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,

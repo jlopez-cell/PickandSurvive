@@ -66,7 +66,7 @@ export default function NewChampionshipPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background flex items-start justify-center p-6">
+    <main className="min-h-screen bg-background flex items-start justify-center px-6 pb-6 pt-[max(1.5rem,env(safe-area-inset-top,0px))]">
       <Card className="w-full max-w-lg">
         <CardHeader>
           <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-2 text-muted-foreground" onClick={() => router.back()}>

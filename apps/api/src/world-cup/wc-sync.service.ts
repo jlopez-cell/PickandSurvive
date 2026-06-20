@@ -65,8 +65,10 @@ export class WcSyncService {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   private dayNumber(kickoff: Date): number {
-    const start = new Date(WC_START_DATE).getTime();
-    return Math.max(1, Math.floor((kickoff.getTime() - start) / 86400000) + 1);
+    // Use CEST midnight (UTC+2) as day boundary: June 11 00:00 CEST = June 10 22:00 UTC.
+    // Matches at 22:00–23:59 UTC belong to the NEXT calendar day in Spain.
+    const startCest = new Date('2026-06-10T22:00:00.000Z').getTime();
+    return Math.max(1, Math.floor((kickoff.getTime() - startCest) / 86400000) + 1);
   }
 
   private resolveWinner(
@@ -201,7 +203,7 @@ export class WcSyncService {
 
         await this.prisma.match.upsert({
           where: { apiFootballFixtureId: m.id },
-          update: { status, homeScore, awayScore, winnerTeamId, tournamentPhase: phase, wcGroup },
+          update: { matchdayId: matchday.id, status, homeScore, awayScore, winnerTeamId, tournamentPhase: phase, wcGroup },
           create: {
             matchdayId: matchday.id,
             homeTeamId: home.id,
@@ -220,9 +222,25 @@ export class WcSyncService {
         upserted++;
       }
 
+      await this.recalcFirstKickoffs(league.id);
       this.logger.log(`WC matches sync complete: ${upserted} upserted`);
     } catch (err) {
       this.logger.error(`syncWcMatches failed: ${(err as Error).message}`);
+    }
+  }
+
+  private async recalcFirstKickoffs(leagueId: string): Promise<void> {
+    const matchdays = await this.prisma.matchday.findMany({
+      where: { leagueId, season: WC_SEASON },
+      include: {
+        matches: { select: { kickoffTime: true }, orderBy: { kickoffTime: 'asc' }, take: 1 },
+      },
+    });
+    for (const md of matchdays) {
+      const earliest = md.matches[0]?.kickoffTime ?? null;
+      if (earliest && md.firstKickoff?.getTime() !== earliest.getTime()) {
+        await this.prisma.matchday.update({ where: { id: md.id }, data: { firstKickoff: earliest } });
+      }
     }
   }
 
@@ -239,6 +257,7 @@ export class WcSyncService {
 
       for (const groupData of standings) {
         if (groupData.stage !== 'GROUP_STAGE') continue;
+        if (!groupData.group) continue;
 
         const groupName: string = (groupData.group as string).replace('GROUP_', '');
 
@@ -310,11 +329,21 @@ export class WcSyncService {
         const existing = await this.prisma.match.findUnique({
           where: { apiFootballFixtureId: m.id },
         });
-        if (!existing || existing.status === MatchStatus.FINISHED) continue;
+        if (!existing) continue;
 
-        const homeScore: number = m.score?.fullTime?.home ?? 0;
-        const awayScore: number = m.score?.fullTime?.away ?? 0;
+        // Skip if API still has null scores — fullTime scores may lag a few seconds after FINISHED status.
+        // Never process as 0-0 when scores aren't available yet.
+        const homeScore = m.score?.fullTime?.home;
+        const awayScore = m.score?.fullTime?.away;
+        if (homeScore === null || homeScore === undefined || awayScore === null || awayScore === undefined) {
+          this.logger.warn(`WC match ${m.id}: FINISHED but null scores — skipping until scores are available`);
+          continue;
+        }
+
         const winnerTeamId = this.resolveWinner(homeScore, awayScore, existing.homeTeamId, existing.awayTeamId);
+
+        // Skip if already FINISHED with the correct result
+        if (existing.status === MatchStatus.FINISHED && existing.winnerTeamId === winnerTeamId) continue;
 
         await this.prisma.match.update({
           where: { id: existing.id },

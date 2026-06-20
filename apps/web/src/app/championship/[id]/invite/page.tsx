@@ -156,7 +156,7 @@ export default function InvitePage() {
   };
 
   return (
-    <main className="min-h-screen bg-background p-4 sm:p-6 pb-24">
+    <main className="min-h-screen bg-background px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top,0px))] sm:px-6 sm:pt-6">
       <div className="max-w-3xl mx-auto pb-2">
         <Button variant="ghost" size="sm" className="-ml-2 mb-6 text-muted-foreground" onClick={() => router.back()}>
           ← Volver

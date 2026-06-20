@@ -1,45 +1,26 @@
 'use client';
 
 import { Bell, LayoutDashboard, UserRound, Users } from 'lucide-react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 type Tab = 'home' | 'leagues' | 'notifications' | 'profile';
 
 export function MobileBottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const tabParam = (searchParams.get('tab') || '').toLowerCase();
 
   const active: Tab = (() => {
     if (pathname.startsWith('/profile')) return 'profile';
-    if (pathname.startsWith('/dashboard')) {
-      if (tabParam === 'notifications') return 'notifications';
-      if (tabParam === 'leagues') return 'leagues';
-      return 'home';
-    }
-    // Championship/edition screens: keep "Mis ligas" highlighted
-    if (pathname.startsWith('/championship') || pathname.startsWith('/edition')) return 'leagues';
+    if (pathname.startsWith('/notifications')) return 'notifications';
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/championship') || pathname.startsWith('/edition') || pathname.startsWith('/world-cup')) return 'home';
     return 'home';
   })();
 
   const go = (tab: Tab) => {
-    if (tab === 'profile') {
-      router.push('/profile');
-      return;
-    }
-    if (tab === 'home') {
-      router.push('/dashboard?tab=home');
-      return;
-    }
-    if (tab === 'leagues') {
-      router.push('/dashboard?tab=leagues');
-      return;
-    }
-    if (tab === 'notifications') {
-      router.push('/dashboard?tab=notifications');
-    }
+    if (tab === 'profile') { router.push('/profile'); return; }
+    if (tab === 'home') { router.push('/dashboard'); return; }
+    if (tab === 'leagues') { router.push('/dashboard'); return; }
+    if (tab === 'notifications') { router.push('/notifications'); }
   };
 
   const cls = (tab: Tab) =>

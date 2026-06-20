@@ -98,12 +98,12 @@ export class NotificationsService {
     const skip = (page - 1) * limit;
     const [notifications, total] = await Promise.all([
       this.prisma.notification.findMany({
-        where: { userId },
+        where: { userId, dismissed: false },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      this.prisma.notification.count({ where: { userId } }),
+      this.prisma.notification.count({ where: { userId, dismissed: false } }),
     ]);
     return { notifications, total, page, limit };
   }
@@ -116,6 +116,21 @@ export class NotificationsService {
   }
 
   async deleteNotification(userId: string, notificationId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id: notificationId, userId },
+      select: { type: true },
+    });
+    if (!notification) return { count: 0 };
+
+    if (notification.type === 'PICK_REMINDER') {
+      // Soft-delete: keep the record so the scheduler's dedup check still finds it
+      await this.prisma.notification.update({
+        where: { id: notificationId },
+        data: { dismissed: true },
+      });
+      return { count: 1 };
+    }
+
     return this.prisma.notification.deleteMany({
       where: { id: notificationId, userId },
     });

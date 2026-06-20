@@ -67,6 +67,23 @@ type EditionHistoryEntry = {
   participantCount: number;
 };
 
+type EditionPickDetail = {
+  matchdayNumber: number;
+  team: { name: string; logoUrl: string } | null;
+  pickStatus: string;
+};
+
+type EditionParticipantDetail = {
+  alias: string;
+  status: string;
+  picks: EditionPickDetail[];
+};
+
+type EditionDetail = {
+  edition: { id: string; name: string; finishedAt: string | null; winnerAlias: string | null };
+  participants: EditionParticipantDetail[];
+};
+
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const PHASE_LABELS: Record<string, string> = {
@@ -177,24 +194,32 @@ export default function WcPickPage() {
   const [history, setHistory] = useState<EditionHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyFetched, setHistoryFetched] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [editionDetails, setEditionDetails] = useState<Record<string, EditionDetail>>({});
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
   const [selectedMatchday, setSelectedMatchday] = useState<number | null>(null);
 
   const loadData = useCallback(async (matchdayNum?: number) => {
-    const mdParam = matchdayNum ? `?matchday=${matchdayNum}` : '';
-    const [todayRes, groupsRes] = await Promise.all([
-      fetch(`/api/wc/editions/${editionId}/today${mdParam}`),
-      fetch(`/api/wc/editions/${editionId}/groups`),
-    ]);
-    if (todayRes.ok) {
-      const data = await todayRes.json();
-      setCtx(data);
+    try {
+      const mdParam = matchdayNum ? `?matchday=${matchdayNum}` : '';
+      const [todayRes, groupsRes] = await Promise.all([
+        fetch(`/api/wc/editions/${editionId}/today${mdParam}`),
+        fetch(`/api/wc/editions/${editionId}/groups`),
+      ]);
+      if (todayRes.ok) {
+        const data = await todayRes.json();
+        setCtx(data);
+      }
+      if (groupsRes.ok) {
+        const data = await groupsRes.json();
+        setGroups(data);
+        if (data.length > 0) setActiveGroup((prev) => prev ?? data[0].name);
+      }
+    } catch {
+      // network error or non-JSON response — page stays in loading=false with null ctx
+    } finally {
+      setLoading(false);
     }
-    if (groupsRes.ok) {
-      const data = await groupsRes.json();
-      setGroups(data);
-      if (data.length > 0) setActiveGroup((prev) => prev ?? data[0].name);
-    }
-    setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editionId]);
 
@@ -257,6 +282,17 @@ export default function WcPickPage() {
       .finally(() => setHistoryLoading(false));
   }, [activeTab, editionId, historyFetched]);
 
+  function handleHistoryToggle(id: string) {
+    setExpandedHistoryId((prev) => (prev === id ? null : id));
+    if (!editionDetails[id]) {
+      setDetailLoadingId(id);
+      fetch(`/api/wc/editions/${id}/detail`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => { if (data) setEditionDetails((prev) => ({ ...prev, [id]: data })); })
+        .finally(() => setDetailLoadingId(null));
+    }
+  }
+
   const matchesByGroup = ctx?.matches.reduce<Record<string, WcMatch[]>>((acc, m) => {
     const key = m.wcGroup ?? m.tournamentPhase ?? 'knockout';
     (acc[key] ??= []).push(m);
@@ -264,6 +300,10 @@ export default function WcPickPage() {
   }, {}) ?? {};
 
   const isEliminated = ctx?.participant.status === 'ELIMINATED';
+  const globalCanPick = !(ctx?.matchday?.deadlinePassed ?? true) && !isEliminated;
+  const selectedTeam = selectedTeamId
+    ? (ctx?.matches ?? []).flatMap(m => [m.homeTeam, m.awayTeam]).find(t => t.id === selectedTeamId) ?? null
+    : null;
   const phase = ctx?.matchday?.tournamentPhase;
   const isGroupStage = phase === 'GROUP_STAGE';
   const activeGroupData = groups.find((g) => g.name === activeGroup) ?? null;
@@ -607,7 +647,7 @@ export default function WcPickPage() {
                     </div>
 
                     {/* Teams + score */}
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5 px-4 py-5">
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-5 px-4 py-5">
                       <TeamSection
                         team={m.homeTeam} used={m.homeUsed}
                         isMyPick={isMyPickHome}
@@ -624,7 +664,7 @@ export default function WcPickPage() {
                       />
 
                       {/* Score / VS */}
-                      <div className="text-center shrink-0 min-w-[2.5rem]">
+                      <div className="text-center shrink-0 min-w-[2.5rem] self-center">
                         {m.status === 'FINISHED' || m.status === 'LIVE' ? (
                           <span className={`text-2xl sm:text-3xl font-black font-mono
                             ${m.status === 'LIVE' ? 'text-red-400' : 'text-white'}`}
@@ -652,6 +692,7 @@ export default function WcPickPage() {
                       />
                     </div>
 
+
                     {/* Gold bottom bar when picked */}
                     {hasMyPick && (
                       <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
@@ -669,7 +710,14 @@ export default function WcPickPage() {
 
           {/* ── HISTORIAL TAB ─────────────────────────────────────────── */}
           {activeTab === 'historico' && (
-            <EditionHistoryList entries={history} loading={historyLoading} />
+            <EditionHistoryList
+              entries={history}
+              loading={historyLoading}
+              expandedId={expandedHistoryId}
+              onToggle={handleHistoryToggle}
+              details={editionDetails}
+              detailLoadingId={detailLoadingId}
+            />
           )}
 
           {/* ── GRUPOS MOBILE ─────────────────────────────────────────── */}
@@ -741,6 +789,61 @@ export default function WcPickPage() {
         )}
       </div>
 
+      {/* Pick bottom sheet */}
+      {globalCanPick && selectedTeamId && selectedTeam && (
+        <>
+          {/* Backdrop — stops above the bottom nav so nav buttons stay tappable */}
+          <div
+            className="fixed inset-x-0 top-0 z-[60] bg-black/60"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
+            onClick={() => setSelectedTeamId(null)}
+          />
+          {/* Sheet */}
+          <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#13151a] rounded-t-3xl shadow-2xl"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}
+          >
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-white/15" />
+            </div>
+            {/* Team header */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-white/8">
+              <img src={selectedTeam.logoUrl} alt={selectedTeam.name} className="w-10 h-10 object-contain shrink-0" />
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Tu pick</p>
+                <p className="text-lg font-black text-white leading-tight">{selectedTeam.name}</p>
+              </div>
+              <button
+                onClick={() => setSelectedTeamId(null)}
+                className="ml-auto w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            {/* Pick options */}
+            <div className="px-6 pt-5 pb-2 space-y-3">
+              <p className="text-xs font-black uppercase tracking-widest text-white/30 text-center">¿Cómo va a quedar?</p>
+              <button
+                onClick={() => handlePick(selectedTeamId, 'WIN')}
+                disabled={!!picking}
+                className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-base text-amber-400 bg-amber-500/12 border border-amber-500/35 active:scale-[0.98] disabled:opacity-40 transition-all"
+              >
+                <span className="text-xl">🏆</span>
+                <span>{picking === `${selectedTeamId}-WIN` ? 'Guardando…' : 'Gana'}</span>
+              </button>
+              <button
+                onClick={() => handlePick(selectedTeamId, 'WIN_OR_DRAW')}
+                disabled={!!picking}
+                className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-base text-sky-400 bg-sky-500/10 border border-sky-500/30 active:scale-[0.98] disabled:opacity-40 transition-all"
+              >
+                <span className="text-xl">🤝</span>
+                <span>{picking === `${selectedTeamId}-WIN_OR_DRAW` ? 'Guardando…' : 'Empata'}</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <MobileBottomNav />
     </div>
   );
@@ -793,9 +896,11 @@ function ParticipantsList({ participants, loading, phaseLabels }: {
             </span>
           )}
         </div>
-        {p.lastPick?.team && (
+        {p.lastPick && (pickSt || p.lastPick.team) && (
           <div className="flex items-center gap-1.5 shrink-0">
-            <img src={p.lastPick.team.logoUrl} alt={p.lastPick.team.name} className="w-5 h-5 object-contain" />
+            {p.lastPick.team && (
+              <img src={p.lastPick.team.logoUrl} alt={p.lastPick.team.name} className="w-5 h-5 object-contain" />
+            )}
             {pickSt && (
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${pickSt.cls}`}>
                 {pickSt.label}
@@ -855,7 +960,24 @@ function ParticipantsList({ participants, loading, phaseLabels }: {
 
 // ── EditionHistoryList ─────────────────────────────────────────────────────
 
-function EditionHistoryList({ entries, loading }: { entries: EditionHistoryEntry[]; loading: boolean }) {
+const PICK_STATUS_COMPACT: Record<string, { label: string; cls: string }> = {
+  SURVIVED:           { label: 'Sobrevivió', cls: 'text-emerald-400' },
+  DRAW_ELIMINATED:    { label: 'Empate · elim.', cls: 'text-red-400' },
+  LOSS_ELIMINATED:    { label: 'Derrota · elim.', cls: 'text-red-400' },
+  NO_PICK_ELIMINATED: { label: 'Sin pick · elim.', cls: 'text-red-400/60' },
+  PENDING:            { label: 'Pendiente', cls: 'text-amber-400' },
+};
+
+function EditionHistoryList({
+  entries, loading, expandedId, onToggle, details, detailLoadingId,
+}: {
+  entries: EditionHistoryEntry[];
+  loading: boolean;
+  expandedId: string | null;
+  onToggle: (id: string) => void;
+  details: Record<string, EditionDetail>;
+  detailLoadingId: string | null;
+}) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-white/30 text-xs font-black tracking-widest uppercase">
@@ -888,47 +1010,114 @@ function EditionHistoryList({ entries, loading }: { entries: EditionHistoryEntry
             ? new Date(e.finishedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
             : '—';
           const isFirst = i === 0;
+          const isExpanded = expandedId === e.id;
+          const detail = details[e.id];
+          const isLoadingDetail = detailLoadingId === e.id;
 
           return (
-            <div
-              key={e.id}
-              className={`flex items-center gap-3 px-4 py-3.5 border-b border-white/5 last:border-0
-                ${isFirst ? 'bg-amber-500/5' : ''}`}
-            >
-              {/* Position badge */}
-              <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black
-                ${isFirst
-                  ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
-                  : 'bg-white/5 text-white/20 border border-white/8'}`}
+            <div key={e.id} className="border-b border-white/5 last:border-0">
+              {/* Header row — clickable */}
+              <button
+                onClick={() => onToggle(e.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors
+                  ${isFirst ? 'bg-amber-500/5' : ''}
+                  ${isExpanded ? 'bg-white/4' : 'hover:bg-white/3'}`}
               >
-                {entries.length - i}
-              </span>
-
-              {/* Edition name */}
-              <div className="flex-1 min-w-0">
-                <span className={`text-xs font-black uppercase tracking-widest
-                  ${isFirst ? 'text-amber-300' : 'text-white/50'}`}
+                {/* Position badge */}
+                <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black
+                  ${isFirst
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                    : 'bg-white/5 text-white/20 border border-white/8'}`}
                 >
-                  {e.name}
+                  {entries.length - i}
                 </span>
-                <div className="text-[10px] text-white/25 mt-0.5">
-                  {e.participantCount} jugadores · {date}
-                </div>
-              </div>
 
-              {/* Winner */}
-              <div className="shrink-0 flex items-center gap-1.5">
-                {e.winnerAlias ? (
-                  <>
-                    <Trophy className={`w-3.5 h-3.5 shrink-0 ${isFirst ? 'text-amber-400' : 'text-white/30'}`} />
-                    <span className={`text-xs font-bold ${isFirst ? 'text-amber-200' : 'text-white/60'}`}>
-                      {e.winnerAlias}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[10px] text-white/20 italic">Sin ganador</span>
-                )}
-              </div>
+                {/* Edition name */}
+                <div className="flex-1 min-w-0">
+                  <span className={`text-xs font-black uppercase tracking-widest
+                    ${isFirst ? 'text-amber-300' : 'text-white/50'}`}
+                  >
+                    {e.name}
+                  </span>
+                  <div className="text-[10px] text-white/25 mt-0.5">
+                    {e.participantCount} jugadores · {date}
+                  </div>
+                </div>
+
+                {/* Winner */}
+                <div className="shrink-0 flex items-center gap-1.5">
+                  {e.winnerAlias ? (
+                    <>
+                      <Trophy className={`w-3.5 h-3.5 shrink-0 ${isFirst ? 'text-amber-400' : 'text-white/30'}`} />
+                      <span className={`text-xs font-bold ${isFirst ? 'text-amber-200' : 'text-white/60'}`}>
+                        {e.winnerAlias}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] text-white/20 italic">Sin ganador</span>
+                  )}
+                </div>
+
+                {/* Chevron */}
+                <span className={`shrink-0 text-white/20 text-xs transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                  ▾
+                </span>
+              </button>
+
+              {/* Detail accordion */}
+              {isExpanded && (
+                <div className="px-4 pb-4 bg-black/20 border-t border-white/5">
+                  {isLoadingDetail && !detail && (
+                    <div className="py-4 text-center text-white/25 text-xs">Cargando…</div>
+                  )}
+                  {detail && (
+                    <div className="space-y-3 pt-3">
+                      {detail.participants.map((p) => {
+                        const isWinner = p.alias === detail.edition.winnerAlias;
+                        return (
+                          <div key={p.alias} className={`rounded-lg border ${isWinner ? 'border-amber-500/30 bg-amber-500/5' : 'border-white/8 bg-white/3'}`}>
+                            {/* Participant header */}
+                            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5">
+                              {isWinner && <Trophy className="w-3 h-3 text-amber-400 shrink-0" />}
+                              <span className={`text-xs font-black uppercase tracking-wider flex-1 ${isWinner ? 'text-amber-300' : 'text-white/60'}`}>
+                                {p.alias}
+                              </span>
+                              <span className={`text-[10px] ${p.status === 'ACTIVE' ? 'text-emerald-400' : 'text-white/25'}`}>
+                                {p.status === 'ACTIVE' ? 'Activo' : 'Eliminado'}
+                              </span>
+                            </div>
+
+                            {/* Picks per day */}
+                            {p.picks.length === 0 ? (
+                              <div className="px-3 py-2.5 text-[11px] text-white/25 italic">Sin picks registrados</div>
+                            ) : (
+                              <div>
+                                {p.picks.map((pk) => {
+                                  const cfg = PICK_STATUS_COMPACT[pk.pickStatus] ?? { label: pk.pickStatus, cls: 'text-white/40' };
+                                  return (
+                                    <div key={pk.matchdayNumber} className="flex items-center gap-2.5 px-3 py-2 border-b border-white/4 last:border-0">
+                                      <span className="text-[10px] text-white/20 font-black w-8 shrink-0">D{pk.matchdayNumber}</span>
+                                      {pk.team ? (
+                                        <>
+                                          <img src={pk.team.logoUrl} alt={pk.team.name} className="w-4 h-4 object-contain shrink-0" />
+                                          <span className="flex-1 text-xs text-white/60 truncate">{pk.team.name}</span>
+                                        </>
+                                      ) : (
+                                        <span className="flex-1 text-xs text-white/25 italic">Sin equipo</span>
+                                      )}
+                                      <span className={`text-[10px] font-semibold shrink-0 ${cfg.cls}`}>{cfg.label}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -994,87 +1183,31 @@ function TeamSection({
         </span>
       </button>
 
-      {/* Status / pick actions */}
+      {/* Status indicators (no pick-action buttons here — those live in the match-card panel) */}
       {isMyPick ? (
-        isSelected && canPick ? (
-          // Step 2 for own pick: change pick type
-          <div className={`flex flex-col gap-1.5 ${isRight ? 'items-end' : 'items-start'}`}>
+        <div className={`flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
+          <span className="flex items-center gap-1 text-[11px] font-black text-amber-400">
+            <Shield className="w-3 h-3" /> Tu pick
+          </span>
+          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold
+            ${myPickType === 'WIN_OR_DRAW'
+              ? 'text-sky-400 bg-sky-500/15'
+              : 'text-amber-400 bg-amber-500/15'}`}
+          >
+            {myPickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
+          </span>
+          {canPick && !isSelected && (
             <button
-              onClick={onPickWin}
-              disabled={loadingWin || loadingDraw}
-              className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
-                text-amber-400 bg-amber-500/15 border border-amber-500/35
-                hover:bg-amber-500/25 hover:border-amber-500/55 active:scale-95"
+              onClick={onSelect}
+              className="text-[10px] text-white/25 hover:text-amber-400/60 transition-colors mt-0.5 font-semibold"
             >
-              {loadingWin ? '…' : '🏆 Gana'}
+              Cambiar tipo
             </button>
-            <button
-              onClick={onPickDraw}
-              disabled={loadingWin || loadingDraw}
-              className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
-                text-sky-400 bg-sky-500/12 border border-sky-500/30
-                hover:bg-sky-500/22 hover:border-sky-500/50 active:scale-95"
-            >
-              {loadingDraw ? '…' : '🤝 Empata'}
-            </button>
-            <button onClick={onSelect} className="text-[10px] text-white/25 hover:text-white/50 transition-colors mt-0.5">
-              ✕ cancelar
-            </button>
-          </div>
-        ) : (
-          <div className={`flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
-            <span className="flex items-center gap-1 text-[11px] font-black text-amber-400">
-              <Shield className="w-3 h-3" /> Tu pick
-            </span>
-            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold
-              ${myPickType === 'WIN_OR_DRAW'
-                ? 'text-sky-400 bg-sky-500/15'
-                : 'text-amber-400 bg-amber-500/15'}`}
-            >
-              {myPickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
-            </span>
-            {canPick && (
-              <button
-                onClick={onSelect}
-                className="text-[10px] text-white/25 hover:text-amber-400/60 transition-colors mt-0.5 font-semibold"
-              >
-                Cambiar tipo
-              </button>
-            )}
-          </div>
-        )
+          )}
+        </div>
       ) : used ? (
         <span className="text-[10px] font-medium text-white/20">Usado</span>
-      ) : canPick && isSelected ? (
-        // Step 2: team selected → choose pick type
-        <div className={`flex flex-col gap-1.5 ${isRight ? 'items-end' : 'items-start'}`}>
-          <button
-            onClick={onPickWin}
-            disabled={loadingWin || loadingDraw}
-            className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
-              text-amber-400 bg-amber-500/15 border border-amber-500/35
-              hover:bg-amber-500/25 hover:border-amber-500/55 active:scale-95"
-          >
-            {loadingWin ? '…' : '🏆 Gana'}
-          </button>
-          <button
-            onClick={onPickDraw}
-            disabled={loadingWin || loadingDraw}
-            className="text-[11px] px-3 py-1.5 rounded-lg font-black transition-all disabled:opacity-40 whitespace-nowrap
-              text-sky-400 bg-sky-500/12 border border-sky-500/30
-              hover:bg-sky-500/22 hover:border-sky-500/50 active:scale-95"
-          >
-            {loadingDraw ? '…' : '🤝 Empata'}
-          </button>
-          <button
-            onClick={onSelect}
-            className="text-[10px] text-white/25 hover:text-white/50 transition-colors mt-0.5"
-          >
-            ✕ cancelar
-          </button>
-        </div>
-      ) : canPick && !isOtherSelected ? (
-        // Step 1 hint: tap the team to select it
+      ) : canPick && !isSelected && !isOtherSelected ? (
         <span className="text-[10px] text-white/20 font-medium">Toca para elegir</span>
       ) : null}
     </div>

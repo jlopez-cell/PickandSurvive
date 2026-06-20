@@ -29,15 +29,32 @@ export class PicksScheduler {
       orderBy: [{ firstKickoff: 'asc' }, { number: 'asc' }],
     });
 
-    for (const matchday of overdueMatchdays) {
-      this.logger.log(`Processing deadline for matchday ${matchday.id} (round ${matchday.number})`);
-      await this.pickProcessing.processNoPickDeadline(matchday.id);
+    if (overdueMatchdays.length === 0) return;
 
-      // Mark matchday as ONGOING
-      await this.prisma.matchday.update({
-        where: { id: matchday.id },
-        data: { status: MatchdayStatus.ONGOING },
-      });
+    // Group by leagueId — if the server was down and multiple days accumulated,
+    // treat the whole batch as one deadline: a pick for ANY day in the batch
+    // protects the player from no-pick elimination on all other days.
+    const byLeague = new Map<string, typeof overdueMatchdays>();
+    for (const md of overdueMatchdays) {
+      if (!byLeague.has(md.leagueId)) byLeague.set(md.leagueId, []);
+      byLeague.get(md.leagueId)!.push(md);
+    }
+
+    for (const [, matchdays] of byLeague) {
+      const batchIds = matchdays.map((m) => m.id);
+      const latest = matchdays[matchdays.length - 1];
+
+      this.logger.log(
+        `Processing deadline batch of ${matchdays.length} matchday(s) ending at round ${latest.number} (league ${latest.leagueId})`,
+      );
+      await this.pickProcessing.processNoPickDeadline(latest.id, batchIds);
+
+      for (const matchday of matchdays) {
+        await this.prisma.matchday.update({
+          where: { id: matchday.id },
+          data: { status: MatchdayStatus.ONGOING },
+        });
+      }
     }
   }
 
