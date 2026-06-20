@@ -5,6 +5,7 @@ import {
   EditionStatus,
   MatchdayStatus,
   ParticipantStatus,
+  PickStatus,
 } from '@prisma/client';
 import { PotDistributionService } from './pot-distribution.service';
 
@@ -50,6 +51,20 @@ export class EditionResolutionService {
     const activeParticipants = edition.participants;
 
     if (activeParticipants.length > 1) return;
+
+    // If exactly 1 participant remains, check for pending picks before declaring winner.
+    // Their match may not have been played yet — closing now would be premature.
+    if (activeParticipants.length === 1) {
+      // Only block on picks whose matchday has already kicked off — future pre-picks don't count.
+      const pendingCount = await this.prisma.pick.count({
+        where: {
+          participantId: activeParticipants[0].id,
+          status: PickStatus.PENDING,
+          matchday: { firstKickoff: { lte: new Date() } },
+        },
+      });
+      if (pendingCount > 0) return;
+    }
 
     const winnerIds = activeParticipants.map((p: any) => p.id);
     // Single survivor → winner; 0 survivors → no winner (all eliminated same round)
@@ -113,9 +128,14 @@ export class EditionResolutionService {
    */
   private async createNextWcEdition(edition: any, userIds: string[]) {
     const leagueId = edition.championship.footballLeague.id;
+    const now = new Date();
 
     const nextMatchday = await this.prisma.matchday.findFirst({
-      where: { leagueId, status: { not: MatchdayStatus.FINISHED } },
+      where: {
+        leagueId,
+        status: { not: MatchdayStatus.FINISHED },
+        firstKickoff: { gt: now },
+      },
       orderBy: { number: 'asc' },
     });
 

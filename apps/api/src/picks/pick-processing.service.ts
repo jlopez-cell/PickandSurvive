@@ -57,6 +57,7 @@ export class PickProcessingService {
 
     for (const pick of pendingPicks) {
       if (!pick.teamId) continue;
+      if (pick.participant.status === ParticipantStatus.ELIMINATED) continue;
       const mode = pick.participant.edition.championship.mode;
       const pickTeamWon = match.winnerTeamId === pick.teamId;
       const isDraw = match.winnerTeamId === null;
@@ -119,7 +120,8 @@ export class PickProcessingService {
    * Called at the firstKickoff of a matchday.
    * Eliminates (TOURNAMENT) or penalizes (LEAGUE) participants who haven't picked.
    */
-  async processNoPickDeadline(matchdayId: string) {
+  // batchMatchdayIds: when multiple matchdays accumulated (server down), picks for ANY day in the batch protect the player.
+  async processNoPickDeadline(matchdayId: string, batchMatchdayIds: string[] = [matchdayId]) {
     const matchday = await this.prisma.matchday.findUnique({ where: { id: matchdayId } });
     if (!matchday) return;
 
@@ -137,7 +139,7 @@ export class PickProcessingService {
           where: { status: ParticipantStatus.ACTIVE },
           include: {
             picks: {
-              where: { matchdayId },
+              where: { matchdayId: { in: batchMatchdayIds } },
             },
           },
         },
