@@ -102,6 +102,7 @@ export class ChampionshipsService {
       include: {
         footballLeague: { select: { id: true, name: true, country: true } },
         editions: {
+          where: { status: { in: ['ACTIVE', 'OPEN'] } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: { id: true, status: true, startMatchday: true },
