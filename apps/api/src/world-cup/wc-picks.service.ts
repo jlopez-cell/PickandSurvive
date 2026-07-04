@@ -63,7 +63,9 @@ export class WcPicksService {
     const participant = await this.prisma.participant.findUnique({
       where: { userId_editionId: { userId, editionId } },
     });
-    if (!participant) throw new ForbiddenException('No eres participante de esta edición');
+
+    const isAdmin = edition.championship.adminId === userId;
+    if (!participant && !isAdmin) throw new ForbiddenException('No eres participante de esta edición');
 
     let matchday = matchdayNumber
       ? await this.prisma.matchday.findFirst({
@@ -91,19 +93,21 @@ export class WcPicksService {
         matchday: null,
         matches: [],
         myPick: null,
-        participant: {
-          status: participant.status,
-          eliminatedAtPhase: participant.eliminatedAtPhase,
-        },
+        participant: participant
+          ? { status: participant.status, eliminatedAtPhase: participant.eliminatedAtPhase }
+          : { status: 'ADMIN_VIEW', eliminatedAtPhase: null },
       };
     }
 
-    // Equipos ya usados por este participante
-    const usedUsages = await this.prisma.teamUsage.findMany({
-      where: { participantId: participant.id, editionId },
-      select: { teamId: true },
-    });
-    const usedTeamIds = new Set(usedUsages.map((u) => u.teamId));
+    // Equipos ya usados por este participante (vacío si es admin sin participación)
+    const usedTeamIds = new Set<string>();
+    if (participant) {
+      const usedUsages = await this.prisma.teamUsage.findMany({
+        where: { participantId: participant.id, editionId },
+        select: { teamId: true },
+      });
+      usedUsages.forEach((u) => usedTeamIds.add(u.teamId));
+    }
 
     const matches = await this.prisma.match.findMany({
       where: { matchdayId: matchday.id },
@@ -114,23 +118,25 @@ export class WcPicksService {
       orderBy: { kickoffTime: 'asc' },
     });
 
-    // Pick del usuario para esta jornada
-    const pick = await this.prisma.pick.findUnique({
-      where: { participantId_matchdayId: { participantId: participant.id, matchdayId: matchday.id } },
-      include: { team: { select: { id: true, name: true, logoUrl: true } } },
-    });
+    // Pick del usuario para esta jornada (null para admin sin participación)
+    const pick = participant
+      ? await this.prisma.pick.findUnique({
+          where: { participantId_matchdayId: { participantId: participant.id, matchdayId: matchday.id } },
+          include: { team: { select: { id: true, name: true, logoUrl: true } } },
+        })
+      : null;
 
-    // Si no hay pick para hoy, buscar el siguiente pick futuro (para mostrar en el card de bienvenida)
-    const nextPick = pick
-      ? null
-      : await this.prisma.pick.findFirst({
+    // Si no hay pick para hoy, buscar el siguiente pick futuro
+    const nextPick = (participant && !pick)
+      ? await this.prisma.pick.findFirst({
           where: {
             participantId: participant.id,
             matchday: { leagueId: league.id, season: WC_SEASON, number: { gt: matchday.number } },
           },
           include: { team: { select: { id: true, name: true, logoUrl: true } } },
           orderBy: { matchday: { number: 'asc' } },
-        });
+        })
+      : null;
 
     const deadline = matchday.firstKickoff ?? matches[0]?.kickoffTime ?? null;
     const deadlinePassed = deadline ? new Date() >= deadline : false;
@@ -180,10 +186,9 @@ export class WcPicksService {
       nextPick: nextPick
         ? { id: nextPick.id, status: nextPick.status, pickType: nextPick.pickType, team: nextPick.team }
         : null,
-      participant: {
-        status: participant.status,
-        eliminatedAtPhase: participant.eliminatedAtPhase,
-      },
+      participant: participant
+        ? { status: participant.status, eliminatedAtPhase: participant.eliminatedAtPhase }
+        : { status: 'ADMIN_VIEW', eliminatedAtPhase: null },
     };
   }
 

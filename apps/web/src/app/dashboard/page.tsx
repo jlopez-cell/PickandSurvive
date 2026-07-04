@@ -487,6 +487,7 @@ export default function DashboardPage() {
 
   // ── Competition view ──────────────────────────────────────────────────────
 
+  const isAdminViewer = isWc && wcCtx?.participant?.status === 'ADMIN_VIEW';
   const isEliminated = isWc
     ? wcCtx?.participant?.status === 'ELIMINATED'
     : false;
@@ -585,6 +586,7 @@ export default function DashboardPage() {
             picking={picking}
             countdown={countdown}
             isEliminated={isEliminated}
+            isAdminViewer={isAdminViewer}
             onSelectTeam={(id) => setSelectedTeamId((p) => (p === id ? null : id))}
             onPick={handleWcPick}
             onNav={handleWcNav}
@@ -803,7 +805,7 @@ export default function DashboardPage() {
 // ── WcPickTab ──────────────────────────────────────────────────────────────
 
 function WcPickTab({
-  ctx, loading, selectedTeamId, picking, countdown, isEliminated,
+  ctx, loading, selectedTeamId, picking, countdown, isEliminated, isAdminViewer,
   onSelectTeam, onPick, onNav,
 }: {
   ctx: WcTodayCtx | null;
@@ -812,6 +814,7 @@ function WcPickTab({
   picking: string | null;
   countdown: string;
   isEliminated: boolean;
+  isAdminViewer?: boolean;
   onSelectTeam: (id: string) => void;
   onPick: (teamId: string, pickType: 'WIN' | 'WIN_OR_DRAW') => void;
   onNav: (dir: 'prev' | 'next') => void;
@@ -918,6 +921,14 @@ function WcPickTab({
         </div>
       )}
 
+      {/* Admin view banner */}
+      {isAdminViewer && (
+        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/8 px-4 py-3 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-blue-400/60 shrink-0" />
+          <p className="text-xs text-blue-300/60">Vista de administrador · solo lectura</p>
+        </div>
+      )}
+
       {/* Matches grouped */}
       {Object.entries(groups).map(([groupName, groupMatches]) => (
         <div key={groupName} className="space-y-2">
@@ -929,7 +940,7 @@ function WcPickTab({
             const isAwayMyPick = myPick?.team?.id === m.awayTeam.id;
             const isHomeSelected = selectedTeamId === m.homeTeam.id;
             const isAwaySelected = selectedTeamId === m.awayTeam.id;
-            const canPick = !deadlinePassed && !eliminated && m.status === 'SCHEDULED';
+            const canPick = !deadlinePassed && !eliminated && !isAdminViewer && m.status === 'SCHEDULED';
             const isFinished = m.status === 'FINISHED' || m.status === 'LIVE';
 
             return (
