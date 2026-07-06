@@ -8,6 +8,13 @@ export function VersionGuard() {
   useEffect(() => {
     if (BUNDLE_TS === 'unknown') return;
 
+    // Anti-loop key scoped to this specific bundle version.
+    // sessionStorage survives window.location.reload() in the same tab,
+    // so if the reload doesn't serve a newer bundle we won't loop.
+    const RELOAD_KEY = `vg_reload_${BUNDLE_TS}`;
+
+    if (sessionStorage.getItem(RELOAD_KEY)) return;
+
     const check = async () => {
       try {
         const res = await fetch('/api/version', { cache: 'no-store' });
@@ -16,20 +23,10 @@ export function VersionGuard() {
         if (!buildTs || buildTs === 'unknown') return;
 
         if (buildTs !== BUNDLE_TS) {
-          const url = new URL(window.location.href);
-          // Anti-loop: if we already tried reloading with this exact build, give up.
-          // Happens when the browser stubbornly serves old JS from cache (iOS PWA, etc.)
-          if (url.searchParams.get('_v') === buildTs) return;
-          url.searchParams.set('_v', buildTs);
-          window.location.replace(url.toString());
-          return;
-        }
-
-        // Bundle is up to date — clean up any stale _v param left in the URL
-        const url = new URL(window.location.href);
-        if (url.searchParams.has('_v')) {
-          url.searchParams.delete('_v');
-          history.replaceState(null, '', url.toString());
+          sessionStorage.setItem(RELOAD_KEY, '1');
+          // Reload WITHOUT touching the URL — avoids desynchronising the
+          // Next.js router, which breaks navigation after history.replaceState.
+          window.location.reload();
         }
       } catch {}
     };
