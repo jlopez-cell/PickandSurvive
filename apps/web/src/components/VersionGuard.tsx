@@ -1,39 +1,109 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const BUNDLE_TS = process.env.NEXT_PUBLIC_BUILD_TS ?? 'unknown';
+const RETRY_KEY = 'vg_retry_count';
+const MAX_AUTO_RETRIES = 2;
+
+function getRetryCount(): number {
+  try { return parseInt(sessionStorage.getItem(RETRY_KEY) ?? '0', 10); } catch { return 0; }
+}
+function incRetryCount() {
+  try { sessionStorage.setItem(RETRY_KEY, String(getRetryCount() + 1)); } catch {}
+}
+function clearRetryCount() {
+  try { sessionStorage.removeItem(RETRY_KEY); } catch {}
+}
 
 export function VersionGuard() {
+  const [state, setState] = useState<'idle' | 'updating' | 'stale'>('idle');
+  const checking = useRef(false);
+
   useEffect(() => {
     if (BUNDLE_TS === 'unknown') return;
 
-    // Anti-loop key scoped to this specific bundle version.
-    // sessionStorage survives window.location.reload() in the same tab,
-    // so if the reload doesn't serve a newer bundle we won't loop.
-    const RELOAD_KEY = `vg_reload_${BUNDLE_TS}`;
-
-    if (sessionStorage.getItem(RELOAD_KEY)) return;
+    // On mount: if we have the _v param, a reload just happened.
+    // Check if it actually served the new bundle.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('_v')) {
+      const targetTs = url.searchParams.get('_v');
+      if (targetTs === BUNDLE_TS) {
+        // Successful update — clear retry counter
+        clearRetryCount();
+      }
+      // Always strip the param from the visible URL
+      url.searchParams.delete('_v');
+      window.history.replaceState({}, '', url.toString());
+    }
 
     const check = async () => {
+      if (checking.current) return;
+      checking.current = true;
       try {
         const res = await fetch('/api/version', { cache: 'no-store' });
         if (!res.ok) return;
         const { buildTs } = await res.json();
-        if (!buildTs || buildTs === 'unknown') return;
+        if (!buildTs || buildTs === 'unknown' || buildTs === BUNDLE_TS) return;
 
-        if (buildTs !== BUNDLE_TS) {
-          sessionStorage.setItem(RELOAD_KEY, '1');
-          // Reload WITHOUT touching the URL — avoids desynchronising the
-          // Next.js router, which breaks navigation after history.replaceState.
-          window.location.reload();
+        // New version detected
+        const retries = getRetryCount();
+        if (retries >= MAX_AUTO_RETRIES) {
+          setState('stale'); // Too many failed auto-reloads → show manual banner
+          return;
         }
-      } catch {}
+
+        setState('updating');
+        incRetryCount();
+
+        // Hard-reload: add _v param so the next mount knows which version we targeted.
+        // This bypasses browser disk cache for the HTML (which Next.js serves with no-store).
+        setTimeout(() => {
+          const dest = new URL(window.location.href);
+          dest.searchParams.set('_v', buildTs);
+          window.location.replace(dest.toString());
+        }, 1_200);
+      } catch {
+        // Ignore network errors (offline, etc.)
+      } finally {
+        checking.current = false;
+      }
     };
 
-    const t = setTimeout(check, 1500);
-    return () => clearTimeout(t);
+    // Check immediately on mount
+    check();
+
+    // Re-check when user returns to the tab (crucial for mobile)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // Periodic check every 45s for long-lived sessions
+    const interval = setInterval(check, 45_000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(interval);
+    };
   }, []);
 
-  return null;
+  if (state === 'idle') return null;
+
+  if (state === 'stale') {
+    return (
+      <button
+        onClick={() => window.location.reload()}
+        className="fixed top-0 inset-x-0 z-[100] bg-amber-500 text-white text-center text-sm font-semibold py-2.5 px-4 w-full cursor-pointer"
+      >
+        🔄 Nueva versión disponible — Toca para actualizar
+      </button>
+    );
+  }
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-[100] bg-orange-500 text-white text-center text-sm font-semibold py-2.5 px-4">
+      ↻ Actualizando a la nueva versión...
+    </div>
+  );
 }
