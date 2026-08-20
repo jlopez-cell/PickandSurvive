@@ -18,6 +18,7 @@ export type StandingEntry = {
   totalPoints?: number;
   survivedPickCount?: number;
   survivalStreak?: number;
+  isGhost?: boolean;
   latestPick?: { team: { name: string; logoUrl: string } | null; status: string } | null;
 };
 
