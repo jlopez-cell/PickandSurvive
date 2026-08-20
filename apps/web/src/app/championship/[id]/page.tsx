@@ -35,7 +35,7 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
   DRAFT: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
   OPEN: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
   ACTIVE: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
-  FINISHED: 'bg-white/5 text-white/35 border-white/[0.07]',
+  FINISHED: 'bg-secondary text-muted-foreground border-border',
   CANCELLED: 'bg-red-500/15 text-red-300 border-red-500/25',
 };
 
@@ -207,17 +207,6 @@ export default function ChampionshipDetailPage() {
 
   const isWcMode = championship?.mode === 'WORLD_CUP';
 
-  const shellBg = (
-    <>
-      <div
-        className="absolute inset-0 bg-cover bg-center opacity-60"
-        style={{ backgroundImage: `url('/Logo_WorldCup.png')` }}
-      />
-      <div className={`absolute inset-0 bg-gradient-to-b ${isWcMode ? 'from-amber-950/85 via-slate-950/65 to-slate-950/95' : 'from-slate-950/90 via-slate-950/65 to-slate-950/95'}`} />
-      {isWcMode && <div className="absolute inset-0 bg-gradient-to-br from-amber-900/30 via-transparent to-amber-900/20 pointer-events-none" />}
-    </>
-  );
-
   const standingsStats = (() => {
     if (!standingsRows || standingsRows.length === 0) return null;
     const hasStatus = standingsRows.some((s) => typeof s.status === 'string');
@@ -229,9 +218,8 @@ export default function ChampionshipDetailPage() {
 
   if (authLoading || fetching) {
     return (
-      <div className="relative min-h-screen text-white overflow-hidden">
-        {shellBg}
-        <main className="relative z-10 flex min-h-screen items-center justify-center text-white/35">
+      <div className="min-h-screen bg-background text-foreground">
+        <main className="flex min-h-screen items-center justify-center text-muted-foreground">
           Cargando…
         </main>
       </div>
@@ -240,12 +228,11 @@ export default function ChampionshipDetailPage() {
 
   if (error || !championship) {
     return (
-      <div className="relative min-h-screen text-white overflow-hidden">
-        {shellBg}
-        <main className="relative z-10 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
-          <p className="text-red-300 mb-4">{error || 'Campeonato no encontrado'}</p>
+      <div className="min-h-screen bg-background text-foreground">
+        <main className="p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+          <p className="text-red-400 mb-4">{error || 'Campeonato no encontrado'}</p>
           <button
-            className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-4 py-2 text-sm"
+            className="bg-secondary border border-border text-muted-foreground rounded-xl px-4 py-2 text-sm"
             onClick={() => router.push('/dashboard')}
           >
             ← Volver al dashboard
@@ -258,13 +245,12 @@ export default function ChampionshipDetailPage() {
   const isAdmin = championship.adminId === user?.id;
 
   return (
-    <div className="relative min-h-screen text-white overflow-hidden">
-      {shellBg}
+    <div className="min-h-screen bg-background text-foreground">
       <MobileTopHeader />
-      <main className="relative z-10 min-h-screen px-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] pt-3 sm:px-6 sm:pt-6">
+      <main className="min-h-screen px-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] pt-3 sm:px-6 sm:pt-6">
         <div className="max-w-3xl mx-auto">
           <button
-            className="mb-6 -ml-2 text-sm text-white/35 hover:text-white/60 transition-colors flex items-center gap-1"
+            className="mb-6 -ml-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             onClick={() => router.push('/dashboard')}
           >
             ← Volver
@@ -274,28 +260,28 @@ export default function ChampionshipDetailPage() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1 min-w-0">
-                <h1 className={`text-2xl font-bold break-words min-w-0 ${isWcMode ? 'text-amber-400' : 'text-white/85'}`}>
+                <h1 className={`text-2xl font-bold break-words min-w-0 ${isWcMode ? 'text-amber-500' : 'text-foreground'}`}>
                   {championship.name}
                 </h1>
                 {isWcMode && (
-                  <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                  <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-500">
                     WC 2026
                   </span>
                 )}
               </div>
-              <p className="text-sm text-white/35 break-words">
+              <p className="text-sm text-muted-foreground break-words">
                 {championship.footballLeague.name} · {championship.footballLeague.country} ·{' '}
                 {MODE_LABEL[championship.mode]}
                 {championship.pickResetAtMidseason && ' · Reset media vuelta'}
               </p>
-              <p className="text-xs text-white/35 mt-1">Admin: @{championship.admin.alias}</p>
+              <p className="text-xs text-muted-foreground mt-1">Admin: @{championship.admin.alias}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {pickEdition && (
                 <button
                   className={`w-full sm:w-auto rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
                     isWcMode
-                      ? 'bg-amber-500/20 border border-amber-500/50 text-amber-200 hover:bg-amber-500/30'
+                      ? 'bg-amber-500/20 border border-amber-500/50 text-amber-500 hover:bg-amber-500/30'
                       : 'bg-emerald-500 text-white hover:bg-emerald-600'
                   }`}
                   onClick={() => router.push(
@@ -309,7 +295,7 @@ export default function ChampionshipDetailPage() {
               )}
               {standingsEdition && (
                 <button
-                  className="gap-1.5 w-full sm:w-auto md:hidden bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-4 py-2 text-sm flex items-center justify-center"
+                  className="gap-1.5 w-full sm:w-auto md:hidden bg-secondary border border-border text-muted-foreground rounded-xl px-4 py-2 text-sm flex items-center justify-center"
                   onClick={() => router.push(`/edition/${standingsEdition.id}/standings`)}
                 >
                   <Trophy className="h-4 w-4" />
@@ -325,7 +311,7 @@ export default function ChampionshipDetailPage() {
                     Invitaciones
                   </button>
                   <button
-                    className="w-full sm:w-auto bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-4 py-2 text-sm"
+                    className="w-full sm:w-auto bg-secondary border border-border text-muted-foreground rounded-xl px-4 py-2 text-sm"
                     onClick={() => router.push(`/championship/${id}/edition/new`)}
                   >
                     + Nueva edición
@@ -337,12 +323,12 @@ export default function ChampionshipDetailPage() {
 
           {/* Standings preview card - mobile only */}
           {standingsEdition && (
-            <div className={`mb-8 rounded-2xl border p-4 sm:p-5 md:hidden ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}>
+            <div className={`mb-8 rounded-2xl border p-4 sm:p-5 md:hidden ${isWcMode ? 'border-amber-500/20 bg-card' : 'border-border bg-card'}`}>
               <div className="flex items-center gap-2 mb-4">
-                <Trophy className="h-5 w-5 text-amber-400 shrink-0" />
+                <Trophy className="h-5 w-5 text-amber-500 shrink-0" />
                 <div>
-                  <div className="font-semibold text-white/85">Estado de la liga</div>
-                  <div className="text-xs text-white/35">
+                  <div className="font-semibold text-foreground">Estado de la liga</div>
+                  <div className="text-xs text-muted-foreground">
                     Participantes en la edición actual (
                     {EDITION_STATUS_LABEL[standingsEdition.status] ?? standingsEdition.status})
                   </div>
@@ -350,21 +336,21 @@ export default function ChampionshipDetailPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/[0.07] bg-white/5 px-4 py-3 text-center sm:text-left">
-                  <div className="text-xs font-medium text-white/35">Activos</div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-300">
+                <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-center sm:text-left">
+                  <div className="text-xs font-medium text-muted-foreground">Activos</div>
+                  <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-500">
                     {standingsLoading ? '…' : standingsError ? '—' : (standingsStats?.active ?? '—')}
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/[0.07] bg-white/5 px-4 py-3 text-center sm:text-left">
-                  <div className="text-xs font-medium text-white/35">Eliminados</div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-red-300">
+                <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-center sm:text-left">
+                  <div className="text-xs font-medium text-muted-foreground">Eliminados</div>
+                  <div className="mt-1 text-2xl font-bold tabular-nums text-red-500">
                     {standingsLoading ? '…' : standingsError ? '—' : (standingsStats?.eliminated ?? '—')}
                   </div>
                 </div>
               </div>
               {!standingsLoading && !standingsError && standingsStats && standingsStats.active === null && (
-                <p className="text-xs text-white/35 mt-3">
+                <p className="text-xs text-muted-foreground mt-3">
                   Los contadores se mostrarán cuando el estado de cada jugador esté disponible en esta edición.
                 </p>
               )}
@@ -373,11 +359,11 @@ export default function ChampionshipDetailPage() {
 
           {/* Pick preview card - mobile only */}
           {pickEdition && (
-            <div className={`mb-6 rounded-2xl border p-4 md:hidden ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}>
+            <div className={`mb-6 rounded-2xl border p-4 md:hidden ${isWcMode ? 'border-amber-500/20 bg-card' : 'border-border bg-card'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-white/85">Tu pick de la jornada</div>
-                  <div className="text-xs text-white/35">
+                  <div className="text-sm font-semibold text-foreground">Tu pick de la jornada</div>
+                  <div className="text-xs text-muted-foreground">
                     {pickPreviewLoading
                       ? 'Comprobando pick...'
                       : myPickPreview?.team?.name
@@ -386,29 +372,29 @@ export default function ChampionshipDetailPage() {
                   </div>
                 </div>
                 {myPickPreview?.team?.name ? (
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
                     Pick hecho
                   </span>
                 ) : (
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/30">
                     Sin pick
                   </span>
                 )}
               </div>
 
               {myPickPreview?.team?.name && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/5 px-3 py-2">
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2">
                   {myPickPreview.team.logoUrl ? (
                     <img src={myPickPreview.team.logoUrl} alt={myPickPreview.team.name} className="h-5 w-5 object-contain" />
                   ) : null}
-                  <span className="text-sm text-white/85">{myPickPreview.team.name}</span>
+                  <span className="text-sm text-foreground">{myPickPreview.team.name}</span>
                 </div>
               )}
             </div>
           )}
 
           {/* Tabs */}
-          <div className="flex border-b border-white/[0.07] mb-6">
+          <div className="flex border-b border-border mb-6">
             {([
               { key: 'ediciones' as const, label: 'Ediciones' },
               { key: 'ajustes' as const, label: 'Ajustes' },
@@ -417,12 +403,12 @@ export default function ChampionshipDetailPage() {
                 key={key}
                 onClick={() => setActiveTab(key)}
                 className={`relative pb-3 mr-6 text-sm font-medium transition-colors ${
-                  activeTab === key ? 'text-white/85' : 'text-white/35 hover:text-white/55'
+                  activeTab === key ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'
                 }`}
               >
                 {label}
                 {activeTab === key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-amber-400" />
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-amber-500" />
                 )}
               </button>
             ))}
@@ -432,8 +418,8 @@ export default function ChampionshipDetailPage() {
           {activeTab === 'ediciones' && (
             <>
               {championship.editions.length === 0 ? (
-                <div className="py-12 text-center rounded-2xl border border-dashed border-white/[0.07] bg-white/[0.02]">
-                  <p className="text-white/35 mb-4">No hay ediciones todavía.</p>
+                <div className="py-12 text-center rounded-2xl border border-dashed border-border bg-secondary/30">
+                  <p className="text-muted-foreground mb-4">No hay ediciones todavía.</p>
                   {isAdmin && (
                     <button
                       className="bg-emerald-500 text-white font-bold rounded-xl px-4 py-2 text-sm"
@@ -448,22 +434,22 @@ export default function ChampionshipDetailPage() {
                   {championship.editions.map((edition) => (
                     <div
                       key={edition.id}
-                      className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}
+                      className={`rounded-2xl border p-4 bg-card ${isWcMode ? 'border-amber-500/20' : 'border-border'}`}
                     >
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                         <div className="min-w-0">
-                          <span className="font-bold text-white/85 text-sm">
+                          <span className="font-bold text-foreground text-sm">
                             Jornada {edition.startMatchday}
                             {edition.endMatchday ? ` → ${edition.endMatchday}` : ''}
                           </span>
                           {edition.potAmountCents > 0 && (
-                            <span className="text-white/35 text-xs ml-2">
+                            <span className="text-muted-foreground text-xs ml-2">
                               · Bote: {(edition.potAmountCents / 100).toFixed(2)} €/persona
                             </span>
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASS[edition.status] ?? 'bg-white/5 text-white/35 border-white/[0.07]'}`}>
+                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASS[edition.status] ?? 'bg-secondary text-muted-foreground border-border'}`}>
                             {EDITION_STATUS_LABEL[edition.status]}
                           </span>
                           {isAdmin && (edition.status === 'DRAFT' || edition.status === 'OPEN') && (
@@ -480,7 +466,7 @@ export default function ChampionshipDetailPage() {
                               edition.status === 'OPEN' ||
                               edition.status === 'ACTIVE') && (
                               <button
-                                className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
+                                className="bg-secondary border border-border text-muted-foreground rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
                                 title="Añade a la edición a los miembros aprobados y a quienes jugaron la última edición finalizada (sin nueva invitación)"
                                 onClick={() => handleSyncMembers(edition.id)}
                                 disabled={syncingMembers === edition.id}
@@ -495,7 +481,7 @@ export default function ChampionshipDetailPage() {
                             )}
                           {(edition.status === 'ACTIVE' || edition.status === 'OPEN') && (
                             <button
-                              className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-xs"
+                              className="bg-secondary border border-border text-muted-foreground rounded-xl px-3 py-1.5 text-xs"
                               onClick={() => router.push(
                                 championship.mode === 'WORLD_CUP'
                                   ? `/world-cup/${edition.id}`
@@ -517,29 +503,29 @@ export default function ChampionshipDetailPage() {
           {/* Tab: Ajustes */}
           {activeTab === 'ajustes' && (
             <div className="flex flex-col gap-4">
-              <div className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}>
-                <div className="text-xs font-medium text-white/35 uppercase tracking-wider mb-4">Información</div>
+              <div className={`rounded-2xl border p-4 bg-card ${isWcMode ? 'border-amber-500/20' : 'border-border'}`}>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">Información</div>
                 <dl className="flex flex-col gap-3.5">
                   <div className="flex justify-between gap-3">
-                    <dt className="text-sm text-white/35 shrink-0">Nombre</dt>
-                    <dd className="text-sm text-white/85 font-medium text-right break-words min-w-0">{championship.name}</dd>
+                    <dt className="text-sm text-muted-foreground shrink-0">Nombre</dt>
+                    <dd className="text-sm text-foreground font-medium text-right break-words min-w-0">{championship.name}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-sm text-white/35 shrink-0">Modo</dt>
-                    <dd className="text-sm text-white/85 font-medium text-right">{MODE_LABEL[championship.mode]}</dd>
+                    <dt className="text-sm text-muted-foreground shrink-0">Modo</dt>
+                    <dd className="text-sm text-foreground font-medium text-right">{MODE_LABEL[championship.mode]}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-sm text-white/35 shrink-0">Liga</dt>
-                    <dd className="text-sm text-white/85 font-medium text-right">{championship.footballLeague.name} · {championship.footballLeague.country}</dd>
+                    <dt className="text-sm text-muted-foreground shrink-0">Liga</dt>
+                    <dd className="text-sm text-foreground font-medium text-right">{championship.footballLeague.name} · {championship.footballLeague.country}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-sm text-white/35 shrink-0">Creado por</dt>
-                    <dd className="text-sm text-white/85 font-medium text-right">@{championship.admin.alias}</dd>
+                    <dt className="text-sm text-muted-foreground shrink-0">Creado por</dt>
+                    <dd className="text-sm text-foreground font-medium text-right">@{championship.admin.alias}</dd>
                   </div>
                   {standingsEdition && (
                     <div className="flex justify-between gap-3">
-                      <dt className="text-sm text-white/35 shrink-0">Jornada</dt>
-                      <dd className="text-sm text-white/85 font-medium text-right">
+                      <dt className="text-sm text-muted-foreground shrink-0">Jornada</dt>
+                      <dd className="text-sm text-foreground font-medium text-right">
                         {standingsEdition.startMatchday}
                         {standingsEdition.endMatchday ? ` → ${standingsEdition.endMatchday}` : ''}
                       </dd>
@@ -550,11 +536,11 @@ export default function ChampionshipDetailPage() {
 
               {isAdmin && (
                 <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-4">
-                  <div className="text-xs font-medium text-red-400/70 uppercase tracking-wider mb-4">Zona de peligro</div>
+                  <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-4">Zona de peligro</div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-bold text-white/85">Eliminar campeonato</div>
-                      <div className="text-xs text-white/35 mt-1">
+                      <div className="text-sm font-bold text-foreground">Eliminar campeonato</div>
+                      <div className="text-xs text-muted-foreground mt-1">
                         Borra el campeonato y sus ediciones. Esta acción no se puede deshacer.
                       </div>
                     </div>
