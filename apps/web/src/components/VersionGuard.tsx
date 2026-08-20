@@ -97,7 +97,18 @@ export function VersionGuard() {
   if (state === 'stale') {
     return (
       <button
-        onClick={() => window.location.reload()}
+        onClick={async () => {
+          clearRetryCount();
+          try {
+            const res = await fetch('/api/version', { cache: 'no-store' });
+            const { buildTs } = await res.json();
+            const url = new URL(window.location.href);
+            url.searchParams.set('_v', buildTs);
+            window.location.replace(url.toString());
+          } catch {
+            window.location.reload();
+          }
+        }}
         style={bannerStyle}
         className="fixed top-0 inset-x-0 z-[100] bg-amber-500 text-white text-center text-sm font-semibold pb-2.5 px-4 w-full cursor-pointer"
       >
