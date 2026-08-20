@@ -100,11 +100,8 @@ export default function DashboardPage() {
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 bg-card/95 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top,0px)]">
         <div className="flex items-center gap-3 px-4 h-14">
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-              <Trophy className="h-4 w-4 text-amber-500" />
-            </div>
-            <span className="font-bold text-foreground text-sm">Pick &amp; Survive</span>
+          <div className="flex items-center flex-1 min-w-0">
+            <img src="/logo.png" alt="Pick & Survive" className="h-9 w-auto object-contain" />
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -128,8 +125,14 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* ── Banner Hero ── */}
+      <div className="relative w-full overflow-hidden" style={{ maxHeight: '200px' }}>
+        <img src="/banner.png" alt="Pick & Survive" className="w-full object-cover object-center" style={{ maxHeight: '200px' }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+      </div>
+
       {/* ── Content ── */}
-      <main className="px-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] pt-6 sm:px-6">
+      <main className="px-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] pt-5 sm:px-6">
         <div className="max-w-3xl mx-auto">
 
           {/* Greeting */}

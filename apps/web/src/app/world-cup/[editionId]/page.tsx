@@ -328,21 +328,14 @@ export default function WcPickPage() {
 
       {/* ══ HERO HEADER ═══════════════════════════════════════════════════ */}
       <header className="relative overflow-hidden pt-[env(safe-area-inset-top,0px)]">
-        {/* Layered backgrounds */}
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/70 via-stone-950/95 to-[#0d0b08]" />
-        {/* Stadium spotlight from top */}
-        <div
-          className="absolute inset-0"
-          style={{ background: 'radial-gradient(ellipse 70% 55% at 50% -10%, rgba(217,119,6,0.25) 0%, transparent 65%)' }}
+        {/* Banner image */}
+        <img
+          src="/banner.png"
+          alt="Pick & Survive"
+          className="absolute inset-0 w-full h-full object-cover object-center"
         />
-        {/* Diamond grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(45deg,#f59e0b 0,#f59e0b 1px,transparent 0,transparent 50%)',
-            backgroundSize: '22px 22px',
-          }}
-        />
+        {/* Overlay to darken and blend */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/60 to-[#0d0b08]" />
         {/* Bottom fade line */}
         <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
 
