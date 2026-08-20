@@ -432,6 +432,9 @@ export class PicksService {
       status: edition.status,
       championshipName: edition.championship.name,
       season: edition.championship.footballLeague.currentSeason,
+      blockCount: edition.championship.blockCount ?? 0,
+      vetoCount: edition.championship.vetoCount ?? 0,
+      challengeCount: edition.championship.challengeCount ?? 0,
     };
   }
 

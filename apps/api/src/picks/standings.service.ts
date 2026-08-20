@@ -170,6 +170,10 @@ export class StandingsService {
             eliminatedAtMatchday: p.eliminatedAtMatchday,
             survivedPickCount,
             survivalStreak,
+            isGhost: p.isGhost ?? false,
+            blocksRemaining: p.blocksRemaining ?? 0,
+            vetosRemaining: p.vetosRemaining ?? 0,
+            challengesRemaining: p.challengesRemaining ?? 0,
             latestPick:
               canRevealPicks || (viewerParticipantId && p.id === viewerParticipantId)
                 ? resolvePickActual(p.picks)
@@ -197,6 +201,10 @@ export class StandingsService {
             totalPoints: p.totalPoints,
             survivedPickCount,
             survivalStreak,
+            isGhost: p.isGhost ?? false,
+            blocksRemaining: p.blocksRemaining ?? 0,
+            vetosRemaining: p.vetosRemaining ?? 0,
+            challengesRemaining: p.challengesRemaining ?? 0,
             latestPick:
               canRevealPicks || (viewerParticipantId && p.id === viewerParticipantId)
                 ? resolvePickActual(p.picks)
