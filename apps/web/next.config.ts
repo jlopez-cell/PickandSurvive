@@ -1,7 +1,9 @@
 import type { NextConfig } from 'next';
 
-// Baked into every JS bundle at build time — changes with every deploy
-const BUILD_TS = Date.now().toString();
+// Set by remote-post-deploy.sh before the build so both server and client
+// webpack compilations share the exact same value. Falls back to Date.now()
+// for local dev (tiny race condition between compilations is acceptable in dev).
+const BUILD_TS = process.env.NEXT_PUBLIC_BUILD_TS ?? Date.now().toString();
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@pickandsurvive/shared'],

@@ -17,6 +17,10 @@ pnpm --filter @pickandsurvive/api run db:generate
 pnpm --filter @pickandsurvive/api exec prisma migrate deploy
 
 pnpm --filter @pickandsurvive/api run build
+
+# Single timestamp shared by both server + client webpack compilations
+# so NEXT_PUBLIC_BUILD_TS is identical in the bundle and in /api/version
+export NEXT_PUBLIC_BUILD_TS="$(date +%s%3N)"
 pnpm --filter @pickandsurvive/web run build
 
 pm2 restart pick-api pick-web
