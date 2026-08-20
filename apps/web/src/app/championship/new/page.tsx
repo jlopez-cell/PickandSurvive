@@ -13,6 +13,12 @@ export default function NewChampionshipPage() {
     footballLeagueId: '',
     mode: 'TOURNAMENT',
     pickResetAtMidseason: false,
+    streakBonusEnabled: false,
+    underdogBonusEnabled: false,
+    socialPressureEnabled: false,
+    wildcardCount: 0 as 0 | 1 | 2,
+    ghostModeEnabled: false,
+    doubleOrNothingEnabled: false,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

@@ -61,7 +61,7 @@ function PageLeaderRow({
       'group rounded-2xl border p-2.5 transition-colors',
       rank === 1
         ? 'border-amber-500/30 bg-amber-500/[0.04] hover:border-amber-500/40'
-        : 'border-white/[0.07] bg-[#0c1220] hover:border-white/12',
+        : 'border-border bg-card hover:border-border/60',
     )}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -70,19 +70,19 @@ function PageLeaderRow({
             rank === 1
               ? 'bg-amber-500/20 text-amber-400 ring-amber-500/30'
               : rank <= 3
-              ? 'bg-white/10 text-white/75 ring-white/10'
-              : 'bg-white/[0.05] text-white/45 ring-white/[0.06]',
+              ? 'bg-secondary text-foreground/75 ring-border'
+              : 'bg-secondary/50 text-muted-foreground ring-border/50',
           )}>
             {rank}
           </span>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm font-black text-white/85">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-sm font-black text-foreground/85">
             {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-white text-sm">@{entry.alias}</p>
+            <p className="truncate font-semibold text-foreground text-sm">@{entry.alias}</p>
             <div className="mt-0 flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:hidden">
               {pickUi && (
-                <span className="flex items-center gap-1.5 text-[11px] text-white/55">
+                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   {pickUi.showLogo && pickUi.logoUrl ? (
                     <img src={pickUi.logoUrl} alt="" className="h-4 w-4 object-contain" />
                   ) : null}
@@ -110,10 +110,10 @@ function PageLeaderRow({
                     className="h-5 w-5 shrink-0 object-contain"
                   />
                 ) : null}
-                <span className="truncate text-sm text-white/65">{pickUi.label}</span>
+                <span className="truncate text-sm text-muted-foreground">{pickUi.label}</span>
               </div>
             ) : (
-              <span className="text-sm text-white/35">—</span>
+              <span className="text-sm text-muted-foreground/60">—</span>
             )}
           </div>
           <div className="hidden w-24 text-right md:block">
@@ -121,11 +121,11 @@ function PageLeaderRow({
               <span className="text-sm font-semibold tabular-nums text-amber-200/90">
                 {entry.survivedPickCount}
                 {(entry.survivalStreak ?? 0) >= 2 ? (
-                  <span className="block text-[10px] font-normal text-white/45">{entry.survivalStreak} seguidos</span>
+                  <span className="block text-[10px] font-normal text-muted-foreground">{entry.survivalStreak} seguidos</span>
                 ) : null}
               </span>
             ) : (
-              <span className="text-sm text-white/35">—</span>
+              <span className="text-sm text-muted-foreground/60">—</span>
             )}
           </div>
         </div>
@@ -245,10 +245,10 @@ export function EditionStandingsPanel({
     return `${hours}h ${minutes}m`;
   };
 
-  const ptsEstadoCell = (entry: StandingEntry, light = true) => {
+  const ptsEstadoCell = (entry: StandingEntry) => {
     const ptsLine =
       entry.totalPoints !== undefined ? (
-        <div className={cn('font-extrabold tabular-nums', light ? 'text-white/95' : 'text-foreground')}>
+        <div className="font-extrabold tabular-nums text-foreground">
           {entry.totalPoints} pts
         </div>
       ) : null;
@@ -258,13 +258,7 @@ export function EditionStandingsPanel({
         <div
           className={cn(
             'text-sm font-semibold',
-            entry.status === 'ACTIVE'
-            ? light
-              ? 'text-emerald-300'
-              : 'text-emerald-600 dark:text-emerald-300'
-            : light
-              ? 'text-red-300'
-              : 'text-red-600 dark:text-red-400',
+            entry.status === 'ACTIVE' ? 'text-emerald-500' : 'text-red-500',
           )}
         >
           {entry.status === 'ACTIVE' ? 'Activo' : `Elim. J${entry.eliminatedAtMatchday ?? '—'}`}
@@ -272,7 +266,7 @@ export function EditionStandingsPanel({
       ) : null;
 
     if (!ptsLine && !statusLine) {
-      return <div className={light ? 'text-white/45' : 'text-muted-foreground'}>—</div>;
+      return <div className="text-muted-foreground">—</div>;
     }
 
     return (
@@ -389,16 +383,16 @@ export function EditionStandingsPanel({
           </div>
 
           <div className="hidden lg:block pb-4">
-            <Card className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0c1220] text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+            <Card className="overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-white/[0.07] hover:bg-transparent">
-                      <TableHead className="w-12 text-[11px] uppercase tracking-wide text-white/55">#</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wide text-white/55">Jugador</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wide text-white/55">PTS / Estado</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wide text-white/55">Pick</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wide text-white/55 text-right">Aciertos</TableHead>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="w-12 text-[11px] uppercase tracking-wide text-muted-foreground">#</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Jugador</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">PTS / Estado</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Pick</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground text-right">Aciertos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -409,24 +403,24 @@ export function EditionStandingsPanel({
                               <TableRow
                                 key={entry.participantId}
                                 className={cn(
-                                  'border-white/[0.07] hover:bg-white/[0.03]',
+                                  'border-border hover:bg-secondary/20',
                                   idx === 0 && 'bg-amber-500/[0.04]',
-                                  idx > 0 && idx < 3 && 'bg-white/[0.02]',
+                                  idx > 0 && idx < 3 && 'bg-secondary/10',
                                   entry.status === 'ELIMINATED' && 'opacity-45',
                                 )}
                               >
-                                <TableCell className="font-semibold text-white/65">{idx + 1}</TableCell>
+                                <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-3">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm font-extrabold text-white/85">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary text-sm font-extrabold text-foreground/85">
                                       {initial}
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="truncate font-semibold text-white">@{entry.alias}</div>
+                                      <div className="truncate font-semibold text-foreground">@{entry.alias}</div>
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell>{ptsEstadoCell(entry, true)}</TableCell>
+                                <TableCell>{ptsEstadoCell(entry)}</TableCell>
                                 <TableCell>
                                   {pickUi ? (
                                     <div className="flex items-center gap-2">
@@ -437,10 +431,10 @@ export function EditionStandingsPanel({
                                           className="h-6 w-6 object-contain"
                                         />
                                       ) : null}
-                                      <span className="text-sm text-white/75">{pickUi.label}</span>
+                                      <span className="text-sm text-muted-foreground">{pickUi.label}</span>
                                     </div>
                                   ) : (
-                                    <span className="text-white/35">—</span>
+                                    <span className="text-muted-foreground/60">—</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -449,7 +443,7 @@ export function EditionStandingsPanel({
                                       {entry.survivedPickCount}
                                     </span>
                                   ) : (
-                                    <span className="text-white/35">—</span>
+                                    <span className="text-muted-foreground/60">—</span>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -467,7 +461,7 @@ export function EditionStandingsPanel({
                 <PageLeaderRow
                   entry={entry}
                   rank={idx + 1}
-                  ptsCell={ptsEstadoCell(entry, true)}
+                  ptsCell={ptsEstadoCell(entry)}
                 />
               </div>
             ))}
@@ -577,7 +571,7 @@ export function EditionStandingsPanel({
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{ptsEstadoCell(entry, false)}</TableCell>
+                        <TableCell>{ptsEstadoCell(entry)}</TableCell>
                         <TableCell className="hidden sm:table-cell">
                           {pickUi ? (
                             <div className="flex items-center gap-2">
@@ -616,14 +610,14 @@ export function EditionStandingsPanel({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+80px)] text-white bg-[#06090f]">
+    <main className="relative min-h-screen overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+80px)] text-foreground bg-background">
       <MobileTopHeader />
 
       <div className="relative z-10 mx-auto max-w-6xl px-3.5 py-5 sm:px-5 sm:py-7 lg:px-8 pt-[max(1.0rem,env(safe-area-inset-top))]">
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-2 mb-2 text-white/60 hover:bg-white/8 hover:text-white/90"
+          className="-ml-2 mb-2 text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           onClick={() => router.back()}
         >
           ← Volver
