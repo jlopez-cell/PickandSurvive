@@ -29,6 +29,29 @@ export type EditionStandingsPanelProps = {
   showFullPageLink?: boolean;
 };
 
+function streakBadge(streak: number | undefined | null): ReactNode {
+  if (!streak || streak < 3) return null;
+  if (streak >= 8) {
+    return (
+      <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 shrink-0">
+        👑 +3
+      </span>
+    );
+  }
+  if (streak >= 5) {
+    return (
+      <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+        🔥 +1
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 shrink-0">
+      🔥
+    </span>
+  );
+}
+
 function standingsPickDisplay(entry: StandingEntry): {
   label: string;
   showLogo: boolean;
@@ -80,7 +103,11 @@ function PageLeaderRow({
             {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-foreground text-sm">@{entry.alias}</p>
+            <div className="flex items-center gap-1 min-w-0">
+              <p className="truncate font-semibold text-foreground text-sm">@{entry.alias}</p>
+              {streakBadge(entry.survivalStreak)}
+              {entry.isGhost && entry.status === 'ELIMINATED' && <span className="text-sm shrink-0">👻</span>}
+            </div>
             <div className="mt-0 flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:hidden">
               {pickUi && (
                 <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -417,7 +444,11 @@ export function EditionStandingsPanel({
                                       {initial}
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="truncate font-semibold text-foreground">@{entry.alias}</div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="truncate font-semibold text-foreground">@{entry.alias}</span>
+                                        {streakBadge(entry.survivalStreak)}
+                                        {entry.isGhost && entry.status === 'ELIMINATED' && <span className="text-sm shrink-0">👻</span>}
+                                      </div>
                                     </div>
                                   </div>
                                 </TableCell>
@@ -558,7 +589,11 @@ export function EditionStandingsPanel({
                               {initial}
                             </div>
                             <div className="min-w-0">
-                              <div className="truncate font-semibold">@{entry.alias}</div>
+                              <div className="flex items-center gap-1">
+                                <span className="truncate font-semibold">@{entry.alias}</span>
+                                {streakBadge(entry.survivalStreak)}
+                                {entry.isGhost && entry.status === 'ELIMINATED' && <span className="text-sm shrink-0">👻</span>}
+                              </div>
                               <div className="mt-1 space-y-1 text-[11px] text-muted-foreground sm:hidden">
                                 {pickUi && (
                                   <div className="flex items-center gap-1">
