@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsBoolean, IsOptional, IsInt, Min } from 'class-validator';
 import { ChampionshipMode } from '@prisma/client';
 
 export class CreateChampionshipDto {
@@ -17,4 +17,29 @@ export class CreateChampionshipDto {
   @IsBoolean()
   @IsOptional()
   pickResetAtMidseason?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  streakBonusEnabled?: boolean;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  wildcardCount?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  ghostModeEnabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  socialPressureEnabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  doubleOrNothingEnabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  underdogBonusEnabled?: boolean;
 }

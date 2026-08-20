@@ -28,6 +28,7 @@ type MyPick = {
   status: string;
   pickType?: 'WIN' | 'WIN_OR_DRAW';
   team: Team | null;
+  isDoubleOrNothing?: boolean;
 };
 
 type StandingRow = {
@@ -35,6 +36,7 @@ type StandingRow = {
   status: string;
   totalPoints?: number;
   eliminatedAtMatchday?: number | null;
+  wildcardsRemaining?: number;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -292,6 +294,13 @@ export default function EditionPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'picks' | 'jugadores'>('picks');
 
+  const [championshipMode, setChampionshipMode] = useState('');
+  const [doubleOrNothingEnabled, setDoubleOrNothingEnabled] = useState(false);
+  const [wildcardCount, setWildcardCount] = useState(0);
+  const [wildcardsRemaining, setWildcardsRemaining] = useState<number | null>(null);
+  const [hasUsedDoubleOrNothing, setHasUsedDoubleOrNothing] = useState(false);
+  const [doubleOrNothingActive, setDoubleOrNothingActive] = useState(false);
+
   // 1-second countdown + deadline check
   useEffect(() => {
     if (!matchdayFirstKickoff) {
@@ -320,6 +329,7 @@ export default function EditionPage() {
   const loadData = useCallback(async (matchday: number) => {
     setLoading(true);
     setError('');
+    setDoubleOrNothingActive(false);
     try {
       const [matchesRes, picksRes] = await Promise.all([
         fetch(`/api/editions/${editionId}/matches?matchday=${matchday}`),
@@ -342,6 +352,9 @@ export default function EditionPage() {
       }
 
       setMyPick(picksData?.myPick ?? null);
+      if (typeof picksData?.wildcardsRemaining === 'number') {
+        setWildcardsRemaining(picksData.wildcardsRemaining);
+      }
     } catch {
       setError('Error al cargar los datos');
     } finally {
@@ -364,6 +377,9 @@ export default function EditionPage() {
         setEditionEndMatchday(Number.isFinite(end) ? end : null);
         setLeagueSeason(meta.season ?? null);
         setChampionshipName(meta.championshipName ?? meta.name ?? '');
+        setChampionshipMode(meta.mode ?? meta.championshipMode ?? '');
+        setDoubleOrNothingEnabled(meta.doubleOrNothingEnabled ?? false);
+        setWildcardCount(meta.wildcardCount ?? 0);
 
         let initialMd = start;
         try {
@@ -390,7 +406,7 @@ export default function EditionPage() {
     loadData(currentMatchday);
   }, [authLoading, editionStartMatchday, currentMatchday, loadData]);
 
-  // Fetch elimination status
+  // Fetch elimination status + wildcardsRemaining
   useEffect(() => {
     if (authLoading || !user?.alias) { setParticipantEliminated(false); return; }
     fetch(`/api/editions/${editionId}/standings`)
@@ -399,9 +415,26 @@ export default function EditionPage() {
         const rows = Array.isArray(data) ? data : [];
         const me = rows.find((r: StandingRow) => r.alias === user.alias);
         setParticipantEliminated(me?.status === 'ELIMINATED');
+        if (typeof me?.wildcardsRemaining === 'number') {
+          setWildcardsRemaining(me.wildcardsRemaining);
+        }
       })
       .catch(() => setParticipantEliminated(false));
   }, [editionId, user?.alias, authLoading]);
+
+  // Check if double-or-nothing was already used in this edition
+  useEffect(() => {
+    if (!editionId) return;
+    fetch(`/api/editions/${editionId}/picks`)
+      .then((r) => r.json())
+      .then((data) => {
+        const picks = Array.isArray(data) ? data : Array.isArray(data?.picks) ? data.picks : [];
+        setHasUsedDoubleOrNothing(
+          picks.some((p: { isDoubleOrNothing?: boolean }) => p.isDoubleOrNothing === true),
+        );
+      })
+      .catch(() => {});
+  }, [editionId]);
 
   const canPick = !submitting && !participantEliminated && !deadlinePassed;
 
@@ -418,9 +451,10 @@ export default function EditionPage() {
       const res = await fetch(`/api/editions/${editionId}/picks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: selectedTeamId, matchdayNumber: currentMatchday, pickType }),
+        body: JSON.stringify({ teamId: selectedTeamId, matchdayNumber: currentMatchday, pickType, isDoubleOrNothing: doubleOrNothingActive }),
       });
       if (res.ok) {
+        if (doubleOrNothingActive) setHasUsedDoubleOrNothing(true);
         setSelectedTeamId(null);
         await loadData(currentMatchday);
       } else {
@@ -642,6 +676,49 @@ export default function EditionPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Wildcard badge */}
+            {wildcardCount > 0 && !participantEliminated && (
+              <div className="mb-4 flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                <span className="text-base shrink-0">🛡️</span>
+                <div className="flex-1 min-w-0">
+                  {wildcardsRemaining !== null ? (
+                    wildcardsRemaining > 0 ? (
+                      <p className="text-sm font-semibold text-amber-300">
+                        {wildcardsRemaining} vida{wildcardsRemaining !== 1 ? 's' : ''} extra
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin vidas extra</p>
+                    )
+                  ) : (
+                    <p className="text-sm font-semibold text-amber-300">Vidas extra disponibles</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Double or nothing */}
+            {doubleOrNothingEnabled && championshipMode === 'LEAGUE' && (
+              hasUsedDoubleOrNothing ? (
+                <div className="mb-4 flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-secondary border border-border">
+                  <span className="text-base shrink-0">🎲</span>
+                  <p className="text-sm text-muted-foreground">Comodín usado</p>
+                </div>
+              ) : !myPick ? (
+                <label className="mb-4 flex items-center gap-3 px-3 py-3 rounded-xl border border-border bg-secondary/50 cursor-pointer hover:border-amber-500/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={doubleOrNothingActive}
+                    onChange={(e) => setDoubleOrNothingActive(e.target.checked)}
+                    className="h-4 w-4 accent-amber-500 rounded shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-foreground">Doble o nada 🎲</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">×2 si ganás · -3 si perdés</p>
+                  </div>
+                </label>
+              ) : null
             )}
 
             {/* Match list */}

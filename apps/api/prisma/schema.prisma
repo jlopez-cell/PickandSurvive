@@ -126,14 +126,20 @@ model User {
 }
 
 model Championship {
-  id                    String           @id @default(uuid())
-  name                  String
-  creatorId             String
-  adminId               String
-  footballLeagueId      String
-  mode                  ChampionshipMode
-  pickResetAtMidseason  Boolean          @default(false)
-  createdAt             DateTime         @default(now())
+  id                     String           @id @default(uuid())
+  name                   String
+  creatorId              String
+  adminId                String
+  footballLeagueId       String
+  mode                   ChampionshipMode
+  pickResetAtMidseason   Boolean          @default(false)
+  streakBonusEnabled     Boolean          @default(false)
+  wildcardCount          Int              @default(0)
+  ghostModeEnabled       Boolean          @default(false)
+  socialPressureEnabled  Boolean          @default(false)
+  doubleOrNothingEnabled Boolean          @default(false)
+  underdogBonusEnabled   Boolean          @default(false)
+  createdAt              DateTime         @default(now())
 
   creator        User           @relation("Creator", fields: [creatorId], references: [id])
   admin          User           @relation("Admin", fields: [adminId], references: [id])
@@ -170,6 +176,8 @@ model Participant {
   eliminatedAtMatchday Int?
   eliminatedAtPhase    TournamentPhase?
   totalPoints          Int               @default(0)
+  wildcardsRemaining   Int               @default(0)
+  isGhost              Boolean           @default(false)
   joinedAt             DateTime          @default(now())
 
   user      User        @relation(fields: [userId], references: [id])
@@ -274,15 +282,18 @@ model Match {
 }
 
 model Pick {
-  id            String     @id @default(uuid())
-  participantId String
-  matchdayId    String
+  id                String     @id @default(uuid())
+  participantId     String
+  matchdayId        String
   /// Ausente cuando status es NO_PICK_ELIMINATED (no se asigna equipo ficticio).
-  teamId        String?
-  status        PickStatus @default(PENDING)
-  pickType      PickType   @default(WIN)
-  pointsAwarded Int?
-  createdAt     DateTime   @default(now())
+  teamId            String?
+  status            PickStatus @default(PENDING)
+  pickType          PickType   @default(WIN)
+  pointsAwarded     Int?
+  isDoubleOrNothing Boolean    @default(false)
+  streakBonusPoints Int        @default(0)
+  underdogBonus     Boolean    @default(false)
+  createdAt         DateTime   @default(now())
 
   participant Participant   @relation(fields: [participantId], references: [id])
   matchday    Matchday      @relation(fields: [matchdayId], references: [id])

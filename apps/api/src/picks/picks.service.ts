@@ -49,7 +49,7 @@ export class PicksService {
       where: { id: editionId },
       include: {
         championship: {
-          select: { mode: true, footballLeagueId: true, pickResetAtMidseason: true },
+          select: { mode: true, footballLeagueId: true, pickResetAtMidseason: true, doubleOrNothingEnabled: true },
         },
       },
     });
@@ -150,6 +150,23 @@ export class PicksService {
       throw new BadRequestException('Este equipo ya fue usado en esta vuelta');
     }
 
+    if (dto.isDoubleOrNothing) {
+      if (!edition.championship.doubleOrNothingEnabled) {
+        throw new BadRequestException('Este campeonato no tiene activado el modo Double or Nothing');
+      }
+      const existingDoubleOrNothing = await this.prisma.pick.findFirst({
+        where: {
+          participantId: participant.id,
+          isDoubleOrNothing: true,
+          ...(existingPick ? { NOT: { id: existingPick.id } } : {}),
+        },
+        select: { id: true },
+      });
+      if (existingDoubleOrNothing) {
+        throw new ConflictException('Ya usaste el Double or Nothing en esta edición');
+      }
+    }
+
     // Si no existe pick previo, crear pick y TeamUsage.
     if (!existingPick) {
       await this.prisma.$transaction([
@@ -160,6 +177,7 @@ export class PicksService {
             teamId: dto.teamId,
             status: PickStatus.PENDING,
             pickType: dto.pickType ?? 'WIN',
+            isDoubleOrNothing: dto.isDoubleOrNothing ?? false,
           },
         }),
         this.prisma.teamUsage.create({
@@ -188,7 +206,13 @@ export class PicksService {
     const txOps: any[] = [
       this.prisma.pick.update({
         where: { id: existingPick.id },
-        data: { teamId: dto.teamId, status: PickStatus.PENDING, pointsAwarded: null, pickType: dto.pickType ?? 'WIN' },
+        data: {
+          teamId: dto.teamId,
+          status: PickStatus.PENDING,
+          pointsAwarded: null,
+          pickType: dto.pickType ?? 'WIN',
+          isDoubleOrNothing: dto.isDoubleOrNothing ?? false,
+        },
       }),
     ];
 

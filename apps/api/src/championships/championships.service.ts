@@ -77,6 +77,12 @@ export class ChampionshipsService {
         footballLeagueId,
         mode: dto.mode,
         pickResetAtMidseason: dto.pickResetAtMidseason ?? false,
+        streakBonusEnabled: dto.streakBonusEnabled ?? false,
+        wildcardCount: dto.wildcardCount ?? 0,
+        ghostModeEnabled: dto.ghostModeEnabled ?? false,
+        socialPressureEnabled: dto.socialPressureEnabled ?? false,
+        doubleOrNothingEnabled: dto.doubleOrNothingEnabled ?? false,
+        underdogBonusEnabled: dto.underdogBonusEnabled ?? false,
         creatorId: userId,
         adminId: userId,
       },
@@ -234,6 +240,12 @@ export class ChampionshipsService {
         data: { status: EditionStatus.ACTIVE },
       });
       await syncMembersToEditionTx(tx, editionId);
+      if (edition.championship.wildcardCount > 0) {
+        await tx.participant.updateMany({
+          where: { editionId },
+          data: { wildcardsRemaining: edition.championship.wildcardCount },
+        });
+      }
     });
 
     return { message: 'Edición activada correctamente.' };
@@ -673,7 +685,7 @@ export class ChampionshipsService {
   private async getEditionOrThrow(championshipId: string, editionId: string) {
     const edition = await this.prisma.edition.findFirst({
       where: { id: editionId, championshipId },
-      include: { championship: { select: { adminId: true } } },
+      include: { championship: { select: { adminId: true, wildcardCount: true } } },
     });
     if (!edition) throw new NotFoundException('Edición no encontrada');
     return edition;

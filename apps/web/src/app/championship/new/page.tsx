@@ -147,6 +147,114 @@ export default function NewChampionshipPage() {
               </label>
             )}
 
+            {!isWc && (
+              <div className="border-t border-border pt-4 flex flex-col gap-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Mecánicas opcionales
+                </p>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.streakBonusEnabled}
+                    onChange={(e) => setForm({ ...form, streakBonusEnabled: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 accent-amber-500 rounded"
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">Bonus por racha</span>
+                    <span className="text-xs text-muted-foreground">+1 pt con 5 victorias seguidas, +3 con 8</span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.underdogBonusEnabled}
+                    onChange={(e) => setForm({ ...form, underdogBonusEnabled: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 accent-amber-500 rounded"
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">Bonus underdog</span>
+                    <span className="text-xs text-muted-foreground">+1 pt si ganás con equipo en zona de descenso</span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.socialPressureEnabled}
+                    onChange={(e) => setForm({ ...form, socialPressureEnabled: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 accent-amber-500 rounded"
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">Presión social</span>
+                    <span className="text-xs text-muted-foreground">Notificación cuando la mitad del grupo ya picó</span>
+                  </div>
+                </label>
+
+                {form.mode === 'TOURNAMENT' && (
+                  <>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Vidas extra por jugador</span>
+                        <span className="text-xs text-muted-foreground">
+                          Wildcards disponibles antes de ser eliminado
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {([0, 1, 2] as const).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setForm({ ...form, wildcardCount: n })}
+                            className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+                              form.wildcardCount === n
+                                ? 'bg-amber-500 text-black border-amber-500'
+                                : 'bg-secondary text-muted-foreground border-border hover:border-amber-500/40'
+                            }`}
+                          >
+                            {n === 0 ? 'Ninguna' : `${n}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.ghostModeEnabled}
+                        onChange={(e) => setForm({ ...form, ghostModeEnabled: e.target.checked })}
+                        className="mt-0.5 h-4 w-4 accent-amber-500 rounded"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Modo fantasma</span>
+                        <span className="text-xs text-muted-foreground">
+                          Los eliminados siguen viendo y picando sin premio
+                        </span>
+                      </div>
+                    </label>
+                  </>
+                )}
+
+                {form.mode === 'LEAGUE' && (
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.doubleOrNothingEnabled}
+                      onChange={(e) => setForm({ ...form, doubleOrNothingEnabled: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 accent-amber-500 rounded"
+                    />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground">Doble o nada</span>
+                      <span className="text-xs text-muted-foreground">
+                        Una vez por edición podés arriesgar el doble de puntos (×2 si ganás, -3 si perdés)
+                      </span>
+                    </div>
+                  </label>
+                )}
+              </div>
+            )}
+
             {error && (
               <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                 {error}

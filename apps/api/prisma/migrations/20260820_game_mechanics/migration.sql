@@ -1,0 +1,11 @@
+ALTER TABLE "Championship" ADD COLUMN "streakBonusEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Championship" ADD COLUMN "wildcardCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Championship" ADD COLUMN "ghostModeEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Championship" ADD COLUMN "socialPressureEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Championship" ADD COLUMN "doubleOrNothingEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Championship" ADD COLUMN "underdogBonusEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Participant" ADD COLUMN "wildcardsRemaining" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Participant" ADD COLUMN "isGhost" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Pick" ADD COLUMN "isDoubleOrNothing" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Pick" ADD COLUMN "streakBonusPoints" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Pick" ADD COLUMN "underdogBonus" BOOLEAN NOT NULL DEFAULT false;

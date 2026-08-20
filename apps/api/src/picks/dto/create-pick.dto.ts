@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsInt, IsPositive, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsPositive, IsOptional, IsIn, IsBoolean } from 'class-validator';
 import { PickType } from '@prisma/client';
 
 export class CreatePickDto {
@@ -13,4 +13,8 @@ export class CreatePickDto {
   @IsOptional()
   @IsIn([PickType.WIN, PickType.WIN_OR_DRAW])
   pickType?: PickType;
+
+  @IsBoolean()
+  @IsOptional()
+  isDoubleOrNothing?: boolean;
 }

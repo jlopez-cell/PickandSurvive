@@ -47,7 +47,23 @@ export class PickProcessingService {
           include: {
             edition: {
               include: {
-                championship: { select: { mode: true } },
+                championship: {
+                  select: {
+                    mode: true,
+                    streakBonusEnabled: true,
+                    wildcardCount: true,
+                    ghostModeEnabled: true,
+                    doubleOrNothingEnabled: true,
+                    underdogBonusEnabled: true,
+                    footballLeagueId: true,
+                    footballLeague: {
+                      select: {
+                        currentSeason: true,
+                        totalMatchdaysPerSeason: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -57,10 +73,19 @@ export class PickProcessingService {
 
     for (const pick of pendingPicks) {
       if (!pick.teamId) continue;
-      if (pick.participant.status === ParticipantStatus.ELIMINATED) continue;
-      const mode = pick.participant.edition.championship.mode;
+
+      const { participant } = pick;
+      const championship = participant.edition.championship;
+      const mode = championship.mode;
       const pickTeamWon = match.winnerTeamId === pick.teamId;
       const isDraw = match.winnerTeamId === null;
+
+      if (
+        participant.status === ParticipantStatus.ELIMINATED &&
+        !participant.isGhost
+      ) {
+        continue;
+      }
 
       if (mode === ChampionshipMode.TOURNAMENT || mode === ChampionshipMode.WORLD_CUP) {
         const winsOrDraw = pick.pickType === PickType.WIN_OR_DRAW;
@@ -71,10 +96,50 @@ export class PickProcessingService {
             where: { id: pick.id },
             data: { status: PickStatus.SURVIVED },
           });
+        } else if (participant.isGhost) {
+          await this.prisma.pick.update({
+            where: { id: pick.id },
+            data: {
+              status: isDraw ? PickStatus.DRAW_ELIMINATED : PickStatus.LOSS_ELIMINATED,
+            },
+          });
+        } else if (participant.wildcardsRemaining > 0) {
+          await this.prisma.$transaction(async (tx) => {
+            await tx.participant.update({
+              where: { id: pick.participantId },
+              data: { wildcardsRemaining: { decrement: 1 } },
+            });
+            await tx.pick.update({
+              where: { id: pick.id },
+              data: { status: PickStatus.SURVIVED },
+            });
+            await tx.notification.create({
+              data: {
+                userId: participant.userId,
+                type: 'PICK_REMINDER',
+                payload: {
+                  wildcardUsed: true,
+                  wildcardsRemaining: participant.wildcardsRemaining - 1,
+                },
+              },
+            });
+          });
         } else {
           const eliminatedStatus = isDraw
             ? PickStatus.DRAW_ELIMINATED
             : PickStatus.LOSS_ELIMINATED;
+
+          const participantUpdateData: Record<string, unknown> = {
+            status: ParticipantStatus.ELIMINATED,
+            eliminatedAtMatchday: match.matchday.number,
+            ...(mode === ChampionshipMode.WORLD_CUP && {
+              eliminatedAtPhase: match.tournamentPhase ?? undefined,
+            }),
+          };
+
+          if (championship.ghostModeEnabled) {
+            participantUpdateData.isGhost = true;
+          }
 
           await this.prisma.$transaction([
             this.prisma.pick.update({
@@ -83,27 +148,73 @@ export class PickProcessingService {
             }),
             this.prisma.participant.update({
               where: { id: pick.participantId },
-              data: {
-                status: ParticipantStatus.ELIMINATED,
-                eliminatedAtMatchday: match.matchday.number,
-                ...(mode === ChampionshipMode.WORLD_CUP && {
-                  eliminatedAtPhase: match.tournamentPhase ?? undefined,
-                }),
-              },
+              data: participantUpdateData,
             }),
           ]);
         }
       } else {
         // LEAGUE mode: award points
-        const points = pickTeamWon ? 3 : isDraw ? 1 : 0;
+        let basePoints: number;
+        if (pick.isDoubleOrNothing) {
+          basePoints = pickTeamWon ? 6 : isDraw ? 1 : -3;
+        } else {
+          basePoints = pickTeamWon ? 3 : isDraw ? 1 : 0;
+        }
+
+        let streakBonus = 0;
+        if (championship.streakBonusEnabled && pickTeamWon && !pick.isDoubleOrNothing) {
+          const recentPicks = await this.prisma.pick.findMany({
+            where: {
+              participantId: pick.participantId,
+              status: PickStatus.SURVIVED,
+            },
+            orderBy: { matchday: { number: 'desc' } },
+            select: { pointsAwarded: true },
+          });
+
+          let streak = 1;
+          for (const p of recentPicks) {
+            if (p.pointsAwarded === 3) streak++;
+            else break;
+          }
+
+          if (streak >= 8) streakBonus = 3;
+          else if (streak >= 5) streakBonus = 1;
+        }
+
+        let underdogBonusFlag = false;
+        if (championship.underdogBonusEnabled && pickTeamWon) {
+          const fl = championship.footballLeague;
+          const threshold = fl.totalMatchdaysPerSeason * 0.35;
+          const teamWins = await this.prisma.match.count({
+            where: {
+              matchday: {
+                leagueId: championship.footballLeagueId,
+                season: fl.currentSeason,
+              },
+              winnerTeamId: pick.teamId,
+            },
+          });
+          if (teamWins < threshold) {
+            underdogBonusFlag = true;
+          }
+        }
+
+        const totalIncrement = basePoints + streakBonus + (underdogBonusFlag ? 1 : 0);
+
         await this.prisma.$transaction([
           this.prisma.pick.update({
             where: { id: pick.id },
-            data: { status: PickStatus.SURVIVED, pointsAwarded: points },
+            data: {
+              status: PickStatus.SURVIVED,
+              pointsAwarded: basePoints,
+              streakBonusPoints: streakBonus,
+              underdogBonus: underdogBonusFlag,
+            },
           }),
           this.prisma.participant.update({
             where: { id: pick.participantId },
-            data: { totalPoints: { increment: points } },
+            data: { totalPoints: { increment: totalIncrement } },
           }),
         ]);
       }
