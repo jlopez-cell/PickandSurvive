@@ -90,11 +90,16 @@ export function VersionGuard() {
 
   if (state === 'idle') return null;
 
+  const bannerStyle: React.CSSProperties = {
+    paddingTop: 'max(0.625rem, env(safe-area-inset-top))',
+  };
+
   if (state === 'stale') {
     return (
       <button
         onClick={() => window.location.reload()}
-        className="fixed top-0 inset-x-0 z-[100] bg-amber-500 text-white text-center text-sm font-semibold py-2.5 px-4 w-full cursor-pointer"
+        style={bannerStyle}
+        className="fixed top-0 inset-x-0 z-[100] bg-amber-500 text-white text-center text-sm font-semibold pb-2.5 px-4 w-full cursor-pointer"
       >
         🔄 Nueva versión disponible — Toca para actualizar
       </button>
@@ -102,7 +107,10 @@ export function VersionGuard() {
   }
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[100] bg-orange-500 text-white text-center text-sm font-semibold py-2.5 px-4">
+    <div
+      style={bannerStyle}
+      className="fixed top-0 inset-x-0 z-[100] bg-orange-500 text-white text-center text-sm font-semibold pb-2.5 px-4"
+    >
       ↻ Actualizando a la nueva versión...
     </div>
   );
