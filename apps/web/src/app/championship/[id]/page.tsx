@@ -450,16 +450,7 @@ export default function ChampionshipDetailPage() {
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASS[edition.status] ?? 'bg-white/5 text-white/35 border-white/[0.07]'}`}>
                         {EDITION_STATUS_LABEL[edition.status]}
                       </span>
-                      {isAdmin && edition.status === 'DRAFT' && (
-                        <button
-                          className="bg-emerald-500 text-white font-bold rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
-                          onClick={() => handlePublish(edition.id)}
-                          disabled={publishing === edition.id}
-                        >
-                          {publishing === edition.id ? 'Publicando...' : 'Publicar'}
-                        </button>
-                      )}
-                      {isAdmin && edition.status === 'OPEN' && (
+                      {isAdmin && (edition.status === 'DRAFT' || edition.status === 'OPEN') && (
                         <button
                           className="bg-emerald-500 text-white font-bold rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
                           onClick={() => handleActivate(edition.id)}

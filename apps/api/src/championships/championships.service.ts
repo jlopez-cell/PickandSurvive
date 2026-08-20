@@ -224,8 +224,8 @@ export class ChampionshipsService {
       throw new ForbiddenException('Solo el admin puede activar ediciones');
     }
 
-    if (edition.status !== EditionStatus.OPEN) {
-      throw new ConflictException(`La edición debe estar ABIERTA para activarse (estado actual: ${edition.status})`);
+    if (edition.status !== EditionStatus.OPEN && edition.status !== EditionStatus.DRAFT) {
+      throw new ConflictException(`La edición debe estar en BORRADOR o ABIERTA para activarse (estado actual: ${edition.status})`);
     }
 
     await this.prisma.$transaction(async (tx) => {
