@@ -3,11 +3,6 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Label } from '@/components/ui/label';
 
 function JoinCodeContent() {
   const router = useRouter();
@@ -85,60 +80,72 @@ function JoinCodeContent() {
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center p-4">
-        <p className="text-muted-foreground">Cargando...</p>
+      <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+        <p className="text-white/35">Cargando...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Entrar con código</CardTitle>
-          <CardDescription>
-            Pega el código del campeonato. Tu solicitud se enviará al admin para su aprobación.
-          </CardDescription>
-        </CardHeader>
+    <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-white/85">Entrar con código</h1>
+          <p className="text-sm text-white/35 mt-1.5 leading-relaxed">
+            Pegá el código del campeonato. Tu solicitud se enviará al admin para su aprobación.
+          </p>
+        </div>
 
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="join-code">Código</Label>
-            <Input
-              id="join-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Ej: 3f2c1e9c-..."
-              autoCapitalize="none"
-              autoCorrect="off"
-              inputMode="text"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void submitJoin();
-              }}
-            />
+        {/* Input */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="join-code" className="text-xs font-medium text-white/35 uppercase tracking-wide">
+            Código
+          </label>
+          <input
+            id="join-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Ej: 3f2c1e9c-..."
+            autoCapitalize="none"
+            autoCorrect="off"
+            inputMode="text"
+            className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void submitJoin();
+            }}
+          />
+        </div>
+
+        {/* Alerts */}
+        {status === 'success' && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 leading-relaxed">
+            {message}
           </div>
+        )}
 
-          {status === 'success' && (
-            <Alert className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          )}
+        {status === 'error' && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 leading-relaxed">
+            {message}
+          </div>
+        )}
 
-          {status === 'error' && (
-            <Alert variant="destructive">
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          )}
+        {/* Buttons */}
+        <button
+          disabled={submitting}
+          onClick={() => void submitJoin()}
+          className="bg-amber-500 text-black font-bold rounded-2xl py-3.5 w-full disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        >
+          {submitting ? 'Enviando...' : 'Solicitar unirme'}
+        </button>
 
-          <Button disabled={submitting} onClick={() => void submitJoin()}>
-            {submitting ? 'Enviando...' : 'Solicitar unirme'}
-          </Button>
-
-          <Button variant="outline" onClick={() => router.push('/dashboard')}>
-            Volver al dashboard
-          </Button>
-        </CardContent>
-      </Card>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="text-sm font-medium text-white/35 hover:text-white/60 transition-colors text-center"
+        >
+          Volver al dashboard
+        </button>
+      </div>
     </main>
   );
 }
@@ -147,8 +154,8 @@ export default function JoinCodePage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-background flex items-center justify-center p-4">
-          <p className="text-muted-foreground">Cargando...</p>
+        <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+          <p className="text-white/35">Cargando...</p>
         </main>
       }
     >
@@ -156,4 +163,3 @@ export default function JoinCodePage() {
     </Suspense>
   );
 }
-

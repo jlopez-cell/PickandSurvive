@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { ChevronLeft } from 'lucide-react';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
+import { cn } from '@/lib/utils';
 
 type EveryonePickRow = {
   id: string;
@@ -16,23 +16,22 @@ type EveryonePickRow = {
   team: { id: string; name: string; logoUrl: string } | null;
 };
 
-type BadgeVariant = 'muted' | 'success' | 'warning' | 'destructive' | 'default';
-const STATUS_BADGE: Record<string, BadgeVariant> = {
-  SURVIVED: 'success',
-  DRAW_ELIMINATED: 'warning',
-  LOSS_ELIMINATED: 'destructive',
-  NO_PICK_ELIMINATED: 'destructive',
-  POSTPONED_PENDING: 'default',
-  PENDING: 'muted',
+const STATUS_STYLE: Record<string, string> = {
+  SURVIVED:           'text-emerald-400 bg-emerald-500/10 border border-emerald-500/25',
+  DRAW_ELIMINATED:    'text-amber-400 bg-amber-500/10 border border-amber-500/25',
+  LOSS_ELIMINATED:    'text-red-400 bg-red-500/10 border border-red-500/25',
+  NO_PICK_ELIMINATED: 'text-red-400 bg-red-500/10 border border-red-500/25',
+  POSTPONED_PENDING:  'text-sky-400 bg-sky-500/10 border border-sky-500/25',
+  PENDING:            'text-white/45 bg-white/5 border border-white/10',
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  SURVIVED: 'Sobrevive',
-  DRAW_ELIMINATED: 'Eliminado (empate)',
-  LOSS_ELIMINATED: 'Eliminado (derrota)',
+  SURVIVED:           'Sobrevive',
+  DRAW_ELIMINATED:    'Eliminado (empate)',
+  LOSS_ELIMINATED:    'Eliminado (derrota)',
   NO_PICK_ELIMINATED: 'Eliminado (sin pick)',
-  POSTPONED_PENDING: 'Aplazado',
-  PENDING: 'Pendiente',
+  POSTPONED_PENDING:  'Aplazado',
+  PENDING:            'Pendiente',
 };
 
 export default function EveryonePicksHistoryPage() {
@@ -63,50 +62,62 @@ export default function EveryonePicksHistoryPage() {
   const matchdayNumbers = Object.keys(grouped).map(Number).sort((a, b) => b - a);
 
   return (
-    <main className="min-h-screen bg-background px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top,0px))] sm:p-6 sm:pt-6">
-      <div className="max-w-3xl mx-auto">
-        <Button variant="ghost" size="sm" className="-ml-2 mb-6 text-muted-foreground" onClick={() => router.back()}>
-          ← Volver
-        </Button>
-        <h1 className="text-2xl font-bold text-foreground mb-2">Picks de todos los participantes</h1>
-        <p className="text-sm text-muted-foreground mb-6">
-          Equipo elegido por jornada. En la jornada en curso, los picks del resto se muestran cuando ha pasado el cierre
-          (misma regla que la clasificación).
+    <main className="min-h-screen bg-[#06090f] pb-[calc(env(safe-area-inset-bottom,0px)+80px)]">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-[#06090f]/95 backdrop-blur-sm border-b border-white/[0.07] flex items-center gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
+        <button
+          onClick={() => router.back()}
+          className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.07] flex items-center justify-center text-white/60 hover:text-white/90 hover:bg-white/10 transition-colors shrink-0"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <h1 className="font-bold text-white/85 text-base">Picks de todos</h1>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <p className="text-sm text-white/35 font-medium mb-6">
+          Equipo elegido por jornada. En la jornada en curso, los picks del resto se muestran cuando
+          ha pasado el cierre (misma regla que la clasificación).
         </p>
 
         {loading ? (
-          <p className="text-muted-foreground">Cargando…</p>
+          <p className="text-white/35 text-sm text-center py-12">Cargando…</p>
         ) : error ? (
-          <p className="text-destructive">{error}</p>
+          <p className="text-red-400 text-sm text-center py-12">{error}</p>
         ) : matchdayNumbers.length === 0 ? (
-          <p className="text-muted-foreground">No hay picks registrados en esta edición.</p>
+          <p className="text-white/35 text-sm text-center py-12">No hay picks registrados en esta edición.</p>
         ) : (
           matchdayNumbers.map((num) => (
             <section key={num} className="mb-8">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-white/35 mb-3">
                 Jornada {num}
-              </h2>
+              </p>
               <div className="flex flex-col gap-2">
                 {grouped[num].map((row) => (
                   <div
                     key={row.id}
-                    className="flex flex-wrap justify-between items-center gap-2 bg-card border border-border rounded-lg px-4 py-3"
+                    className="flex flex-wrap justify-between items-center gap-2 bg-[#0c1220] border border-white/[0.07] rounded-2xl px-4 py-3"
                   >
-                    <span className="text-muted-foreground text-sm min-w-[7rem]">@{row.alias}</span>
+                    <span className="text-white/35 text-sm min-w-[7rem] font-medium">@{row.alias}</span>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       {row.team?.logoUrl ? (
                         <img src={row.team.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />
                       ) : null}
-                      <span className="text-foreground text-sm truncate">
+                      <span className="text-white/85 text-sm font-medium truncate">
                         {row.team?.name ?? 'Sin pick (eliminado)'}
                       </span>
                     </div>
-                    <Badge variant={STATUS_BADGE[row.pickStatus] ?? 'muted'} className="text-xs shrink-0">
+                    <span
+                      className={cn(
+                        'text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0',
+                        STATUS_STYLE[row.pickStatus] ?? 'text-white/45 bg-white/5 border border-white/10',
+                      )}
+                    >
                       {STATUS_LABEL[row.pickStatus] ?? row.pickStatus}
                       {row.pointsAwarded !== null && row.pointsAwarded !== undefined
                         ? ` (+${row.pointsAwarded})`
                         : ''}
-                    </Badge>
+                    </span>
                   </div>
                 ))}
               </div>

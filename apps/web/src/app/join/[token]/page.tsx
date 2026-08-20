@@ -3,9 +3,6 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function JoinPage() {
   const { token } = useParams<{ token: string }>();
@@ -35,90 +32,107 @@ export default function JoinPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Cargando...</p>
+      <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center pt-[env(safe-area-inset-top,0px)]">
+        <p className="text-white/35">Cargando...</p>
       </main>
     );
   }
 
   if (!user) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm text-center">
-          <CardHeader>
-            <CardTitle>Únete al campeonato</CardTitle>
-            <CardDescription>
-              Debes iniciar sesión o registrarte para poder unirte a este campeonato.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex gap-3">
-            <Button className="flex-1" onClick={() => router.push(`/login?redirect=/join/${token}`)}>
+      <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+        <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5 text-center">
+          <div>
+            <h1 className="text-xl font-bold text-white/85">Únete al campeonato</h1>
+            <p className="text-sm text-white/35 mt-1.5 leading-relaxed">
+              Debés iniciar sesión o registrarte para poder unirte a este campeonato.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              className="bg-amber-500 text-black font-bold rounded-2xl py-3.5 w-full"
+              onClick={() => router.push(`/login?redirect=/join/${token}`)}
+            >
               Iniciar sesión
-            </Button>
-            <Button className="flex-1" variant="outline" onClick={() => router.push(`/register?redirect=/join/${token}`)}>
+            </button>
+            <button
+              className="bg-white/5 border border-white/[0.08] text-white/80 font-medium rounded-2xl py-3.5 w-full hover:bg-white/[0.08] transition-colors"
+              onClick={() => router.push(`/register?redirect=/join/${token}`)}
+            >
               Registrarse
-            </Button>
-          </CardContent>
-        </Card>
+            </button>
+          </div>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm text-center">
+    <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5 text-center">
         {status === 'success' ? (
           <>
-            <CardHeader>
-              <div className="w-14 h-14 rounded-full bg-green-500/20 text-green-400 text-2xl flex items-center justify-center mx-auto mb-2">
+            {/* Success icon */}
+            <div className="flex justify-center">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-2xl flex items-center justify-center">
                 ✓
               </div>
-              <CardTitle>Solicitud enviada</CardTitle>
-              <CardDescription>{message}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-4">
-                El administrador del campeonato deberá aprobar tu solicitud. Te notificaremos por email.
-              </p>
-              <Button className="w-full" onClick={() => router.push('/dashboard')}>
-                Ir al dashboard
-              </Button>
-            </CardContent>
+            </div>
+
+            <div>
+              <h1 className="text-xl font-bold text-white/85">Solicitud enviada</h1>
+              <p className="text-sm text-white/35 mt-1.5 leading-relaxed">{message}</p>
+            </div>
+
+            <p className="text-xs text-white/35 leading-relaxed">
+              El administrador del campeonato deberá aprobar tu solicitud. Te notificaremos por email.
+            </p>
+
+            <button
+              className="bg-amber-500 text-black font-bold rounded-2xl py-3.5 w-full"
+              onClick={() => router.push('/dashboard')}
+            >
+              Ir al dashboard
+            </button>
           </>
         ) : (
           <>
-            <CardHeader>
-              <CardTitle>Únete al campeonato</CardTitle>
-              <CardDescription>
-                Hola, <strong className="text-foreground">@{user.alias}</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground">
-                Al confirmar, se enviará una solicitud al administrador del campeonato. Tu participación
-                quedará pendiente hasta que sea aprobada.
+            <div>
+              <h1 className="text-xl font-bold text-white/85">Únete al campeonato</h1>
+              <p className="text-sm text-white/35 mt-1.5">
+                Hola, <strong className="text-amber-400 font-bold">@{user.alias}</strong>
               </p>
-              {status === 'error' && (
-                <Alert variant="destructive">
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-              )}
-              <div className="flex gap-3">
-                <Button
-                  className="flex-1"
-                  onClick={handleJoin}
-                  disabled={status === 'loading'}
-                >
-                  {status === 'loading' ? 'Enviando...' : 'Solicitar unirme'}
-                </Button>
-                <Button className="flex-1" variant="outline" onClick={() => router.push('/dashboard')}>
-                  Cancelar
-                </Button>
+            </div>
+
+            <p className="text-sm text-white/35 leading-relaxed">
+              Al confirmar, se enviará una solicitud al administrador del campeonato. Tu participación
+              quedará pendiente hasta que sea aprobada.
+            </p>
+
+            {status === 'error' && (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 leading-relaxed">
+                {message}
               </div>
-            </CardContent>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <button
+                className="bg-amber-500 text-black font-bold rounded-2xl py-3.5 w-full disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                onClick={handleJoin}
+                disabled={status === 'loading'}
+              >
+                {status === 'loading' ? 'Enviando...' : 'Solicitar unirme'}
+              </button>
+              <button
+                className="text-sm font-medium text-white/35 hover:text-white/60 transition-colors"
+                onClick={() => router.push('/dashboard')}
+              >
+                Cancelar
+              </button>
+            </div>
           </>
         )}
-      </Card>
+      </div>
     </main>
   );
 }

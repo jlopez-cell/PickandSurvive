@@ -44,7 +44,7 @@ const PICK_STATUS_CONFIG: Record<string, { label: string; cls: string; icon: Rea
   DRAW_ELIMINATED:    { label: 'Eliminado · empate',  cls: 'text-red-400 bg-red-500/10 border-red-500/25',            icon: <XCircle className="w-3.5 h-3.5" />     },
   LOSS_ELIMINATED:    { label: 'Eliminado · derrota', cls: 'text-red-400 bg-red-500/10 border-red-500/25',            icon: <XCircle className="w-3.5 h-3.5" />     },
   NO_PICK_ELIMINATED: { label: 'Sin pick · eliminado',cls: 'text-red-400 bg-red-500/10 border-red-500/25',            icon: <XCircle className="w-3.5 h-3.5" />     },
-  PENDING:            { label: 'Pendiente',           cls: 'text-orange-400 bg-orange-500/10 border-orange-500/25',   icon: <Clock className="w-3.5 h-3.5" />       },
+  PENDING:            { label: 'Pendiente',           cls: 'text-amber-400 bg-amber-500/10 border-amber-500/25',   icon: <Clock className="w-3.5 h-3.5" />       },
   POSTPONED_PENDING:  { label: 'Aplazado',            cls: 'text-sky-400 bg-sky-500/10 border-sky-500/25',            icon: <AlertCircle className="w-3.5 h-3.5" /> },
 };
 
@@ -73,18 +73,18 @@ function PickBottomSheet({
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}
         onClick={onClose}
       />
-      <div className="fixed bottom-[56px] inset-x-0 z-[70] bg-[#111] rounded-t-2xl">
+      <div className="fixed bottom-[56px] inset-x-0 z-[70] bg-[#0c1220] border-t border-white/[0.07] rounded-t-2xl">
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-white/15" />
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
           <div className="flex items-center gap-3">
             {team.logoUrl && (
               <img src={team.logoUrl} alt={team.name} className="w-9 h-9 object-contain" />
             )}
-            <span className="font-bold text-white text-base">{team.name}</span>
+            <span className="font-bold text-white/85 text-base">{team.name}</span>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors">
+          <button onClick={onClose} className="text-white/35 hover:text-white/70 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -92,14 +92,14 @@ function PickBottomSheet({
           <button
             disabled={submitting}
             onClick={() => onPick('WIN')}
-            className="w-full flex items-center justify-center gap-2 h-14 rounded-xl bg-orange-500 hover:bg-orange-400 active:bg-orange-600 disabled:opacity-50 font-bold text-white text-base transition-colors"
+            className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 font-bold text-black text-base transition-colors"
           >
             🏆 Gana
           </button>
           <button
             disabled={submitting}
             onClick={() => onPick('WIN_OR_DRAW')}
-            className="w-full flex items-center justify-center gap-2 h-14 rounded-xl bg-white/8 hover:bg-white/12 active:bg-white/5 border border-white/15 disabled:opacity-50 font-bold text-white text-base transition-colors"
+            className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl bg-white/[0.06] hover:bg-white/10 active:bg-white/[0.04] border border-white/[0.07] disabled:opacity-50 font-bold text-white/85 text-base transition-colors"
           >
             🤝 Gana o Empata
           </button>
@@ -119,7 +119,7 @@ function TeamButton({
   isOtherSelected,
   canPick,
   onSelect,
-  align,
+  align: _align,
 }: {
   team: Team;
   isUsed: boolean;
@@ -137,13 +137,12 @@ function TeamButton({
       onClick={clickable ? onSelect : undefined}
       disabled={!clickable}
       className={cn(
-        'flex-1 flex items-center gap-2.5 px-3 py-3 rounded-xl transition-all min-w-0',
-        align === 'right' && 'flex-row-reverse text-right',
-        isMyPick && 'bg-orange-500/12 ring-1 ring-inset ring-orange-500/35',
+        'flex-1 flex flex-col items-center gap-2 px-2 py-3 rounded-xl transition-all min-w-0',
+        isMyPick && 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/30',
         isSelected && !isMyPick && 'bg-white/8 ring-1 ring-inset ring-white/20',
         isUsed && !isMyPick && 'opacity-35',
         isOtherSelected && !isMyPick && !isSelected && 'opacity-30',
-        clickable && !isMyPick && !isSelected && 'hover:bg-white/5 active:bg-white/10',
+        clickable && !isMyPick && !isSelected && 'hover:bg-white/[0.04] active:bg-white/8',
         !clickable && 'cursor-default',
       )}
     >
@@ -151,29 +150,29 @@ function TeamButton({
         <img
           src={team.logoUrl}
           alt={team.name}
-          className={cn('w-10 h-10 object-contain', isUsed && !isMyPick && 'grayscale opacity-60')}
+          className={cn('w-14 h-14 object-contain', isUsed && !isMyPick && 'grayscale opacity-60')}
         />
         {isMyPick && (
-          <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shadow-sm">
-            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center shadow-sm">
+            <CheckCircle2 className="w-3 h-3 text-black" />
           </div>
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex flex-col items-center min-w-0 w-full gap-0.5">
         <p className={cn(
-          'text-xs font-semibold truncate leading-tight',
-          isMyPick ? 'text-orange-300' : isUsed ? 'text-white/25' : 'text-white/85',
+          'text-[11px] font-semibold truncate leading-tight text-center w-full px-1',
+          isMyPick ? 'text-amber-300' : isUsed ? 'text-white/25' : 'text-white/85',
         )}>
           {team.name}
         </p>
-        <p className="text-[10px] mt-0.5 leading-none">
+        <p className="text-[10px] leading-none">
           {isMyPick
-            ? <span className="text-orange-400/70 font-medium">Tu pick</span>
+            ? <span className="text-amber-400/70 font-medium">Tu pick</span>
             : isUsed
             ? <span className="text-white/20">Usado</span>
             : canPick && !isOtherSelected
-            ? <span className="text-white/25">Toca para elegir</span>
+            ? <span className="text-white/20">Toca</span>
             : null}
         </p>
       </div>
@@ -216,7 +215,7 @@ function ParticipantsList({ editionId }: { editionId: string }) {
               </div>
               <span className="text-sm text-white/80 flex-1 font-medium">{r.alias}</span>
               {r.totalPoints != null && (
-                <span className="text-xs font-bold text-orange-400 tabular-nums">{r.totalPoints} pts</span>
+                <span className="text-xs font-bold text-amber-400 tabular-nums">{r.totalPoints} pts</span>
               )}
             </div>
           ))}
@@ -253,14 +252,14 @@ function LaLigaLogo() {
   const [imgFailed, setImgFailed] = useState(false);
   if (imgFailed) {
     return (
-      <Shield className="relative w-16 h-16 sm:w-20 sm:h-20 text-orange-500 drop-shadow-[0_0_20px_rgba(249,115,22,0.5)]" />
+      <Shield className="relative w-16 h-16 sm:w-20 sm:h-20 text-amber-500 drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]" />
     );
   }
   return (
     <img
       src="/Logo_LaLiga.png"
       alt="La Liga"
-      className="relative w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_20px_rgba(249,115,22,0.45)]"
+      className="relative w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_20px_rgba(245,158,11,0.45)]"
       onError={() => setImgFailed(true)}
     />
   );
@@ -446,10 +445,10 @@ export default function EditionPage() {
 
   if (authLoading || (loading && editionStartMatchday === null)) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
+      <div className="flex items-center justify-center min-h-screen bg-[#06090f]">
         <div className="text-center space-y-4">
-          <Shield className="w-14 h-14 mx-auto text-orange-500 animate-pulse drop-shadow-[0_0_20px_rgba(249,115,22,0.5)]" />
-          <p className="text-xs font-black tracking-[0.4em] uppercase text-white/20">Cargando…</p>
+          <Shield className="w-14 h-14 mx-auto text-amber-500 animate-pulse drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]" />
+          <p className="text-xs font-bold tracking-widest uppercase text-white/20">Cargando…</p>
         </div>
       </div>
     );
@@ -458,7 +457,7 @@ export default function EditionPage() {
   // ── Page ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pb-24 lg:pb-0">
+    <div className="min-h-screen bg-[#06090f] pb-[calc(env(safe-area-inset-bottom,0px)+80px)] lg:pb-0">
 
       {/* ══ BOTTOM SHEET ══════════════════════════════════════════════════ */}
       {selectedTeam && canPick && (
@@ -473,42 +472,35 @@ export default function EditionPage() {
       {/* ══ HERO HEADER ═══════════════════════════════════════════════════ */}
       <header className="relative overflow-hidden pt-[env(safe-area-inset-top,0px)]">
         {/* Layered backgrounds */}
-        <div className="absolute inset-0 bg-gradient-to-b from-orange-950/60 via-stone-950/95 to-[#0a0a0a]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/30 via-[#06090f]/95 to-[#06090f]" />
         <div
           className="absolute inset-0"
-          style={{ background: 'radial-gradient(ellipse 70% 55% at 50% -10%, rgba(249,115,22,0.18) 0%, transparent 65%)' }}
+          style={{ background: 'radial-gradient(ellipse 70% 55% at 50% -10%, rgba(245,158,11,0.12) 0%, transparent 65%)' }}
         />
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(45deg,#f97316 0,#f97316 1px,transparent 0,transparent 50%)',
-            backgroundSize: '22px 22px',
-          }}
-        />
-        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-orange-500/25 to-transparent" />
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
 
         <div className="relative max-w-4xl mx-auto px-4">
           {/* Nav row */}
           <div className="h-13 flex items-center justify-between py-3">
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-1.5 text-sm font-semibold text-orange-400/50 hover:text-orange-400 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-semibold text-amber-400/50 hover:text-amber-400 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" /> Dashboard
             </button>
             <div className="hidden sm:flex flex-col items-center gap-0.5">
-              <span className="text-[10px] font-black tracking-[0.45em] uppercase text-orange-500/25">
-                LA LIGA
+              <span className="text-[10px] font-bold tracking-widest uppercase text-amber-500/25">
+                La Liga
               </span>
               {championshipName && (
-                <span className="text-[11px] font-bold text-orange-300/45 truncate max-w-[180px]">
+                <span className="text-[11px] font-medium text-amber-300/45 truncate max-w-[180px]">
                   {championshipName}
                 </span>
               )}
             </div>
             <button
               onClick={() => setActiveTab('jugadores')}
-              className="text-orange-400/50 hover:text-orange-400 transition-colors"
+              className="text-amber-400/50 hover:text-amber-400 transition-colors"
             >
               <Users className="w-5 h-5" />
             </button>
@@ -518,20 +510,20 @@ export default function EditionPage() {
           <div className="pb-8 pt-3 flex flex-col items-center text-center gap-3">
             {/* Logo */}
             <div className="relative">
-              <div className="absolute inset-0 scale-150 blur-2xl bg-orange-500/10 rounded-full" />
+              <div className="absolute inset-0 scale-150 blur-2xl bg-amber-500/10 rounded-full" />
               <LaLigaLogo />
             </div>
 
             {/* Title */}
             <div>
               <h1
-                className="text-4xl sm:text-5xl font-black uppercase tracking-tight text-orange-400"
-                style={{ textShadow: '0 0 50px rgba(249,115,22,0.4), 0 0 100px rgba(249,115,22,0.15), 0 3px 10px rgba(0,0,0,0.9)' }}
+                className="text-4xl sm:text-5xl font-black tracking-tight text-amber-400"
+                style={{ textShadow: '0 0 50px rgba(245,158,11,0.4), 0 0 100px rgba(245,158,11,0.15), 0 3px 10px rgba(0,0,0,0.9)' }}
               >
                 La Liga
               </h1>
               {leagueSeason != null && (
-                <p className="text-xs font-bold tracking-[0.35em] uppercase text-orange-300/30 mt-1.5">
+                <p className="text-xs font-medium tracking-widest uppercase text-amber-300/30 mt-1.5">
                   Temporada {leagueSeason}/{Number(leagueSeason) + 1}
                 </p>
               )}
@@ -576,14 +568,14 @@ export default function EditionPage() {
                 <span className="text-xs font-bold text-red-400">Has sido eliminado</span>
               </div>
             ) : deadlinePassed ? (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10">
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.07]">
                 <Clock className="w-3.5 h-3.5 text-white/25" />
-                <span className="text-xs font-bold text-white/30">Picks cerrados</span>
+                <span className="text-xs font-medium text-white/30">Picks cerrados</span>
               </div>
             ) : matchdayFirstKickoff ? (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20">
-                <Clock className="w-3.5 h-3.5 text-orange-400" />
-                <span className="text-xs font-bold text-orange-400">Cierra en {countdown}</span>
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-bold text-amber-400">Cierra en {countdown}</span>
               </div>
             ) : null}
           </div>
@@ -598,12 +590,12 @@ export default function EditionPage() {
                 onClick={() => setActiveTab(tab)}
                 className={cn(
                   'px-5 py-3 text-sm font-bold transition-colors relative',
-                  activeTab === tab ? 'text-orange-400' : 'text-white/25 hover:text-white/50',
+                  activeTab === tab ? 'text-amber-400' : 'text-white/25 hover:text-white/50',
                 )}
               >
                 {tab === 'picks' ? '⚽ Picks' : '👥 Jugadores'}
                 {activeTab === tab && (
-                  <span className="absolute bottom-0 inset-x-3 h-0.5 bg-orange-500 rounded-t-full" />
+                  <span className="absolute bottom-0 inset-x-3 h-0.5 bg-amber-500 rounded-t-full" />
                 )}
               </button>
             ))}
@@ -627,8 +619,8 @@ export default function EditionPage() {
             {/* My pick banner */}
             {myPick?.team && (
               <div className={cn(
-                'mb-4 flex items-center gap-3 px-3 py-3 rounded-xl border',
-                pickStatus ? pickStatus.cls : 'border-orange-500/20 bg-orange-500/5 text-orange-400',
+                'mb-4 flex items-center gap-3 px-3 py-3 rounded-2xl border',
+                pickStatus ? pickStatus.cls : 'border-amber-500/20 bg-amber-500/[0.06] text-amber-400',
               )}>
                 <img
                   src={myPick.team.logoUrl}
@@ -677,35 +669,38 @@ export default function EditionPage() {
                     <div
                       key={match.id}
                       className={cn(
-                        'rounded-2xl border overflow-hidden transition-colors',
+                        'rounded-2xl border overflow-hidden transition-all',
                         isPickedMatch
-                          ? 'border-orange-500/30 bg-gradient-to-br from-orange-950/20 to-transparent shadow-[0_0_24px_rgba(249,115,22,0.06)]'
-                          : 'border-white/7 bg-white/[0.025]',
+                          ? 'border-amber-500/30 bg-[#0c1220] shadow-[0_0_24px_rgba(245,158,11,0.06)]'
+                          : 'border-white/[0.07] bg-[#0c1220]',
                       )}
                     >
-                      {/* Status / kickoff row */}
-                      <div className="flex items-center justify-between px-3 pt-2 pb-0.5">
+                      {/* Status bar */}
+                      <div className={cn(
+                        'flex items-center justify-between px-3 py-1.5 border-b',
+                        isLive
+                          ? 'border-red-500/20 bg-red-500/[0.06]'
+                          : 'border-white/[0.04] bg-white/[0.015]',
+                      )}>
                         <div className="flex items-center gap-1.5">
                           {isLive ? (
                             <>
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">En vivo</span>
+                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">En vivo</span>
                             </>
                           ) : isFinished ? (
-                            <span className="text-[10px] font-bold text-white/18 uppercase tracking-wide">Finalizado</span>
+                            <span className="text-[10px] font-bold text-white/25 uppercase tracking-widest">Finalizado</span>
                           ) : (
-                            <span className="text-[10px] text-white/25">{formatKickoff(match.kickoffTime)}</span>
+                            <span className="text-[10px] font-medium text-white/35">{formatKickoff(match.kickoffTime)}</span>
                           )}
                         </div>
-                        {hasScore && (
-                          <span className="text-xs font-black text-white/45 tabular-nums">
-                            {match.homeScore} – {match.awayScore}
-                          </span>
+                        {isPickedMatch && (
+                          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Tu pick</span>
                         )}
                       </div>
 
-                      {/* Teams */}
-                      <div className="flex items-stretch gap-1 px-1.5 pb-1.5">
+                      {/* Teams + score */}
+                      <div className="flex items-center px-2 py-3 gap-1">
                         <TeamButton
                           team={match.homeTeam}
                           isUsed={homeLocked}
@@ -716,9 +711,20 @@ export default function EditionPage() {
                           onSelect={() => handleSelectTeam(match.homeTeam.id)}
                           align="left"
                         />
-                        <div className="flex items-center justify-center w-5 shrink-0">
-                          <span className="text-[10px] font-black text-white/12">vs</span>
+
+                        {/* Score / VS */}
+                        <div className="flex flex-col items-center justify-center shrink-0 w-14 gap-0.5">
+                          {hasScore ? (
+                            <span className="text-xl font-black text-white/85 tabular-nums tracking-tight leading-none">
+                              {match.homeScore}
+                              <span className="text-white/30 mx-0.5">–</span>
+                              {match.awayScore}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-black text-white/15 tracking-widest">VS</span>
+                          )}
                         </div>
+
                         <TeamButton
                           team={match.awayTeam}
                           isUsed={awayLocked}
@@ -731,9 +737,9 @@ export default function EditionPage() {
                         />
                       </div>
 
-                      {/* Orange strip on picked match */}
+                      {/* Amber strip on picked match */}
                       {isPickedMatch && (
-                        <div className="h-0.5 bg-gradient-to-r from-transparent via-orange-500/45 to-transparent" />
+                        <div className="h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
                       )}
                     </div>
                   );

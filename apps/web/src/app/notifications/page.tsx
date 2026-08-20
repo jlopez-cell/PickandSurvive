@@ -7,7 +7,7 @@ import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 export default function NotificationsPage() {
   return (
-    <Suspense fallback={<div className="h-[100dvh] bg-[#0d0b08]" />}>
+    <Suspense fallback={<div className="h-[100dvh] bg-[#06090f]" />}>
       <NotificationsContent />
     </Suspense>
   );
@@ -49,17 +49,17 @@ function NotificationsContent() {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#0d0b08]">
+    <div className="h-[100dvh] flex flex-col bg-[#06090f]">
       {/* Header */}
       <div className="pt-[env(safe-area-inset-top,0px)] px-4">
         <div className="h-14 flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center"
+            className="w-9 h-9 rounded-xl bg-white/5 border border-white/[0.08] flex items-center justify-center"
           >
             <ChevronLeft className="w-4 h-4 text-white/60" />
           </button>
-          <p className="text-sm font-black uppercase tracking-widest text-white/60">Notificaciones</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-white/35">Notificaciones</p>
         </div>
       </div>
 
@@ -72,7 +72,7 @@ function NotificationsContent() {
 
         {!loading && notifications.length === 0 && (
           <div className="flex flex-col items-center py-20 gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/[0.08] flex items-center justify-center">
               <Bell className="w-8 h-8 text-white/20" />
             </div>
             <p className="text-sm text-white/30 font-semibold">Sin notificaciones</p>
@@ -87,8 +87,8 @@ function NotificationsContent() {
                 onClick={() => markRead(n.id)}
                 className={`w-full text-left px-4 py-4 rounded-2xl border transition-all active:scale-[0.98] ${
                   n.read
-                    ? 'bg-white/3 border-white/6 opacity-60'
-                    : 'bg-white/6 border-white/12'
+                    ? 'bg-white/[0.03] border-white/[0.06] opacity-60'
+                    : 'bg-white/[0.06] border-white/[0.12]'
                 }`}
               >
                 <div className="flex items-start gap-3">

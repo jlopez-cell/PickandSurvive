@@ -1,9 +1,9 @@
 'use client';
 
-import { Bell, LayoutDashboard, UserRound, Users } from 'lucide-react';
+import { Bell, Home, Trophy, UserRound } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
-type Tab = 'home' | 'leagues' | 'notifications' | 'profile';
+type Tab = 'home' | 'championships' | 'notifications' | 'profile';
 
 export function MobileBottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const router = useRouter();
@@ -12,46 +12,48 @@ export function MobileBottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const active: Tab = (() => {
     if (pathname.startsWith('/profile')) return 'profile';
     if (pathname.startsWith('/notifications')) return 'notifications';
-    if (pathname.startsWith('/dashboard') || pathname.startsWith('/championship') || pathname.startsWith('/edition') || pathname.startsWith('/world-cup')) return 'home';
+    if (pathname.startsWith('/championship')) return 'championships';
     return 'home';
   })();
 
-  const go = (tab: Tab) => {
-    if (tab === 'profile') { router.push('/profile'); return; }
-    if (tab === 'home') { router.push('/dashboard'); return; }
-    if (tab === 'leagues') { router.push('/dashboard'); return; }
-    if (tab === 'notifications') { router.push('/notifications'); }
-  };
-
-  const cls = (tab: Tab) =>
-    `rounded-xl px-2 py-2 text-xs font-semibold flex flex-col items-center gap-1 ${
-      active === tab ? 'bg-white/10 text-white' : 'text-white/70 hover:text-white'
-    }`;
+  const TABS: { key: Tab; label: string; icon: React.ReactNode; route: string }[] = [
+    { key: 'home',          label: 'Inicio',       icon: <Home className="w-5 h-5" />,     route: '/dashboard' },
+    { key: 'championships', label: 'Ligas',         icon: <Trophy className="w-5 h-5" />,   route: '/championship/new' },
+    { key: 'notifications', label: 'Alertas',       icon: <Bell className="w-5 h-5" />,     route: '/notifications' },
+    { key: 'profile',       label: 'Perfil',        icon: <UserRound className="w-5 h-5" />, route: '/profile' },
+  ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-white/10 bg-slate-950/90 backdrop-blur px-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-2">
-      <div className="grid grid-cols-4 gap-2 max-w-xl mx-auto">
-        <button className={cls('home')} onClick={() => go('home')}>
-          <LayoutDashboard className="h-5 w-5" />
-          Inicio
-        </button>
-        <button className={cls('leagues')} onClick={() => go('leagues')}>
-          <Users className="h-5 w-5" />
-          Mis ligas
-        </button>
-        <button className={`relative ${cls('notifications')}`} onClick={() => go('notifications')}>
-          <Bell className="h-5 w-5" />
-          Notifs
-          {unreadCount > 0 && (
-            <span className="absolute right-3 top-2 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[10px] leading-4 text-white text-center">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </button>
-        <button className={cls('profile')} onClick={() => go('profile')}>
-          <UserRound className="h-5 w-5" />
-          Perfil
-        </button>
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-white/[0.06] bg-[#06090f]/95 backdrop-blur-xl"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)' }}
+    >
+      <div className="grid grid-cols-4 max-w-xl mx-auto pt-1.5">
+        {TABS.map(({ key, label, icon, route }) => {
+          const isActive = active === key;
+          return (
+            <button
+              key={key}
+              onClick={() => router.push(route)}
+              className="relative flex flex-col items-center gap-1 py-1.5 px-1 transition-all"
+            >
+              {key === 'notifications' && unreadCount > 0 && (
+                <span className="absolute top-1.5 right-[calc(50%-10px)] min-w-[14px] h-3.5 px-1 rounded-full bg-red-500 text-[9px] leading-3.5 text-white text-center font-bold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+              <span className={`transition-colors ${isActive ? 'text-amber-400' : 'text-white/35'}`}>
+                {icon}
+              </span>
+              <span className={`text-[10px] font-medium transition-colors ${isActive ? 'text-amber-400' : 'text-white/30'}`}>
+                {label}
+              </span>
+              {isActive && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-amber-400" />
+              )}
+            </button>
+          );
+        })}
       </div>
     </nav>
   );

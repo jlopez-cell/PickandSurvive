@@ -2,13 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type League = { id: string; name: string; country: string };
 
@@ -66,42 +59,45 @@ export default function NewChampionshipPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background flex items-start justify-center px-6 pb-6 pt-[max(1.5rem,env(safe-area-inset-top,0px))]">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-2 text-muted-foreground" onClick={() => router.back()}>
-            ← Volver
-          </Button>
-          <CardTitle>Nuevo campeonato</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <main className="min-h-screen bg-[#06090f] flex items-start justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-lg pt-6">
+        <button
+          type="button"
+          className="mb-6 flex items-center gap-1 text-sm text-white/35 hover:text-white/60 transition-colors"
+          onClick={() => router.back()}
+        >
+          ← Volver
+        </button>
+
+        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6">
+          <h1 className="text-xl font-bold text-white/85 mb-6">Nuevo campeonato</h1>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="name">Nombre del campeonato</Label>
-              <Input
+              <label htmlFor="name" className="text-sm font-medium text-white/35">
+                Nombre del campeonato
+              </label>
+              <input
                 id="name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Ej: Liga de los Viernes"
                 maxLength={80}
+                className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>Modo de juego</Label>
-              <Select
+              <label className="text-sm font-medium text-white/35">Modo de juego</label>
+              <select
                 value={form.mode}
-                onValueChange={(v) => setForm({ ...form, mode: v, footballLeagueId: '' })}
+                onChange={(e) => setForm({ ...form, mode: e.target.value, footballLeagueId: '' })}
+                className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full"
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TOURNAMENT">Torneo (supervivencia)</SelectItem>
-                  <SelectItem value="LEAGUE">Liga (puntos)</SelectItem>
-                  <SelectItem value="WORLD_CUP">🏆 World Cup 2026</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="TOURNAMENT" className="bg-[#0c1220]">Torneo (supervivencia)</option>
+                <option value="LEAGUE" className="bg-[#0c1220]">Liga (puntos)</option>
+                <option value="WORLD_CUP" className="bg-[#0c1220]">🏆 World Cup 2026</option>
+              </select>
             </div>
 
             {isWc && (
@@ -112,55 +108,55 @@ export default function NewChampionshipPage() {
 
             {!isWc && (
               <div className="flex flex-col gap-1.5">
-                <Label>Liga de fútbol</Label>
-                <Select
+                <label className="text-sm font-medium text-white/35">Liga de fútbol</label>
+                <select
                   value={form.footballLeagueId}
-                  onValueChange={(v) => setForm({ ...form, footballLeagueId: v })}
+                  onChange={(e) => setForm({ ...form, footballLeagueId: e.target.value })}
+                  className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una liga..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leagues.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name} ({l.country})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" className="bg-[#0c1220]">Selecciona una liga...</option>
+                  {leagues.map((l) => (
+                    <option key={l.id} value={l.id} className="bg-[#0c1220]">
+                      {l.name} ({l.country})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
             {!isWc && (
-              <div className="flex items-start gap-3 cursor-pointer">
-                <Checkbox
-                  id="midseason"
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
                   checked={form.pickResetAtMidseason}
-                  onCheckedChange={(checked) => setForm({ ...form, pickResetAtMidseason: !!checked })}
+                  onChange={(e) => setForm({ ...form, pickResetAtMidseason: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-amber-500 rounded"
                 />
                 <div className="flex flex-col gap-0.5">
-                  <Label htmlFor="midseason" className="cursor-pointer text-foreground">
-                    Reiniciar picks a media vuelta
-                  </Label>
-                  <p className="text-xs text-muted-foreground/60">
+                  <span className="text-sm font-medium text-white/85">Reiniciar picks a media vuelta</span>
+                  <span className="text-xs text-white/35">
                     Permite volver a elegir equipos usados en la primera vuelta
-                  </p>
+                  </span>
                 </div>
-              </div>
+              </label>
             )}
 
             {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {error}
+              </div>
             )}
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-amber-500 text-black font-bold rounded-2xl py-3.5 w-full disabled:opacity-50 transition-opacity"
+            >
               {loading ? 'Creando...' : 'Crear campeonato'}
-            </Button>
+            </button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }

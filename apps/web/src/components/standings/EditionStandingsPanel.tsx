@@ -57,10 +57,22 @@ function PageLeaderRow({
   const initial = (entry.alias?.[0] ?? '?').toUpperCase();
   const pickUi = standingsPickDisplay(entry);
   return (
-    <div className="group rounded-xl border border-white/10 bg-gradient-to-br from-slate-950/55 via-slate-900/35 to-slate-950/50 p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/15">
+    <div className={cn(
+      'group rounded-2xl border p-2.5 transition-colors',
+      rank === 1
+        ? 'border-amber-500/30 bg-amber-500/[0.04] hover:border-amber-500/40'
+        : 'border-white/[0.07] bg-[#0c1220] hover:border-white/12',
+    )}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sm font-black text-white/90 ring-1 ring-white/10">
+          <span className={cn(
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-black ring-1',
+            rank === 1
+              ? 'bg-amber-500/20 text-amber-400 ring-amber-500/30'
+              : rank <= 3
+              ? 'bg-white/10 text-white/75 ring-white/10'
+              : 'bg-white/[0.05] text-white/45 ring-white/[0.06]',
+          )}>
             {rank}
           </span>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm font-black text-white/85">
@@ -255,7 +267,7 @@ export function EditionStandingsPanel({
               : 'text-red-600 dark:text-red-400',
           )}
         >
-          {entry.status === 'ACTIVE' ? 'ACTIVO' : `ELIM. J${entry.eliminatedAtMatchday ?? '—'}`}
+          {entry.status === 'ACTIVE' ? 'Activo' : `Elim. J${entry.eliminatedAtMatchday ?? '—'}`}
         </div>
       ) : null;
 
@@ -273,7 +285,7 @@ export function EditionStandingsPanel({
 
   const statCardClass = isEmbedded
     ? 'rounded-xl border border-border bg-card/80 p-4 shadow-sm'
-    : 'rounded-xl border border-white/10 bg-slate-950/35 p-3 backdrop-blur-sm';
+    : 'rounded-xl border border-white/[0.07] bg-[#0c1220] p-3';
 
   const statLabelClass = isEmbedded
     ? 'text-xs text-muted-foreground font-semibold tracking-wide'
@@ -289,13 +301,13 @@ export function EditionStandingsPanel({
         {metaLoading ? (
           <p className="mt-1 text-sm text-white/50">…</p>
         ) : championshipNameMeta ? (
-          <p className="mt-1 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-sm font-semibold text-emerald-100">
-            <Trophy className="h-4 w-4 text-amber-300" />
+          <p className="mt-1 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-sm font-semibold text-amber-300">
+            <Trophy className="h-4 w-4 text-amber-400" />
             {championshipNameMeta}
           </p>
         ) : null}
         <p className="mt-2 flex items-center gap-2 text-sm text-white/60">
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-bold text-cyan-200">
+          <span className="rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[11px] font-bold text-amber-400">
             J{deadline?.matchdayNumber ?? '—'}
           </span>
           Jornada actual
@@ -311,7 +323,7 @@ export function EditionStandingsPanel({
           <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
             <div className={statCardClass}>
               <div className={statLabelClass}>JORNADA</div>
-              <div className="mt-1.5 text-2xl font-black tabular-nums text-cyan-200">J{deadline?.matchdayNumber ?? '—'}</div>
+              <div className="mt-1.5 text-2xl font-black tabular-nums text-amber-400">J{deadline?.matchdayNumber ?? '—'}</div>
             </div>
             <div className={statCardClass}>
               <div className={statLabelClass}>ACTIVOS</div>
@@ -323,34 +335,34 @@ export function EditionStandingsPanel({
             </div>
           </div>
 
-          <div className="mb-5 rounded-2xl border border-white/10 bg-gradient-to-r from-cyan-950/30 via-slate-950/45 to-emerald-950/20 p-3.5 backdrop-blur-md">
+          <div className="mb-5 rounded-2xl border border-white/[0.07] bg-[#0c1220] p-3.5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-1 items-start gap-3">
-                <div className="rounded-xl bg-white/10 p-2">
-                  <Users className="h-5 w-5 text-cyan-200" />
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-2">
+                  <Users className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-[15px] font-bold text-white">Tu pick cuenta esta jornada</p>
-                  <p className="mt-0.5 text-[13px] text-white/55">Un equipo por jugador y solo una vez por liga.</p>
+                  <p className="text-[15px] font-bold text-white/85">Tu pick cuenta esta jornada</p>
+                  <p className="mt-0.5 text-[13px] text-white/35">Un equipo por jugador y solo una vez por liga.</p>
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[13px] text-white/70">
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-[13px] text-white/60">
                   <div className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 shrink-0 text-cyan-300" />
+                    <Clock3 className="h-4 w-4 shrink-0 text-amber-400" />
                     <span>
                       Cierre:{' '}
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-white/85">
                         {deadlineLoading ? '…' : formatDeadline(deadline?.firstKickoff ?? null)}
                       </span>
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-white/45">
+                  <p className="mt-0.5 text-xs text-white/35">
                     {deadlineLoading ? '' : formatCountdown(deadline?.firstKickoff ?? null)}
                   </p>
                 </div>
                 <Button
-                  className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 font-semibold text-white shadow-lg shadow-emerald-900/40 hover:from-emerald-500 hover:to-emerald-600"
+                  className="gap-2 bg-amber-500 text-black font-bold rounded-2xl hover:bg-amber-400 active:bg-amber-600 shadow-lg shadow-amber-900/25"
                   onClick={() => router.push(`/edition/${editionId}`)}
                 >
                   Elegir pick
@@ -369,7 +381,7 @@ export function EditionStandingsPanel({
             <Button
               size="sm"
               variant="outline"
-              className="shrink-0 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              className="shrink-0 border-amber-500/30 bg-amber-500/8 text-amber-400 hover:bg-amber-500/15 hover:text-amber-300"
               onClick={() => router.push(`/edition/${editionId}/all-picks`)}
             >
               Picks de todos
@@ -377,11 +389,11 @@ export function EditionStandingsPanel({
           </div>
 
           <div className="hidden lg:block pb-4">
-            <Card className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+            <Card className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0c1220] text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableRow className="border-white/[0.07] hover:bg-transparent">
                       <TableHead className="w-12 text-[11px] uppercase tracking-wide text-white/55">#</TableHead>
                       <TableHead className="text-[11px] uppercase tracking-wide text-white/55">Jugador</TableHead>
                       <TableHead className="text-[11px] uppercase tracking-wide text-white/55">PTS / Estado</TableHead>
@@ -397,8 +409,10 @@ export function EditionStandingsPanel({
                               <TableRow
                                 key={entry.participantId}
                                 className={cn(
-                                  'border-white/10 hover:bg-white/[0.03]',
-                                  idx < 3 && 'bg-white/[0.03]',
+                                  'border-white/[0.07] hover:bg-white/[0.03]',
+                                  idx === 0 && 'bg-amber-500/[0.04]',
+                                  idx > 0 && idx < 3 && 'bg-white/[0.02]',
+                                  entry.status === 'ELIMINATED' && 'opacity-45',
                                 )}
                               >
                                 <TableCell className="font-semibold text-white/65">{idx + 1}</TableCell>
@@ -449,12 +463,13 @@ export function EditionStandingsPanel({
 
           <div className="flex flex-col gap-2 pb-4 lg:hidden">
             {standings.map((entry, idx) => (
-              <PageLeaderRow
-                key={entry.participantId}
-                entry={entry}
-                rank={idx + 1}
-                ptsCell={ptsEstadoCell(entry, true)}
-              />
+              <div key={entry.participantId} className={cn(entry.status === 'ELIMINATED' && 'opacity-45')}>
+                <PageLeaderRow
+                  entry={entry}
+                  rank={idx + 1}
+                  ptsCell={ptsEstadoCell(entry, true)}
+                />
+              </div>
             ))}
           </div>
         </>
@@ -601,15 +616,14 @@ export function EditionStandingsPanel({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden pb-24 text-white bg-background">
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/95 via-slate-950/75 to-slate-950/95" />
+    <main className="relative min-h-screen overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+80px)] text-white bg-[#06090f]">
       <MobileTopHeader />
 
       <div className="relative z-10 mx-auto max-w-6xl px-3.5 py-5 sm:px-5 sm:py-7 lg:px-8 pt-[max(1.0rem,env(safe-area-inset-top))]">
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-2 mb-2 text-white/75 hover:bg-white/10 hover:text-white"
+          className="-ml-2 mb-2 text-white/60 hover:bg-white/8 hover:text-white/90"
           onClick={() => router.back()}
         >
           ← Volver

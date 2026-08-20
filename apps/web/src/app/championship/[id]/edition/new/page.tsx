@@ -2,11 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Trophy } from 'lucide-react';
 
 type ChampionshipMeta = {
@@ -85,24 +80,28 @@ export default function NewEditionPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background flex items-start justify-center px-6 pb-6 pt-[max(1.5rem,env(safe-area-inset-top,0px))]">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <Button variant="ghost" size="sm" className="-ml-2 mb-2 w-fit text-muted-foreground" onClick={() => router.back()}>
-            ← Volver
-          </Button>
-          <CardTitle className="flex items-center gap-2">
+    <main className="min-h-screen bg-[#06090f] flex items-start justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-md pt-6">
+        <button
+          type="button"
+          className="mb-6 flex items-center gap-1 text-sm text-white/35 hover:text-white/60 transition-colors"
+          onClick={() => router.back()}
+        >
+          ← Volver
+        </button>
+
+        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-white/85 mb-6">
             {isWc && <Trophy className="w-5 h-5 text-amber-400" />}
             Nueva edición
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </h1>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
             {isWc ? (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 space-y-1">
-                <p className="text-sm font-semibold text-amber-300">World Cup 2026</p>
-                <p className="text-xs text-amber-200/70">
+                <p className="text-sm font-bold text-amber-400">World Cup 2026</p>
+                <p className="text-xs text-amber-300/70">
                   La edición arranca desde el{' '}
                   <span className="font-bold">
                     {leagueCurrentMatchday && leagueCurrentMatchday > 1
@@ -115,45 +114,49 @@ export default function NewEditionPage() {
             ) : (
               <>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="start">Jornada de inicio *</Label>
-                  <Input
+                  <label htmlFor="start" className="text-sm font-medium text-white/35">
+                    Jornada de inicio <span className="text-amber-400">*</span>
+                  </label>
+                  <input
                     id="start"
                     type="number"
                     min={leagueCurrentMatchday ?? 1}
                     value={form.startMatchday}
                     onChange={(e) => setForm({ ...form, startMatchday: e.target.value })}
                     placeholder={leagueCurrentMatchday ? `Desde J${leagueCurrentMatchday}` : 'Ej: 10'}
+                    className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
                   />
                   {leagueCurrentMatchday !== null && (
-                    <p className="text-xs text-muted-foreground">
-                      Jornada actual de la liga: <span className="font-semibold">J{leagueCurrentMatchday}</span>.
+                    <p className="text-xs text-white/35">
+                      Jornada actual de la liga: <span className="font-bold text-white/60">J{leagueCurrentMatchday}</span>.
                     </p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="end">
+                  <label htmlFor="end" className="text-sm font-medium text-white/35">
                     Jornada de fin{' '}
-                    <span className="text-muted-foreground/60 font-normal">(solo modo Liga)</span>
-                  </Label>
-                  <Input
+                    <span className="font-normal text-white/20">(solo modo Liga)</span>
+                  </label>
+                  <input
                     id="end"
                     type="number"
                     min={1}
                     value={form.endMatchday}
                     onChange={(e) => setForm({ ...form, endMatchday: e.target.value })}
                     placeholder="Ej: 38"
+                    className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
                   />
                 </div>
               </>
             )}
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pot">
+              <label htmlFor="pot" className="text-sm font-medium text-white/35">
                 Bote por participante (€){' '}
-                <span className="text-muted-foreground/60 font-normal">(opcional)</span>
-              </Label>
-              <Input
+                <span className="font-normal text-white/20">(opcional)</span>
+              </label>
+              <input
                 id="pot"
                 type="number"
                 min={0}
@@ -161,21 +164,26 @@ export default function NewEditionPage() {
                 value={form.potAmountCents}
                 onChange={(e) => setForm({ ...form, potAmountCents: e.target.value })}
                 placeholder="Ej: 5.00"
+                className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
               />
             </div>
 
             {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {error}
+              </div>
             )}
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-amber-500 text-black font-bold rounded-2xl py-3.5 w-full disabled:opacity-50 transition-opacity"
+            >
               {loading ? 'Creando...' : 'Crear edición'}
-            </Button>
+            </button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }
