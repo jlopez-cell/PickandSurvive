@@ -462,7 +462,7 @@ export default function DashboardPage() {
   if (loading || fetchingEditions) {
     return (
       <IsLightCtx.Provider value={isLight}>
-        <div className={`flex items-center justify-center min-h-screen ${isLight ? 'bg-slate-100' : 'bg-[#0d0b08]'}`}>
+        <div className={`flex items-center justify-center min-h-screen ${isLight ? 'bg-slate-100' : 'bg-[#06090f]'}`}>
           <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
         </div>
       </IsLightCtx.Provider>
@@ -494,66 +494,73 @@ export default function DashboardPage() {
 
   return (
     <IsLightCtx.Provider value={isLight}>
-    <div className={`h-[100dvh] flex flex-col overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-[#0d0b08]'}`}>
+    <div className={`h-[100dvh] flex flex-col overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-[#06090f]'}`}>
 
       {/* ══ STICKY HEADER ══════════════════════════════════════════════════ */}
-      <header className={`sticky top-0 z-30 backdrop-blur-md border-b ${isLight ? 'bg-white/95 border-slate-200' : 'bg-[#0d0b08]/95 border-white/5'}`}>
+      <header className={`sticky top-0 z-30 backdrop-blur-xl border-b ${isLight ? 'bg-white/96 border-slate-200' : 'bg-[#06090f]/97 border-white/[0.06]'}`}>
         <div className="pt-[env(safe-area-inset-top,0px)]">
 
-          {/* Top bar: nombre campeonato + otros campeonatos + icons */}
-          <div className="flex items-center gap-2 px-4 h-12">
-            {/* Otros campeonatos — solo si hay más de 1 */}
-            {activeEditions.length > 1 && (
+          {/* Top bar */}
+          <div className="flex items-center gap-2 px-4 h-13 py-2.5">
+            {/* Selector de campeonato */}
+            {activeEditions.length > 1 ? (
               <button
                 onClick={() => setShowSwitcher(true)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border shrink-0 ${isLight ? 'bg-slate-100 border-slate-200 active:bg-slate-200' : 'bg-white/5 border-white/10 active:bg-white/10'}`}
+                className={`flex items-center gap-2 min-w-0 flex-1 text-left ${isLight ? '' : ''}`}
               >
-                <LayoutGrid className={`w-3.5 h-3.5 ${isLight ? 'text-slate-400' : 'text-white/50'}`} />
-                <span className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Otros</span>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isLight ? 'bg-slate-100' : 'bg-white/8'}`}>
+                  {selected?.mode === 'WORLD_CUP'
+                    ? <Globe className="w-3.5 h-3.5 text-amber-400" />
+                    : <Trophy className={`w-3.5 h-3.5 ${isLight ? 'text-slate-400' : 'text-amber-500/60'}`} />}
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-[10px] font-medium leading-none mb-0.5 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Competición activa</p>
+                  <p className={`text-sm font-bold truncate leading-tight ${isLight ? 'text-slate-800' : 'text-white/85'}`}>{selected?.championshipName}</p>
+                </div>
+                <LayoutGrid className={`w-3.5 h-3.5 shrink-0 ml-1 ${isLight ? 'text-slate-300' : 'text-white/20'}`} />
               </button>
+            ) : (
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isLight ? 'bg-slate-100' : 'bg-amber-500/10'}`}>
+                  {selected?.mode === 'WORLD_CUP'
+                    ? <Globe className="w-3.5 h-3.5 text-amber-400" />
+                    : <Trophy className="w-3.5 h-3.5 text-amber-500/70" />}
+                </div>
+                <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white/85'}`}>{selected?.championshipName}</p>
+              </div>
             )}
 
-            {/* Nombre del campeonato */}
-            <div className="flex-1 min-w-0 flex items-center gap-1.5">
-              {selected?.mode === 'WORLD_CUP' && (
-                <Globe className={`w-3.5 h-3.5 shrink-0 ${isLight ? 'text-amber-600' : 'text-amber-400/60'}`} />
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Invite - solo para admin */}
+              {selected?.adminId === user?.id && (
+                <button
+                  onClick={() => router.push(`/championship/${selected!.championshipId}/invite`)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-xl ${isLight ? 'bg-amber-50 text-amber-600' : 'bg-amber-500/10 text-amber-400/80'}`}
+                >
+                  <Users className="w-4 h-4" />
+                </button>
               )}
-              <p className={`text-xs font-black uppercase tracking-widest truncate ${isLight ? 'text-slate-600' : 'text-white/60'}`}>
-                {selected?.championshipName}
-              </p>
-            </div>
-
-            {/* Invite - solo para admin */}
-            {selected?.adminId === user?.id && (
+              {/* Theme toggle */}
               <button
-                onClick={() => router.push(`/championship/${selected!.championshipId}/invite`)}
-                className={`w-9 h-9 flex items-center justify-center rounded-xl shrink-0 ${isLight ? 'bg-amber-100 border border-amber-300' : 'bg-amber-500/15 border border-amber-500/30'}`}
+                onClick={toggleTheme}
+                className={`w-8 h-8 flex items-center justify-center rounded-xl ${isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/5 text-white/35'}`}
               >
-                <Users className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+                {isLight ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
               </button>
-            )}
-
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/5'}`}
-            >
-              {isLight ? <Moon className="w-4 h-4 text-slate-600" /> : <Sun className="w-4 h-4 text-amber-400/70" />}
-            </button>
-
-            {/* Profile */}
-            <button
-              onClick={() => router.push('/profile')}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/5'}`}
-            >
-              <span className={`text-[11px] font-black uppercase ${isLight ? 'text-slate-500' : 'text-white/50'}`}>
-                {user?.alias?.slice(0, 2) ?? 'P'}
-              </span>
-            </button>
+              {/* Avatar */}
+              <button
+                onClick={() => router.push('/profile')}
+                className={`w-8 h-8 flex items-center justify-center rounded-xl ${isLight ? 'bg-slate-100' : 'bg-white/8'}`}
+              >
+                <span className={`text-[10px] font-black uppercase ${isLight ? 'text-slate-500' : 'text-white/50'}`}>
+                  {user?.alias?.slice(0, 2) ?? 'P'}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
-          <div className={`flex border-t ${isLight ? 'border-slate-200' : 'border-white/5'}`}>
+          <div className={`flex border-t ${isLight ? 'border-slate-100' : 'border-white/[0.05]'}`}>
             {(isWc
               ? ['pick', 'jugadores', 'historial', 'calendario'] as const
               : ['pick', 'jugadores', 'historial'] as const
@@ -561,13 +568,16 @@ export default function DashboardPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 ${
+                className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-all relative ${
                   activeTab === tab
-                    ? 'text-amber-400 border-amber-400'
-                    : isLight ? 'text-slate-400 border-transparent' : 'text-white/25 border-transparent'
+                    ? isLight ? 'text-amber-600' : 'text-amber-400'
+                    : isLight ? 'text-slate-400' : 'text-white/28'
                 }`}
               >
-                {tab === 'pick' ? '🎯 Pick' : tab === 'jugadores' ? '👥 Jugadores' : tab === 'historial' ? '🏅 Historial' : '📅 Cal.'}
+                {tab === 'pick' ? 'Pick' : tab === 'jugadores' ? 'Jugadores' : tab === 'historial' ? 'Historial' : 'Calendario'}
+                <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all ${
+                  activeTab === tab ? 'w-8 bg-amber-400' : 'w-0 bg-transparent'
+                }`} />
               </button>
             ))}
           </div>
@@ -643,7 +653,7 @@ export default function DashboardPage() {
       {notifsOpen && (
         <div className="fixed inset-0 z-50 flex flex-col" onClick={(e) => { if (e.target === e.currentTarget) setNotifsOpen(false); }}>
           <div className="absolute inset-0 bg-black/60" onClick={() => setNotifsOpen(false)} />
-          <div ref={notifPanelRef} className={`relative mt-auto rounded-t-3xl border-t max-h-[70vh] flex flex-col ${isLight ? 'bg-white border-slate-200' : 'bg-[#111] border-white/10'}`}>
+          <div ref={notifPanelRef} className={`relative mt-auto rounded-t-3xl border-t max-h-[70vh] flex flex-col ${isLight ? 'bg-white border-slate-200' : 'bg-[#0b1120] border-white/10'}`}>
             <div className={`px-4 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-3 flex items-center gap-3 border-b ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
               <button onClick={() => setNotifsOpen(false)} className={isLight ? 'text-slate-400' : 'text-white/40'}>
                 <X className="w-5 h-5" />
@@ -682,7 +692,7 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex flex-col" onClick={() => setShowSwitcher(false)}>
           <div className="absolute inset-0 bg-black/70" />
           <div
-            className={`relative mt-auto rounded-t-3xl border-t ${isLight ? 'bg-white border-slate-200' : 'bg-[#111] border-white/10'}`}
+            className={`relative mt-auto rounded-t-3xl border-t ${isLight ? 'bg-white border-slate-200' : 'bg-[#0b1120] border-white/10'}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`px-4 pt-5 pb-3 flex items-center gap-3 border-b ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
@@ -737,7 +747,7 @@ export default function DashboardPage() {
             <div className="fixed inset-x-0 top-0 z-[60] bg-black/60"
               style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
               onClick={() => setSelectedTeamId(null)} />
-            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#13151a] rounded-t-3xl shadow-2xl"
+            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#0b1120] rounded-t-3xl shadow-2xl"
               style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}
             >
               <div className="flex justify-center pt-3 pb-1">
@@ -777,7 +787,7 @@ export default function DashboardPage() {
           <div className="fixed inset-x-0 top-0 z-[60] bg-black/60"
             style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
             onClick={() => setLeagueSelectedTeamId(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#13151a] rounded-t-3xl shadow-2xl"
+          <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#0b1120] rounded-t-3xl shadow-2xl"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}
           >
             <div className="flex justify-center pt-3 pb-4">
@@ -1042,117 +1052,201 @@ function LeaguePickTab({
 }) {
   const isLight = useIsLight();
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><div className="w-7 h-7 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" /></div>;
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="w-6 h-6 rounded-full border-2 border-amber-500/25 border-t-amber-500 animate-spin" />
+      </div>
+    );
   }
 
   if (!deadline?.matchdayNumber) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 px-6">
-        <Trophy className={`w-10 h-10 ${isLight ? 'text-slate-300' : 'text-white/20'}`} />
-        <p className={`text-sm text-center ${isLight ? 'text-slate-400' : 'text-white/30'}`}>No hay jornada disponible.</p>
+      <div className="flex flex-col items-center justify-center py-24 gap-5 px-8">
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border ${isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/4 border-white/8'}`}>
+          <Trophy className={`w-8 h-8 ${isLight ? 'text-slate-300' : 'text-white/18'}`} />
+        </div>
+        <div className="text-center space-y-1.5">
+          <p className={`text-sm font-semibold ${isLight ? 'text-slate-500' : 'text-white/40'}`}>Sin datos de jornada</p>
+          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-400' : 'text-white/22'}`}>El calendario de la temporada 26/27 aún no está sincronizado.</p>
+        </div>
       </div>
     );
   }
 
   const deadlinePassed = deadline.firstKickoff
     ? new Date(deadline.firstKickoff).getTime() <= Date.now()
-    : false;
+    : deadline.matchdayStatus === 'FINISHED';
 
   return (
-    <div className="px-4 py-4 space-y-4 pb-[140px]">
-      {/* Matchday header */}
-      <div className="text-center space-y-0.5">
-        <p className={`text-xs font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Jornada actual</p>
-        <p className={`text-2xl font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>J{deadline.matchdayNumber}</p>
-        {deadline.firstKickoff && (
-          <p className={`text-xs font-semibold ${deadlinePassed ? (isLight ? 'text-slate-400' : 'text-white/25') : (isLight ? 'text-amber-700' : 'text-amber-400/80')}`}>
-            {deadlinePassed ? 'Cerrada' : `Cierra a las ${formatKickoff(deadline.firstKickoff)}`}
-          </p>
-        )}
+    <div className="pb-[140px]">
+      {/* ── Matchday header ── */}
+      <div className={`px-5 pt-5 pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.05]'}`}>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
+              La Liga · {deadline.matchdayStatus === 'FINISHED' ? 'Temporada 25/26' : 'Temporada 26/27'}
+            </p>
+            <p className={`text-[34px] font-black leading-none tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              J{deadline.matchdayNumber}
+            </p>
+          </div>
+          <div className={`mb-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            !deadlinePassed && deadline.matchdayStatus !== 'FINISHED'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+              : isLight ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white/5 border-white/10 text-white/30'
+          }`}>
+            {!deadlinePassed && deadline.matchdayStatus !== 'FINISHED' && deadline.firstKickoff
+              ? `Cierra ${formatKickoff(deadline.firstKickoff)}`
+              : 'Cerrada'}
+          </div>
+        </div>
       </div>
 
-      {/* My pick */}
+      {/* ── My pick banner ── */}
       {myPick?.team && (
-        <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${
-          myPick.status === 'SURVIVED' ? 'bg-emerald-500/10 border-emerald-500/30' :
-          myPick.status === 'PENDING' ? 'bg-amber-500/10 border-amber-500/30' :
-          'bg-red-500/10 border-red-500/25'
-        }`}>
-          <img src={myPick.team.logoUrl} alt={myPick.team.name} className="w-10 h-10 object-contain" />
-          <div className="flex-1 min-w-0">
-            <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Tu pick</p>
-            <p className={`text-base font-black truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>{myPick.team.name}</p>
-          </div>
-          <div className={`flex items-center gap-1 ${PICK_STATUS_COMPACT[myPick.status]?.cls ?? 'text-white/40'}`}>
-            {PICK_STATUS_COMPACT[myPick.status]?.icon}
+        <div className="px-4 pt-4">
+          <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3.5 ${
+            myPick.status === 'SURVIVED' ? 'bg-emerald-500/7 border-emerald-500/25' :
+            myPick.status === 'PENDING'  ? 'bg-amber-500/7 border-amber-500/25' :
+            'bg-red-500/7 border-red-500/20'
+          }`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              myPick.status === 'SURVIVED' ? 'bg-emerald-500/12' :
+              myPick.status === 'PENDING'  ? 'bg-amber-500/12' : 'bg-red-500/12'
+            }`}>
+              <img src={myPick.team.logoUrl} alt={myPick.team.name} className="w-7 h-7 object-contain" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-[10px] font-medium uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Tu pick</p>
+              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white/85'}`}>{myPick.team.name}</p>
+            </div>
+            <div className={`flex items-center gap-1.5 ${PICK_STATUS_COMPACT[myPick.status]?.cls ?? 'text-white/40'}`}>
+              {PICK_STATUS_COMPACT[myPick.status]?.icon}
+              <span className="text-[10px] font-semibold">{PICK_STATUS_COMPACT[myPick.status]?.label ?? myPick.status}</span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Matches */}
-      {matches.map((m) => {
-        const isHomeSelected = selectedTeamId === m.homeTeam.id;
-        const isAwaySelected = selectedTeamId === m.awayTeam.id;
-        const isHomeMyPick = myPick?.team?.id === m.homeTeam.id;
-        const isAwayMyPick = myPick?.team?.id === m.awayTeam.id;
-        const canPick = !deadlinePassed && m.status === 'SCHEDULED';
-        const isFinished = m.status === 'FINISHED' || m.status === 'LIVE';
-        return (
-          <div key={m.id} className={`rounded-2xl border overflow-hidden ${
-            isHomeMyPick || isAwayMyPick ? 'border-amber-500/30 bg-amber-500/5' : (isLight ? 'border-slate-200 bg-white' : 'border-white/8 bg-white/3')
-          }`}>
-            <div className="flex items-stretch min-h-[72px]">
-              {/* Local */}
-              <button
-                onClick={() => canPick && onSelectTeam(m.homeTeam.id)}
-                disabled={!canPick}
-                className={`flex-1 flex items-center gap-3 px-4 py-3 transition-all ${
-                  isHomeSelected ? 'bg-amber-500/20' :
-                  isHomeMyPick ? 'bg-amber-500/10' :
-                  canPick ? 'active:bg-white/5' : ''
-                }`}
-              >
-                <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-10 h-10 object-contain shrink-0" />
-                <p className={`text-sm font-bold leading-tight line-clamp-2 ${
-                  isHomeMyPick || isHomeSelected ? 'text-amber-300' : (isLight ? 'text-slate-700' : 'text-white/80')
-                }`}>{m.homeTeam.name}</p>
-              </button>
-
-              {/* Centro */}
-              <div className={`w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 border-x ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
-                {isFinished && m.homeScore !== null ? (
-                  <div className="flex items-center gap-1">
-                    <span className={`text-base font-black ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.homeScore}</span>
-                    <span className={`text-sm font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>-</span>
-                    <span className={`text-base font-black ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{m.awayScore}</span>
-                  </div>
+      {/* ── Matches ── */}
+      <div className="px-4 pt-4 space-y-3">
+        {matches.map((m) => {
+          const isHomeSelected = selectedTeamId === m.homeTeam.id;
+          const isAwaySelected = selectedTeamId === m.awayTeam.id;
+          const isHomeMyPick = myPick?.team?.id === m.homeTeam.id;
+          const isAwayMyPick = myPick?.team?.id === m.awayTeam.id;
+          const canPick = !deadlinePassed && m.status === 'SCHEDULED';
+          const isFinished = m.status === 'FINISHED';
+          const isLive = m.status === 'LIVE';
+          const isMyPickMatch = isHomeMyPick || isAwayMyPick;
+          return (
+            <div
+              key={m.id}
+              className={`rounded-2xl overflow-hidden border transition-all ${
+                isMyPickMatch
+                  ? 'border-amber-500/35'
+                  : isLight ? 'border-slate-200' : 'border-white/[0.07]'
+              }`}
+              style={{
+                background: isMyPickMatch
+                  ? (isLight ? '#fffbf0' : 'linear-gradient(160deg,rgba(245,158,11,0.07) 0%,#0a1020 55%)')
+                  : (isLight ? '#fff' : '#0c1220'),
+                boxShadow: isMyPickMatch && !isLight ? '0 0 24px rgba(245,158,11,0.06)' : undefined,
+              }}
+            >
+              {/* Status strip */}
+              <div className={`flex items-center justify-center px-4 py-1.5 border-b ${
+                isLive
+                  ? 'border-emerald-500/20 bg-emerald-500/8'
+                  : isLight ? 'border-slate-100' : 'border-white/[0.05]'
+              }`}>
+                {isLive ? (
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    En Vivo
+                  </span>
+                ) : isFinished ? (
+                  <span className={`text-[10px] font-medium uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-white/25'}`}>
+                    Finalizado
+                  </span>
                 ) : (
-                  <>
-                    <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-white/50'}`}>{formatKickoff(m.kickoffTime)}</span>
-                    <span className={`text-[10px] font-black ${isLight ? 'text-slate-300' : 'text-white/20'}`}>vs</span>
-                  </>
+                  <span className={`text-[11px] font-medium ${isLight ? 'text-slate-500' : 'text-white/40'}`}>
+                    {formatKickoff(m.kickoffTime)}
+                  </span>
                 )}
               </div>
 
-              {/* Visitante */}
-              <button
-                onClick={() => canPick && onSelectTeam(m.awayTeam.id)}
-                disabled={!canPick}
-                className={`flex-1 flex items-center gap-3 px-4 py-3 flex-row-reverse transition-all ${
-                  isAwaySelected ? 'bg-amber-500/20' :
-                  isAwayMyPick ? 'bg-amber-500/10' :
-                  canPick ? 'active:bg-white/5' : ''
-                }`}
-              >
-                <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-10 h-10 object-contain shrink-0" />
-                <p className={`text-sm font-bold leading-tight line-clamp-2 text-right ${
-                  isAwayMyPick || isAwaySelected ? 'text-amber-300' : (isLight ? 'text-slate-700' : 'text-white/80')
-                }`}>{m.awayTeam.name}</p>
-              </button>
+              {/* Teams */}
+              <div className="flex items-stretch">
+                {/* Home */}
+                <button
+                  onClick={() => canPick && onSelectTeam(m.homeTeam.id)}
+                  disabled={!canPick}
+                  className={`flex-1 flex flex-col items-center gap-2 px-3 py-5 transition-all ${
+                    isHomeSelected ? 'bg-amber-500/15' :
+                    isHomeMyPick ? 'bg-amber-500/8' :
+                    canPick ? 'active:bg-white/5' : ''
+                  }`}
+                >
+                  <img src={m.homeTeam.logoUrl} alt={m.homeTeam.name} className="w-12 h-12 object-contain drop-shadow-sm" />
+                  <p className={`text-xs font-semibold text-center leading-snug line-clamp-2 px-1 ${
+                    isHomeMyPick || isHomeSelected ? 'text-amber-400' : (isLight ? 'text-slate-700' : 'text-white/72')
+                  }`}>{m.homeTeam.name}</p>
+                  {isHomeSelected && (
+                    <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-widest -mt-1">Seleccionado</span>
+                  )}
+                </button>
+
+                {/* Score / VS */}
+                <div className={`w-[68px] shrink-0 flex flex-col items-center justify-center border-x ${isLight ? 'border-slate-100' : 'border-white/[0.05]'}`}>
+                  {(isFinished || isLive) && m.homeScore !== null ? (
+                    <p className={`text-[22px] font-black tracking-tight leading-none ${isLight ? 'text-slate-800' : 'text-white/90'}`}>
+                      {m.homeScore}<span className={`text-base mx-0.5 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>–</span>{m.awayScore}
+                    </p>
+                  ) : (
+                    <span className={`text-sm font-bold ${isLight ? 'text-slate-300' : 'text-white/22'}`}>vs</span>
+                  )}
+                </div>
+
+                {/* Away */}
+                <button
+                  onClick={() => canPick && onSelectTeam(m.awayTeam.id)}
+                  disabled={!canPick}
+                  className={`flex-1 flex flex-col items-center gap-2 px-3 py-5 transition-all ${
+                    isAwaySelected ? 'bg-amber-500/15' :
+                    isAwayMyPick ? 'bg-amber-500/8' :
+                    canPick ? 'active:bg-white/5' : ''
+                  }`}
+                >
+                  <img src={m.awayTeam.logoUrl} alt={m.awayTeam.name} className="w-12 h-12 object-contain drop-shadow-sm" />
+                  <p className={`text-xs font-semibold text-center leading-snug line-clamp-2 px-1 ${
+                    isAwayMyPick || isAwaySelected ? 'text-amber-400' : (isLight ? 'text-slate-700' : 'text-white/72')
+                  }`}>{m.awayTeam.name}</p>
+                  {isAwaySelected && (
+                    <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-widest -mt-1">Seleccionado</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Pick footer */}
+              {isMyPickMatch && (
+                <div className={`flex items-center gap-2 px-4 py-2 border-t ${isLight ? 'border-amber-100' : 'border-amber-500/15'}`}>
+                  <span className={`text-[10px] font-medium uppercase tracking-widest ${isLight ? 'text-amber-600/70' : 'text-amber-400/50'}`}>Tu pick</span>
+                  <div className={`ml-auto flex items-center gap-1 ${PICK_STATUS_COMPACT[myPick!.status]?.cls ?? 'text-white/40'}`}>
+                    {PICK_STATUS_COMPACT[myPick!.status]?.icon}
+                    <span className="text-[10px] font-semibold">{PICK_STATUS_COMPACT[myPick!.status]?.label}</span>
+                  </div>
+                </div>
+              )}
             </div>
+          );
+        })}
+        {matches.length === 0 && (
+          <div className={`py-12 text-center text-sm ${isLight ? 'text-slate-400' : 'text-white/25'}`}>
+            Sin partidos en esta jornada.
           </div>
-        );
-      })}
+        )}
+      </div>
     </div>
   );
 }
@@ -1211,22 +1305,53 @@ function PlayersTab({
   }
 
   return (
-    <div className="px-4 py-4 pb-[80px]">
-      <div className={`rounded-2xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/8'}`}>
-        {leagueStandings.map((s, i) => (
-          <div key={s.participantId} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
-            <span className={`w-5 text-xs font-black shrink-0 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>{i + 1}</span>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-700' : 'text-white/80'}`}>{s.alias}</p>
-              {s.eliminatedAtMatchday && <p className="text-[10px] text-red-400/60">Elim. J{s.eliminatedAtMatchday}</p>}
+    <div className="px-4 py-5 pb-[80px] space-y-3">
+      <div className={`flex items-center justify-between px-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
+        <span className="text-[10px] font-medium uppercase tracking-widest">Clasificación</span>
+        <span className="text-[10px] font-medium uppercase tracking-widest">{leagueStandings.filter(s => s.status === 'ACTIVE').length} activos</span>
+      </div>
+      <div className={`rounded-2xl border overflow-hidden ${isLight ? 'border-slate-200' : 'border-white/[0.07]'}`}
+        style={{ background: isLight ? '#fff' : '#0c1220' }}>
+        {leagueStandings.map((s, i) => {
+          const isActive = s.status === 'ACTIVE';
+          const isTop = i === 0 && isActive;
+          return (
+            <div key={s.participantId} className={`flex items-center gap-3.5 px-4 py-3.5 border-b last:border-0 ${
+              isLight ? 'border-slate-100' : 'border-white/[0.04]'
+            } ${!isActive ? 'opacity-50' : ''}`}>
+              {/* Position */}
+              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[11px] font-black ${
+                isTop
+                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  : isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/25'
+              }`}>{i + 1}</div>
+
+              {/* Name */}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold truncate ${
+                  isTop
+                    ? isLight ? 'text-amber-700' : 'text-amber-300/90'
+                    : isLight ? 'text-slate-700' : 'text-white/75'
+                }`}>{s.alias}</p>
+                {s.eliminatedAtMatchday && (
+                  <p className="text-[10px] text-red-400/50 font-medium">Elim. J{s.eliminatedAtMatchday}</p>
+                )}
+              </div>
+
+              {/* Status / points */}
+              {isActive ? (
+                <span className={`text-sm font-bold tabular-nums ${isTop ? (isLight ? 'text-amber-600' : 'text-amber-400') : (isLight ? 'text-slate-600' : 'text-white/60')}`}>
+                  {s.totalPoints} <span className="text-[10px] font-medium opacity-60">pts</span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold text-red-400/50 uppercase tracking-wider">Eliminado</span>
+              )}
             </div>
-            {s.status === 'ACTIVE'
-              ? <span className={`text-[11px] font-black ${isLight ? 'text-slate-500' : 'text-white/60'}`}>{s.totalPoints} pts</span>
-              : <span className="text-[10px] text-red-400/50 font-bold uppercase">Eliminado</span>
-            }
-          </div>
-        ))}
-        {leagueStandings.length === 0 && <p className={`text-center text-sm py-10 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin datos.</p>}
+          );
+        })}
+        {leagueStandings.length === 0 && (
+          <p className={`text-center text-sm py-10 ${isLight ? 'text-slate-300' : 'text-white/20'}`}>Sin datos.</p>
+        )}
       </div>
     </div>
   );
@@ -1536,7 +1661,7 @@ function WelcomeScreen({
   const hasEditions = editions.length > 0;
 
   return (
-    <div className={`h-[100dvh] flex flex-col overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-[#0d0b08]'}`}>
+    <div className={`h-[100dvh] flex flex-col overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-[#06090f]'}`}>
       {/* Header */}
       <div className="pt-[env(safe-area-inset-top,0px)] px-4">
         <div className="h-14 flex items-center justify-between">
@@ -1611,22 +1736,31 @@ function WelcomeScreen({
           )}
 
           {/* CTAs */}
-          <div className="space-y-2 pt-2">
+          <div className="space-y-2.5 pt-2">
             <button
               onClick={() => router.push('/join-code')}
-              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-bold text-sm ${isLight ? 'bg-slate-200 border-slate-300 text-slate-500' : 'bg-white/5 border-white/10 text-white/40'}`}
+              className={`w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl border font-semibold text-sm transition-all active:scale-[0.98] ${
+                isLight
+                  ? 'bg-white border-slate-200 text-slate-600 active:bg-slate-50'
+                  : 'bg-white/5 border-white/[0.08] text-white/50 active:bg-white/8'
+              }`}
             >
               <Users className="w-4 h-4" />
               Unirse por código
             </button>
             <button
               onClick={() => router.push('/championship/new')}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm ${isLight ? 'text-slate-400' : 'text-white/25'}`}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-medium text-sm transition-all ${
+                isLight ? 'text-slate-400' : 'text-white/25'
+              }`}
             >
               <Plus className="w-4 h-4" />
               Crear campeonato
             </button>
-            <button onClick={onLogout} className={`w-full py-2 text-xs font-bold ${isLight ? 'text-slate-300' : 'text-white/15'}`}>
+            <button
+              onClick={onLogout}
+              className={`w-full py-2.5 text-xs font-medium ${isLight ? 'text-slate-300' : 'text-white/15'}`}
+            >
               Cerrar sesión
             </button>
           </div>
@@ -1643,37 +1777,56 @@ function WelcomeScreen({
 function WelcomeEditionCard({ edition, onSelect }: { edition: ActiveEdition; onSelect: (e: ActiveEdition) => void }) {
   const isWc = edition.mode === 'WORLD_CUP';
   const isLight = useIsLight();
+  const modeLabel = isWc ? 'Mundial 2026' : edition.mode === 'LEAGUE' ? 'Liga' : 'Torneo';
+
   return (
     <button
       onClick={() => onSelect(edition)}
-      className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
-        isWc
-          ? 'bg-amber-500/8 border-amber-500/25 active:bg-amber-500/12'
-          : (isLight ? 'bg-white border-slate-200 active:bg-slate-50' : 'bg-white/4 border-white/10 active:bg-white/8')
-      }`}
+      className="w-full text-left transition-all active:scale-[0.985] active:opacity-90"
     >
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-        isWc ? 'bg-amber-500/15' : (isLight ? 'bg-slate-100' : 'bg-white/8')
-      }`}>
-        {isWc
-          ? <Globe className="w-7 h-7 text-amber-400" />
-          : <Trophy className={`w-7 h-7 ${isLight ? 'text-slate-400' : 'text-white/40'}`} />
-        }
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-base font-black uppercase tracking-wide truncate leading-tight ${
-          isWc ? (isLight ? 'text-amber-700' : 'text-amber-100') : (isLight ? 'text-slate-700' : 'text-white/80')
-        }`}>
-          {edition.championshipName}
-        </p>
-        <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
-          {isWc ? 'Mundial 2026 · Activo' : `${edition.mode === 'LEAGUE' ? 'Liga' : 'Torneo'} · Activo`}
-        </p>
-      </div>
-      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-        isWc ? 'bg-amber-500/20' : (isLight ? 'bg-slate-100' : 'bg-white/8')
-      }`}>
-        <ChevronRight className={`w-4 h-4 ${isWc ? 'text-amber-400' : (isLight ? 'text-slate-400' : 'text-white/30')}`} />
+      <div
+        className={`rounded-2xl border overflow-hidden ${
+          isWc
+            ? 'border-amber-500/30'
+            : isLight ? 'border-slate-200' : 'border-white/[0.08]'
+        }`}
+        style={{
+          background: isWc
+            ? (isLight ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : 'linear-gradient(135deg,rgba(245,158,11,0.10),rgba(12,18,32,1) 60%)')
+            : (isLight ? '#fff' : '#0c1220'),
+        }}
+      >
+        <div className="flex items-center gap-4 px-4 py-4">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${
+            isWc
+              ? 'bg-amber-500/15 border-amber-500/25'
+              : isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/8 border-white/10'
+          }`}>
+            {isWc
+              ? <Globe className="w-6 h-6 text-amber-400" />
+              : <Trophy className={`w-6 h-6 ${isLight ? 'text-slate-400' : 'text-white/35'}`} />}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                isWc
+                  ? 'border-amber-500/30 text-amber-400/80 bg-amber-500/8'
+                  : isLight ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-white/10 text-white/30 bg-white/5'
+              }`}>{modeLabel}</span>
+              <span className={`text-[9px] font-medium ${isLight ? 'text-emerald-600' : 'text-emerald-400/70'}`}>● Activo</span>
+            </div>
+            <p className={`text-sm font-bold truncate leading-tight ${
+              isWc
+                ? isLight ? 'text-amber-800' : 'text-amber-100/90'
+                : isLight ? 'text-slate-800' : 'text-white/85'
+            }`}>{edition.championshipName}</p>
+          </div>
+
+          <ChevronRight className={`w-4 h-4 shrink-0 ${
+            isWc ? 'text-amber-400/60' : isLight ? 'text-slate-300' : 'text-white/25'
+          }`} />
+        </div>
       </div>
     </button>
   );

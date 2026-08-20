@@ -485,14 +485,25 @@ export class PicksService {
 
     if (!edition) throw new NotFoundException('Edición no encontrada');
 
-    const matchday = await findNextOpenMatchdayByCalendar(this.prisma, {
-      leagueId: edition.championship.footballLeagueId,
-      season: edition.championship.footballLeague.currentSeason,
-      number: {
-        gte: edition.startMatchday,
-        ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
-      },
+    const leagueId = edition.championship.footballLeagueId;
+    const season   = edition.championship.footballLeague.currentSeason;
+    const numberFilter = {
+      gte: edition.startMatchday,
+      ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
+    };
+
+    let matchday = await findNextOpenMatchdayByCalendar(this.prisma, {
+      leagueId, season, number: numberFilter,
     });
+
+    // When every matchday in the edition range is already FINISHED (season over),
+    // fall back to the last one so clients can still display results.
+    if (!matchday) {
+      matchday = await this.prisma.matchday.findFirst({
+        where: { leagueId, season, number: numberFilter },
+        orderBy: { number: 'desc' },
+      }) ?? undefined;
+    }
 
     let firstKickoff = matchday?.firstKickoff ?? null;
     if (matchday && !firstKickoff) {

@@ -57,7 +57,8 @@ export class AdminService {
     for (const league of leagues) {
       await this.footballData.syncLeagueTeams(league.id);
     }
-    await this.footballData.syncUpcomingFixtures();
+    // fullSeason: true → descarga toda la temporada, no solo la ventana de 60 días
+    await this.footballData.syncUpcomingFixtures({ fullSeason: true });
     return { message: 'Fixtures sincronizados correctamente' };
   }
 

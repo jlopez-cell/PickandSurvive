@@ -218,8 +218,8 @@ export class FootballDataService {
 
   // ─── Sync Upcoming Fixtures (daily cron) ────────────────────────────────────
 
-  async syncUpcomingFixtures() {
-    this.logger.log('Syncing upcoming fixtures...');
+  async syncUpcomingFixtures(opts: { fullSeason?: boolean } = {}) {
+    this.logger.log(`Syncing fixtures (${opts.fullSeason ? 'full season' : 'upcoming window'})...`);
 
     const leagues = await this.prisma.footballLeague.findMany({
       where: { name: SYNC_FIXTURES_LEAGUE_NAME },
@@ -236,21 +236,24 @@ export class FootballDataService {
       // ── Provider: football-data.org (si está configurado) ────────────────
       if (this.isFootballDataEnabled()) {
         try {
-          const today = new Date();
-          const from = new Date(today.getTime());
-          from.setDate(from.getDate() - 7);
-          const to = new Date(today.getTime());
-          to.setDate(to.getDate() + 60);
-
-          const dateFrom = this.formatDate(from);
-          const dateTo = this.formatDate(to);
+          // fullSeason → no date filter, se descarga toda la temporada de una vez.
+          // Default rolling window: -7d … +60d (cron diario).
+          const dateParams: Record<string, string | number> = opts.fullSeason
+            ? {}
+            : (() => {
+                const today = new Date();
+                const from = new Date(today.getTime());
+                from.setDate(from.getDate() - 7);
+                const to = new Date(today.getTime());
+                to.setDate(to.getDate() + 60);
+                return { dateFrom: this.formatDate(from), dateTo: this.formatDate(to) };
+              })();
 
           const fdData: any = await this.footballDataGet(
             `/competitions/${league.apiFootballId}/matches`,
             {
               season: league.currentSeason,
-              dateFrom,
-              dateTo,
+              ...dateParams,
               limit: 500,
               offset: 0,
             },
@@ -278,11 +281,11 @@ export class FootballDataService {
 
       let data: any;
       try {
-        data = await this.get('/fixtures', {
-          league: league.apiFootballId,
-          season: league.currentSeason,
-          next: 30,
-        });
+        // fullSeason → no usamos "next" sino que descargamos toda la temporada
+        const fixtureParams: Record<string, string | number> = opts.fullSeason
+          ? { league: league.apiFootballId, season: league.currentSeason }
+          : { league: league.apiFootballId, season: league.currentSeason, next: 30 };
+        data = await this.get('/fixtures', fixtureParams);
 
         // Si no hay fixtures "próximos" (por ejemplo, porque la temporada ya terminó
         // o el rango `next` no devuelve nada), hacemos un fallback por rango de fechas
