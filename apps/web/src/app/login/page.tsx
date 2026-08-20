@@ -30,17 +30,17 @@ function LoginContent() {
   }
 
   return (
-    <main className="min-h-[100dvh] flex items-center justify-center bg-[#06090f] p-4 pt-[env(safe-area-inset-top,0px)]">
+    <main className="min-h-[100dvh] flex items-center justify-center bg-background p-4 pt-[env(safe-area-inset-top,0px)]">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white/85">Pick & Survive</h1>
-          <p className="text-sm text-white/35 mt-1">Iniciá sesión para continuar</p>
+          <h1 className="text-2xl font-bold text-foreground">Pick & Survive</h1>
+          <p className="text-sm text-muted-foreground mt-1">Iniciá sesión para continuar</p>
         </div>
 
-        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-xs font-medium text-white/35 uppercase tracking-wider">
+              <label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Email
               </label>
               <input
@@ -50,12 +50,12 @@ function LoginContent() {
                 onChange={e => setEmail(e.target.value)}
                 required
                 placeholder="tu@email.com"
-                className="bg-white/5 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white/85 placeholder:text-white/20 outline-none focus:border-amber-500/30 focus:bg-white/[0.07] transition-colors"
+                className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30 transition-colors"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="password" className="text-xs font-medium text-white/35 uppercase tracking-wider">
+              <label htmlFor="password" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Contraseña
               </label>
               <input
@@ -65,7 +65,7 @@ function LoginContent() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="bg-white/5 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white/85 placeholder:text-white/20 outline-none focus:border-amber-500/30 focus:bg-white/[0.07] transition-colors"
+                className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30 transition-colors"
               />
             </div>
 
@@ -84,7 +84,7 @@ function LoginContent() {
             </button>
           </form>
 
-          <p className="mt-5 text-center text-sm text-white/35">
+          <p className="mt-5 text-center text-sm text-muted-foreground">
             ¿No tenés cuenta?{' '}
             <Link
               href={redirectTo ? `/register?redirect=${encodeURIComponent(redirectTo)}` : '/register'}
@@ -103,7 +103,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-[100dvh] flex items-center justify-center bg-[#06090f]">
+        <main className="min-h-[100dvh] flex items-center justify-center bg-background">
           <div className="w-6 h-6 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin" />
         </main>
       }

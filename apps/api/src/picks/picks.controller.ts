@@ -81,7 +81,11 @@ export class PicksController {
   }
 
   @Get('deadline')
-  getEditionDeadline(@Param('editionId') editionId: string) {
-    return this.service.getEditionDeadline(editionId);
+  getEditionDeadline(
+    @Param('editionId') editionId: string,
+    @Query('matchday') matchday?: string,
+  ) {
+    const matchdayNumber = matchday ? parseInt(matchday, 10) : undefined;
+    return this.service.getEditionDeadline(editionId, matchdayNumber);
   }
 }

@@ -34,6 +34,28 @@
   }
 }
 
+/* ── Light theme ──────────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --background: 0 0% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --border: 214 32% 85%;
+  --input: 214 32% 85%;
+  --ring: 38 92% 50%;
+  --primary: 38 92% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 94%;
+  --secondary-foreground: 222 47% 25%;
+  --muted: 210 40% 94%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 94%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 82% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --radius: 0.75rem;
+}
+
 /* ── World Cup 2026 theme ─────────────────────────────────────────────────── */
 [data-theme="world-cup"] {
   --background:          20 14% 6%;

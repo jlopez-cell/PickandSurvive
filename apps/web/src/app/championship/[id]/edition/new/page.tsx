@@ -80,18 +80,18 @@ export default function NewEditionPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#06090f] flex items-start justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0px)]">
+    <main className="min-h-screen bg-background flex items-start justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0px)]">
       <div className="w-full max-w-md pt-6">
         <button
           type="button"
-          className="mb-6 flex items-center gap-1 text-sm text-white/35 hover:text-white/60 transition-colors"
+          className="mb-6 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           onClick={() => router.back()}
         >
           ← Volver
         </button>
 
-        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6">
-          <h1 className="flex items-center gap-2 text-xl font-bold text-white/85 mb-6">
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-foreground mb-6">
             {isWc && <Trophy className="w-5 h-5 text-amber-400" />}
             Nueva edición
           </h1>
@@ -114,7 +114,7 @@ export default function NewEditionPage() {
             ) : (
               <>
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="start" className="text-sm font-medium text-white/35">
+                  <label htmlFor="start" className="text-sm font-medium text-muted-foreground">
                     Jornada de inicio <span className="text-amber-400">*</span>
                   </label>
                   <input
@@ -124,19 +124,19 @@ export default function NewEditionPage() {
                     value={form.startMatchday}
                     onChange={(e) => setForm({ ...form, startMatchday: e.target.value })}
                     placeholder={leagueCurrentMatchday ? `Desde J${leagueCurrentMatchday}` : 'Ej: 10'}
-                    className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
+                    className="bg-secondary border border-border text-foreground rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-muted-foreground"
                   />
                   {leagueCurrentMatchday !== null && (
-                    <p className="text-xs text-white/35">
-                      Jornada actual de la liga: <span className="font-bold text-white/60">J{leagueCurrentMatchday}</span>.
+                    <p className="text-xs text-muted-foreground">
+                      Jornada actual de la liga: <span className="font-bold text-foreground">J{leagueCurrentMatchday}</span>.
                     </p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="end" className="text-sm font-medium text-white/35">
+                  <label htmlFor="end" className="text-sm font-medium text-muted-foreground">
                     Jornada de fin{' '}
-                    <span className="font-normal text-white/20">(solo modo Liga)</span>
+                    <span className="font-normal text-muted-foreground/60">(solo modo Liga)</span>
                   </label>
                   <input
                     id="end"
@@ -145,16 +145,16 @@ export default function NewEditionPage() {
                     value={form.endMatchday}
                     onChange={(e) => setForm({ ...form, endMatchday: e.target.value })}
                     placeholder="Ej: 38"
-                    className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
+                    className="bg-secondary border border-border text-foreground rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-muted-foreground"
                   />
                 </div>
               </>
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="pot" className="text-sm font-medium text-white/35">
+              <label htmlFor="pot" className="text-sm font-medium text-muted-foreground">
                 Bote por participante (€){' '}
-                <span className="font-normal text-white/20">(opcional)</span>
+                <span className="font-normal text-muted-foreground/60">(opcional)</span>
               </label>
               <input
                 id="pot"
@@ -164,7 +164,7 @@ export default function NewEditionPage() {
                 value={form.potAmountCents}
                 onChange={(e) => setForm({ ...form, potAmountCents: e.target.value })}
                 placeholder="Ej: 5.00"
-                className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
+                className="bg-secondary border border-border text-foreground rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-muted-foreground"
               />
             </div>
 

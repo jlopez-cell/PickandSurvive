@@ -32,9 +32,8 @@ function VerifyEmailContent() {
   }, [token]);
 
   return (
-    <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-      <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5 text-center">
-        {/* Status icon */}
+    <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 flex flex-col gap-5 text-center">
         <div className="flex justify-center">
           {status === 'loading' && (
             <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
@@ -53,29 +52,27 @@ function VerifyEmailContent() {
           )}
         </div>
 
-        {/* Title + description */}
         <div>
           {status === 'loading' && (
             <>
-              <h1 className="text-xl font-bold text-white/85">Verificando...</h1>
-              <p className="text-sm text-white/35 mt-1.5">Por favor esperá un momento.</p>
+              <h1 className="text-xl font-bold text-foreground">Verificando...</h1>
+              <p className="text-sm text-muted-foreground mt-1.5">Por favor esperá un momento.</p>
             </>
           )}
           {status === 'success' && (
             <>
               <h1 className="text-xl font-bold text-emerald-400">Email verificado</h1>
-              <p className="text-sm text-white/35 mt-1.5 leading-relaxed">{message}</p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{message}</p>
             </>
           )}
           {status === 'error' && (
             <>
               <h1 className="text-xl font-bold text-red-400">Error de verificación</h1>
-              <p className="text-sm text-white/35 mt-1.5 leading-relaxed">{message}</p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{message}</p>
             </>
           )}
         </div>
 
-        {/* CTA */}
         {status !== 'loading' && (
           <Link
             href="/login"
@@ -93,8 +90,8 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-          <p className="text-white/35">Cargando...</p>
+        <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+          <p className="text-muted-foreground">Cargando...</p>
         </main>
       }
     >

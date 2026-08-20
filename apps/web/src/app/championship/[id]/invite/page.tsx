@@ -42,7 +42,6 @@ export default function InvitePage() {
   }, [fetchRequests]);
 
   useEffect(() => {
-    // Asegura que siempre haya un enlace/código visible al abrir la pantalla.
     void generateLink();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -62,7 +61,6 @@ export default function InvitePage() {
     if (!inviteUrl) return;
     setCopyError('');
     try {
-      // Modern API (puede fallar en iOS/HTTP/no permisos)
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(inviteUrl);
       } else {
@@ -72,7 +70,6 @@ export default function InvitePage() {
       setTimeout(() => setCopied(false), 2000);
       return;
     } catch {
-      // Fallback para navegadores móviles antiguos
       try {
         const textArea = document.createElement('textarea');
         textArea.value = inviteUrl;
@@ -153,25 +150,24 @@ export default function InvitePage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#06090f] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] pt-[env(safe-area-inset-top,0px)] sm:px-6">
+    <main className="min-h-screen bg-background px-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] pt-[env(safe-area-inset-top,0px)] sm:px-6">
       <div className="max-w-3xl mx-auto pt-6 pb-2">
         <button
           type="button"
-          className="mb-6 -ml-2 flex items-center gap-1 text-sm text-white/35 hover:text-white/60 transition-colors"
+          className="mb-6 -ml-2 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           onClick={() => router.back()}
         >
           ← Volver
         </button>
-        <h1 className="text-xl sm:text-2xl font-bold text-white/85 mb-6 sm:mb-8">Invitaciones</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-6 sm:mb-8">Invitaciones</h1>
 
-        {/* Enlace de invitación */}
-        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-5 mb-5 sm:mb-6">
-          <h2 className="text-sm font-bold text-white/85 mb-4">Enlace de invitación</h2>
+        <div className="bg-card border border-border rounded-2xl p-5 mb-5 sm:mb-6">
+          <h2 className="text-sm font-bold text-foreground mb-4">Enlace de invitación</h2>
           <div className="flex flex-col gap-3">
             {inviteUrl ? (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white/5 border border-white/[0.08] rounded-xl px-3 py-2">
-                  <span className="text-xs sm:text-sm text-white/35 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-secondary border border-border rounded-xl px-3 py-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                     {inviteUrl}
                   </span>
                   <button
@@ -187,13 +183,13 @@ export default function InvitePage() {
                 </div>
 
                 {inviteToken && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white/5 border border-white/[0.08] rounded-xl px-3 py-2">
-                    <span className="text-xs sm:text-sm text-white/35 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-secondary border border-border rounded-xl px-3 py-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                       Código: {inviteToken}
                     </span>
                     <button
-                      className={`w-full sm:w-auto bg-white/5 border border-white/[0.08] rounded-xl px-3 py-1.5 text-sm transition-colors ${
-                        copiedToken ? 'text-emerald-300' : 'text-white/60'
+                      className={`w-full sm:w-auto bg-secondary border border-border rounded-xl px-3 py-1.5 text-sm transition-colors ${
+                        copiedToken ? 'text-emerald-300' : 'text-muted-foreground'
                       }`}
                       onClick={copyToken}
                     >
@@ -212,7 +208,7 @@ export default function InvitePage() {
             )}
             {inviteUrl && (
               <button
-                className="w-full sm:w-fit bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-4 py-2 text-sm"
+                className="w-full sm:w-fit bg-secondary border border-border text-muted-foreground rounded-xl px-4 py-2 text-sm"
                 onClick={generateLink}
               >
                 Generar nuevo enlace
@@ -224,9 +220,8 @@ export default function InvitePage() {
           </div>
         </div>
 
-        {/* Invitar por email */}
-        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-5 mb-5 sm:mb-6">
-          <h2 className="text-sm font-bold text-white/85 mb-4">Invitar por email</h2>
+        <div className="bg-card border border-border rounded-2xl p-5 mb-5 sm:mb-6">
+          <h2 className="text-sm font-bold text-foreground mb-4">Invitar por email</h2>
           <div className="flex flex-col gap-3">
             <form onSubmit={sendEmail} className="flex flex-col sm:flex-row gap-2">
               <input
@@ -234,7 +229,7 @@ export default function InvitePage() {
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="email@ejemplo.com"
-                className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none flex-1 placeholder:text-white/20"
+                className="bg-secondary border border-border text-foreground rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none flex-1 placeholder:text-muted-foreground"
               />
               <button
                 type="submit"
@@ -250,22 +245,21 @@ export default function InvitePage() {
           </div>
         </div>
 
-        {/* Solicitudes pendientes */}
-        <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl p-5">
-          <h2 className="text-sm font-bold text-white/85 mb-4">Solicitudes pendientes</h2>
+        <div className="bg-card border border-border rounded-2xl p-5">
+          <h2 className="text-sm font-bold text-foreground mb-4">Solicitudes pendientes</h2>
           {loadingRequests ? (
-            <p className="text-white/35 text-sm">Cargando...</p>
+            <p className="text-muted-foreground text-sm">Cargando...</p>
           ) : requests.length === 0 ? (
-            <p className="text-white/35 text-sm">No hay solicitudes pendientes.</p>
+            <p className="text-muted-foreground text-sm">No hay solicitudes pendientes.</p>
           ) : (
             <div className="flex flex-col gap-3">
               {requests.map((req) => (
-                <div key={req.id} className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-3 sm:px-4 sm:py-3">
+                <div key={req.id} className="bg-secondary/50 border border-border rounded-xl p-3 sm:px-4 sm:py-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-bold text-white/85 text-sm truncate">@{req.user.alias}</div>
-                      <div className="text-white/35 text-xs break-all">{req.user.email}</div>
-                      <div className="text-white/25 text-xs mt-1">
+                      <div className="font-bold text-foreground text-sm truncate">@{req.user.alias}</div>
+                      <div className="text-muted-foreground text-xs break-all">{req.user.email}</div>
+                      <div className="text-muted-foreground text-xs mt-1">
                         vía {req.source === 'LINK' ? 'enlace' : 'email'} ·{' '}
                         {new Date(req.createdAt).toLocaleString('es-ES', {
                           day: '2-digit',

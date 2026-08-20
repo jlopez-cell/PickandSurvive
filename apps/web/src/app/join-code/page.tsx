@@ -37,8 +37,6 @@ function JoinCodeContent() {
       return;
     }
 
-    // Si no hay sesión, redirigimos a login y, tras autenticarse,
-    // volvemos a esta misma URL para auto-enviar el join.
     if (!user && !authLoading) {
       router.push(`/login?redirect=${encodeURIComponent(redirectAfterLogin)}`);
       return;
@@ -66,13 +64,11 @@ function JoinCodeContent() {
     }
   };
 
-  // Si llegamos con ?code=... y ya hay sesión, pedimos el join automáticamente.
   useEffect(() => {
     const trimmed = codeFromQuery.trim();
     if (!trimmed) return;
     if (!user) return;
     if (submitting) return;
-    // Si ya se ha completado, no reenviar.
     if (status === 'success') return;
     void submitJoin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,26 +76,24 @@ function JoinCodeContent() {
 
   if (authLoading) {
     return (
-      <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-        <p className="text-white/35">Cargando...</p>
+      <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+        <p className="text-muted-foreground">Cargando...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-      <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5">
-        {/* Header */}
+    <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 flex flex-col gap-5">
         <div className="text-center">
-          <h1 className="text-xl font-bold text-white/85">Entrar con código</h1>
-          <p className="text-sm text-white/35 mt-1.5 leading-relaxed">
+          <h1 className="text-xl font-bold text-foreground">Entrar con código</h1>
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
             Pegá el código del campeonato. Tu solicitud se enviará al admin para su aprobación.
           </p>
         </div>
 
-        {/* Input */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="join-code" className="text-xs font-medium text-white/35 uppercase tracking-wide">
+          <label htmlFor="join-code" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Código
           </label>
           <input
@@ -110,14 +104,13 @@ function JoinCodeContent() {
             autoCapitalize="none"
             autoCorrect="off"
             inputMode="text"
-            className="bg-white/5 border border-white/[0.08] text-white/80 rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-white/20"
+            className="bg-secondary border border-border text-foreground rounded-xl px-4 py-3 focus:border-amber-500/50 outline-none w-full placeholder:text-muted-foreground"
             onKeyDown={(e) => {
               if (e.key === 'Enter') void submitJoin();
             }}
           />
         </div>
 
-        {/* Alerts */}
         {status === 'success' && (
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 leading-relaxed">
             {message}
@@ -130,7 +123,6 @@ function JoinCodeContent() {
           </div>
         )}
 
-        {/* Buttons */}
         <button
           disabled={submitting}
           onClick={() => void submitJoin()}
@@ -141,7 +133,7 @@ function JoinCodeContent() {
 
         <button
           onClick={() => router.push('/dashboard')}
-          className="text-sm font-medium text-white/35 hover:text-white/60 transition-colors text-center"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors text-center"
         >
           Volver al dashboard
         </button>
@@ -154,8 +146,8 @@ export default function JoinCodePage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-          <p className="text-white/35">Cargando...</p>
+        <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+          <p className="text-muted-foreground">Cargando...</p>
         </main>
       }
     >

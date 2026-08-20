@@ -473,7 +473,7 @@ export class PicksService {
    * Matchday en vigor dentro del rango de la edición: la abierta (SCHEDULED u ONGOING) que viene
    * antes en calendario de competición (primer pitido), no necesariamente la de número mínimo.
    */
-  async getEditionDeadline(editionId: string) {
+  async getEditionDeadline(editionId: string, requestedMatchdayNumber?: number) {
     const edition = await this.prisma.edition.findUnique({
       where: { id: editionId },
       include: {
@@ -492,17 +492,23 @@ export class PicksService {
       ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
     };
 
-    let matchday = await findNextOpenMatchdayByCalendar(this.prisma, {
-      leagueId, season, number: numberFilter,
-    });
+    let matchday;
 
-    // When every matchday in the edition range is already FINISHED (season over),
-    // fall back to the last one so clients can still display results.
-    if (!matchday) {
-      matchday = await this.prisma.matchday.findFirst({
-        where: { leagueId, season, number: numberFilter },
-        orderBy: { number: 'desc' },
+    if (requestedMatchdayNumber !== undefined) {
+      matchday = await this.prisma.matchday.findUnique({
+        where: { leagueId_season_number: { leagueId, season, number: requestedMatchdayNumber } },
       }) ?? undefined;
+    } else {
+      matchday = await findNextOpenMatchdayByCalendar(this.prisma, {
+        leagueId, season, number: numberFilter,
+      });
+
+      if (!matchday) {
+        matchday = await this.prisma.matchday.findFirst({
+          where: { leagueId, season, number: numberFilter },
+          orderBy: { number: 'desc' },
+        }) ?? undefined;
+      }
     }
 
     let firstKickoff = matchday?.firstKickoff ?? null;
@@ -515,10 +521,39 @@ export class PicksService {
       firstKickoff = firstMatch?.kickoffTime ?? null;
     }
 
+    const currentNumber = matchday?.number ?? null;
+
+    let prevNumber: number | null = null;
+    let nextNumber: number | null = null;
+
+    if (currentNumber !== null) {
+      const [prevMatchday, nextMatchday] = await Promise.all([
+        this.prisma.matchday.findFirst({
+          where: { leagueId, season, number: { gte: edition.startMatchday, lt: currentNumber } },
+          orderBy: { number: 'desc' },
+        }),
+        this.prisma.matchday.findFirst({
+          where: {
+            leagueId,
+            season,
+            number: {
+              gt: currentNumber,
+              ...(edition.endMatchday !== null ? { lte: edition.endMatchday } : {}),
+            },
+          },
+          orderBy: { number: 'asc' },
+        }),
+      ]);
+      prevNumber = prevMatchday?.number ?? null;
+      nextNumber = nextMatchday?.number ?? null;
+    }
+
     return {
-      matchdayNumber: matchday?.number ?? null,
+      matchdayNumber: currentNumber,
       matchdayStatus: matchday?.status ?? null,
       firstKickoff,
+      prevNumber,
+      nextNumber,
     };
   }
 

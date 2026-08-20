@@ -18,7 +18,7 @@ export function MobileBottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode; route: string }[] = [
     { key: 'home',          label: 'Inicio',       icon: <Home className="w-5 h-5" />,     route: '/dashboard' },
-    { key: 'championships', label: 'Ligas',         icon: <Trophy className="w-5 h-5" />,   route: '/championship/new' },
+    { key: 'championships', label: 'Ligas',         icon: <Trophy className="w-5 h-5" />,   route: '/championship' },
     { key: 'notifications', label: 'Alertas',       icon: <Bell className="w-5 h-5" />,     route: '/notifications' },
     { key: 'profile',       label: 'Perfil',        icon: <UserRound className="w-5 h-5" />, route: '/profile' },
   ];

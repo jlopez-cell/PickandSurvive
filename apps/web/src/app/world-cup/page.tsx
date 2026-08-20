@@ -30,12 +30,11 @@ export default function WcLobbyPage() {
   const router = useRouter();
 
   return (
-    <div className="min-h-[100dvh] bg-[#06090f] flex flex-col pt-[env(safe-area-inset-top,0px)]">
-      {/* Nav */}
+    <div className="min-h-[100dvh] bg-background flex flex-col pt-[env(safe-area-inset-top,0px)]">
       <nav className="flex items-center justify-between px-4 sm:px-6 h-14 border-b border-amber-500/10">
         <button
           onClick={() => router.push('/dashboard')}
-          className="flex items-center gap-1.5 text-sm font-medium text-white/35 hover:text-white/60 transition-colors"
+          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="w-4 h-4" /> Dashboard
         </button>
@@ -45,9 +44,7 @@ export default function WcLobbyPage() {
         <div className="w-20" />
       </nav>
 
-      {/* Hero */}
       <section className="relative flex-1 flex flex-col items-center justify-center px-4 py-16 sm:py-24 text-center overflow-hidden">
-        {/* Ambient glow */}
         <div className="absolute inset-0 bg-gradient-to-b from-amber-950/30 via-transparent to-transparent pointer-events-none" />
         <div
           className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -59,7 +56,6 @@ export default function WcLobbyPage() {
         />
 
         <div className="relative z-10 max-w-2xl mx-auto space-y-6">
-          {/* Trophy */}
           <div className="flex justify-center">
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
               <Trophy
@@ -69,7 +65,6 @@ export default function WcLobbyPage() {
             </div>
           </div>
 
-          {/* Title */}
           <div>
             <h1
               className="text-4xl sm:text-5xl md:text-6xl font-black text-amber-400"
@@ -82,36 +77,34 @@ export default function WcLobbyPage() {
             </p>
           </div>
 
-          <p className="text-base sm:text-lg text-white/35 max-w-md mx-auto leading-relaxed">
+          <p className="text-base sm:text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
             La versión más épica de Pick &amp; Survive. Picks diarios, grupos, eliminatorias y el Mundial entero en tus manos.
           </p>
 
-          {/* Features grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left mt-2">
             {FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="flex items-start gap-3 p-4 rounded-xl bg-[#0c1220] border border-white/[0.07] hover:border-amber-500/20 transition-colors"
+                className="flex items-start gap-3 p-4 rounded-xl bg-card border border-border hover:border-amber-500/20 transition-colors"
               >
                 <span className="text-amber-400 shrink-0 mt-0.5">{f.icon}</span>
                 <div>
-                  <p className="font-bold text-sm text-white/85">{f.title}</p>
-                  <p className="text-xs text-white/35 mt-0.5 leading-relaxed">{f.desc}</p>
+                  <p className="font-bold text-sm text-foreground">{f.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{f.desc}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* CTA */}
           <div className="pt-2 space-y-3">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-semibold">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               Torneo en curso · 11 Jun – 19 Jul 2026
             </div>
 
-            <p className="text-sm text-white/35">
+            <p className="text-sm text-muted-foreground">
               Pide a tu admin que cree un campeonato de tipo{' '}
-              <strong className="text-white/60 font-bold">World Cup</strong> e invítate para empezar a jugar.
+              <strong className="text-foreground font-bold">World Cup</strong> e invítate para empezar a jugar.
             </p>
 
             <button

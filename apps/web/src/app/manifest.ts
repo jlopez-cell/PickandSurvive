@@ -3,19 +3,26 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Pick & Survive',
-    short_name: 'PickSurvive',
-    description: 'Football pick & survive game',
+    short_name: 'Pick&Survive',
+    description: 'El juego de fútbol definitivo',
     start_url: '/dashboard',
     scope: '/',
     display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#0f172a',
+    background_color: '#06090f',
+    theme_color: '#f59e0b',
     orientation: 'portrait',
     icons: [
       {
-        src: '/Logo_WorldCup.png',
-        sizes: '1024x1024',
-        type: 'image/jpeg',
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable',
       },
     ],
   };

@@ -57,6 +57,8 @@ type LeagueDeadline = {
   matchdayNumber: number | null;
   firstKickoff: string | null;
   matchdayStatus: string | null;
+  prevNumber: number | null;
+  nextNumber: number | null;
 };
 type LeaguePick = {
   status: string;
@@ -279,10 +281,13 @@ export default function DashboardPage() {
 
   // ── League pick data ──────────────────────────────────────────────────────
 
-  async function loadLeaguePickTab(editionId: string) {
+  async function loadLeaguePickTab(editionId: string, matchdayOverride?: number) {
     setLeaguePickLoading(true);
+    setLeagueMatches([]);
+    setLeagueMyPick(null);
     try {
-      const deadlineRes = await fetch(`/api/editions/${editionId}/deadline`);
+      const q = matchdayOverride !== undefined ? `?matchday=${matchdayOverride}` : '';
+      const deadlineRes = await fetch(`/api/editions/${editionId}/deadline${q}`);
       const deadline: LeagueDeadline = await deadlineRes.json();
       setLeagueDeadline(deadline);
       const md = deadline.matchdayNumber;
@@ -406,6 +411,14 @@ export default function DashboardPage() {
         await loadLeaguePickTab(selected.editionId);
       }
     } finally { setLeaguePickingTeamId(null); }
+  }
+
+  function handleLeagueNav(dir: 'prev' | 'next') {
+    if (!selected) return;
+    const target = dir === 'prev' ? leagueDeadline?.prevNumber : leagueDeadline?.nextNumber;
+    if (!target) return;
+    setLeagueSelectedTeamId(null);
+    loadLeaguePickTab(selected.editionId, target);
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────
@@ -612,6 +625,7 @@ export default function DashboardPage() {
             pickingTeamId={leaguePickingTeamId}
             onSelectTeam={(id) => setLeagueSelectedTeamId((p) => (p === id ? null : id))}
             onPick={handleLeaguePick}
+            onNav={handleLeagueNav}
           />
         )}
 
@@ -1039,7 +1053,7 @@ function WcPickTab({
 // ── LeaguePickTab ──────────────────────────────────────────────────────────
 
 function LeaguePickTab({
-  deadline, matches, myPick, loading, selectedTeamId, pickingTeamId, onSelectTeam, onPick,
+  deadline, matches, myPick, loading, selectedTeamId, pickingTeamId, onSelectTeam, onPick, onNav,
 }: {
   deadline: LeagueDeadline | null;
   matches: LeagueMatch[];
@@ -1049,6 +1063,7 @@ function LeaguePickTab({
   pickingTeamId: string | null;
   onSelectTeam: (id: string) => void;
   onPick: (teamId: string) => void;
+  onNav: (dir: 'prev' | 'next') => void;
 }) {
   const isLight = useIsLight();
   if (loading) {
@@ -1080,25 +1095,43 @@ function LeaguePickTab({
   return (
     <div className="pb-[140px]">
       {/* ── Matchday header ── */}
-      <div className={`px-5 pt-5 pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.05]'}`}>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
-              La Liga · {deadline.matchdayStatus === 'FINISHED' ? 'Temporada 25/26' : 'Temporada 26/27'}
-            </p>
-            <p className={`text-[34px] font-black leading-none tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              J{deadline.matchdayNumber}
-            </p>
+      <div className={`px-4 pt-5 pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.05]'}`}>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onNav('prev')}
+            disabled={!deadline.prevNumber}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 disabled:opacity-20 disabled:cursor-not-allowed ${isLight ? 'bg-slate-100' : 'bg-white/5'}`}
+          >
+            <ChevronLeft className={`w-4 h-4 ${isLight ? 'text-slate-500' : 'text-white/60'}`} />
+          </button>
+
+          <div className="flex-1 flex items-end justify-between">
+            <div>
+              <p className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>
+                La Liga · {deadline.matchdayStatus === 'FINISHED' ? 'Temporada 25/26' : 'Temporada 26/27'}
+              </p>
+              <p className={`text-[34px] font-black leading-none tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                J{deadline.matchdayNumber}
+              </p>
+            </div>
+            <div className={`mb-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+              !deadlinePassed && deadline.matchdayStatus !== 'FINISHED'
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                : isLight ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white/5 border-white/10 text-white/30'
+            }`}>
+              {!deadlinePassed && deadline.matchdayStatus !== 'FINISHED' && deadline.firstKickoff
+                ? `Cierra ${formatKickoff(deadline.firstKickoff)}`
+                : 'Cerrada'}
+            </div>
           </div>
-          <div className={`mb-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
-            !deadlinePassed && deadline.matchdayStatus !== 'FINISHED'
-              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-              : isLight ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white/5 border-white/10 text-white/30'
-          }`}>
-            {!deadlinePassed && deadline.matchdayStatus !== 'FINISHED' && deadline.firstKickoff
-              ? `Cierra ${formatKickoff(deadline.firstKickoff)}`
-              : 'Cerrada'}
-          </div>
+
+          <button
+            onClick={() => onNav('next')}
+            disabled={!deadline.nextNumber}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 disabled:opacity-20 disabled:cursor-not-allowed ${isLight ? 'bg-slate-100' : 'bg-white/5'}`}
+          >
+            <ChevronRight className={`w-4 h-4 ${isLight ? 'text-slate-500' : 'text-white/60'}`} />
+          </button>
         </div>
       </div>
 

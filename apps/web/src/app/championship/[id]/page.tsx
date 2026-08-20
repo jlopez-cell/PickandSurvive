@@ -64,7 +64,7 @@ export default function ChampionshipDetailPage() {
   const [activating, setActivating] = useState<string | null>(null);
   const [syncingMembers, setSyncingMembers] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ediciones' | 'ajustes'>('ediciones');
   const [standingsRows, setStandingsRows] = useState<StandingRow[] | null>(null);
   const [standingsLoading, setStandingsLoading] = useState(false);
   const [standingsError, setStandingsError] = useState(false);
@@ -330,12 +330,6 @@ export default function ChampionshipDetailPage() {
                   >
                     + Nueva edición
                   </button>
-                  <button
-                    className="w-full sm:w-auto bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-4 py-2 text-sm"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    Ajustes
-                  </button>
                 </>
               )}
             </div>
@@ -413,109 +407,152 @@ export default function ChampionshipDetailPage() {
             </div>
           )}
 
-          <h2 className="text-base font-bold text-white/85 mb-4">Ediciones</h2>
+          {/* Tabs */}
+          <div className="flex border-b border-white/[0.07] mb-6">
+            {([
+              { key: 'ediciones' as const, label: 'Ediciones' },
+              { key: 'ajustes' as const, label: 'Ajustes' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`relative pb-3 mr-6 text-sm font-medium transition-colors ${
+                  activeTab === key ? 'text-white/85' : 'text-white/35 hover:text-white/55'
+                }`}
+              >
+                {label}
+                {activeTab === key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-amber-400" />
+                )}
+              </button>
+            ))}
+          </div>
 
-          {championship.editions.length === 0 ? (
-            <div className="py-12 text-center rounded-2xl border border-dashed border-white/[0.07] bg-white/[0.02]">
-              <p className="text-white/35 mb-4">No hay ediciones todavía.</p>
-              {isAdmin && (
-                <button
-                  className="bg-emerald-500 text-white font-bold rounded-xl px-4 py-2 text-sm"
-                  onClick={() => router.push(`/championship/${id}/edition/new`)}
-                >
-                  Crear primera edición
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {championship.editions.map((edition) => (
-                <div
-                  key={edition.id}
-                  className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                    <div className="min-w-0">
-                      <span className="font-bold text-white/85 text-sm">
-                        Jornada {edition.startMatchday}
-                        {edition.endMatchday ? ` → ${edition.endMatchday}` : ''}
-                      </span>
-                      {edition.potAmountCents > 0 && (
-                        <span className="text-white/35 text-xs ml-2">
-                          · Bote: {(edition.potAmountCents / 100).toFixed(2)} €/persona
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASS[edition.status] ?? 'bg-white/5 text-white/35 border-white/[0.07]'}`}>
-                        {EDITION_STATUS_LABEL[edition.status]}
-                      </span>
-                      {isAdmin && (edition.status === 'DRAFT' || edition.status === 'OPEN') && (
-                        <button
-                          className="bg-emerald-500 text-white font-bold rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
-                          onClick={() => handleActivate(edition.id)}
-                          disabled={activating === edition.id}
-                        >
-                          {activating === edition.id ? 'Activando...' : 'Activar'}
-                        </button>
-                      )}
-                      {isAdmin &&
-                        (edition.status === 'DRAFT' ||
-                          edition.status === 'OPEN' ||
-                          edition.status === 'ACTIVE') && (
-                          <button
-                            className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
-                            title="Añade a la edición a los miembros aprobados y a quienes jugaron la última edición finalizada (sin nueva invitación)"
-                            onClick={() => handleSyncMembers(edition.id)}
-                            disabled={syncingMembers === edition.id}
-                          >
-                            {syncingMembers === edition.id ? 'Sincronizando…' : (
-                              <>
-                                <span className="sm:hidden">Sincronizar</span>
-                                <span className="hidden sm:inline">Sincronizar jugadores</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      {(edition.status === 'ACTIVE' || edition.status === 'OPEN') && (
-                        <button
-                          className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-xs"
-                          onClick={() => router.push(
-                            championship.mode === 'WORLD_CUP'
-                              ? `/world-cup/${edition.id}`
-                              : `/edition/${edition.id}`
-                          )}
-                        >
-                          Ver →
-                        </button>
-                      )}
-                    </div>
-                  </div>
+          {/* Tab: Ediciones */}
+          {activeTab === 'ediciones' && (
+            <>
+              {championship.editions.length === 0 ? (
+                <div className="py-12 text-center rounded-2xl border border-dashed border-white/[0.07] bg-white/[0.02]">
+                  <p className="text-white/35 mb-4">No hay ediciones todavía.</p>
+                  {isAdmin && (
+                    <button
+                      className="bg-emerald-500 text-white font-bold rounded-xl px-4 py-2 text-sm"
+                      onClick={() => router.push(`/championship/${id}/edition/new`)}
+                    >
+                      Crear primera edición
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {championship.editions.map((edition) => (
+                    <div
+                      key={edition.id}
+                      className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <div className="min-w-0">
+                          <span className="font-bold text-white/85 text-sm">
+                            Jornada {edition.startMatchday}
+                            {edition.endMatchday ? ` → ${edition.endMatchday}` : ''}
+                          </span>
+                          {edition.potAmountCents > 0 && (
+                            <span className="text-white/35 text-xs ml-2">
+                              · Bote: {(edition.potAmountCents / 100).toFixed(2)} €/persona
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASS[edition.status] ?? 'bg-white/5 text-white/35 border-white/[0.07]'}`}>
+                            {EDITION_STATUS_LABEL[edition.status]}
+                          </span>
+                          {isAdmin && (edition.status === 'DRAFT' || edition.status === 'OPEN') && (
+                            <button
+                              className="bg-emerald-500 text-white font-bold rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
+                              onClick={() => handleActivate(edition.id)}
+                              disabled={activating === edition.id}
+                            >
+                              {activating === edition.id ? 'Activando...' : 'Activar'}
+                            </button>
+                          )}
+                          {isAdmin &&
+                            (edition.status === 'DRAFT' ||
+                              edition.status === 'OPEN' ||
+                              edition.status === 'ACTIVE') && (
+                              <button
+                                className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-xs disabled:opacity-50"
+                                title="Añade a la edición a los miembros aprobados y a quienes jugaron la última edición finalizada (sin nueva invitación)"
+                                onClick={() => handleSyncMembers(edition.id)}
+                                disabled={syncingMembers === edition.id}
+                              >
+                                {syncingMembers === edition.id ? 'Sincronizando…' : (
+                                  <>
+                                    <span className="sm:hidden">Sincronizar</span>
+                                    <span className="hidden sm:inline">Sincronizar jugadores</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          {(edition.status === 'ACTIVE' || edition.status === 'OPEN') && (
+                            <button
+                              className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-xs"
+                              onClick={() => router.push(
+                                championship.mode === 'WORLD_CUP'
+                                  ? `/world-cup/${edition.id}`
+                                  : `/edition/${edition.id}`
+                              )}
+                            >
+                              Ver →
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
-          {/* Settings modal */}
-          {isAdmin && settingsOpen && (
-            <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-[1px]">
-              <div className="absolute inset-0 flex items-center justify-center p-4">
-                <div className="w-full max-w-md rounded-2xl border border-white/[0.07] bg-[#0c1220] shadow-[0_30px_120px_rgba(0,0,0,0.55)] p-4">
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                      <div className="text-sm font-bold text-white/85">Ajustes del campeonato</div>
-                      <div className="text-xs text-white/35">Acciones avanzadas</div>
-                    </div>
-                    <button
-                      className="bg-white/5 border border-white/[0.08] text-white/60 rounded-xl px-3 py-1.5 text-sm"
-                      onClick={() => setSettingsOpen(false)}
-                    >
-                      Cerrar
-                    </button>
+          {/* Tab: Ajustes */}
+          {activeTab === 'ajustes' && (
+            <div className="flex flex-col gap-4">
+              <div className={`rounded-2xl border p-4 ${isWcMode ? 'border-amber-500/20 bg-[#0c1220]' : 'border-white/[0.07] bg-[#0c1220]'}`}>
+                <div className="text-xs font-medium text-white/35 uppercase tracking-wider mb-4">Información</div>
+                <dl className="flex flex-col gap-3.5">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-sm text-white/35 shrink-0">Nombre</dt>
+                    <dd className="text-sm text-white/85 font-medium text-right break-words min-w-0">{championship.name}</dd>
                   </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-sm text-white/35 shrink-0">Modo</dt>
+                    <dd className="text-sm text-white/85 font-medium text-right">{MODE_LABEL[championship.mode]}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-sm text-white/35 shrink-0">Liga</dt>
+                    <dd className="text-sm text-white/85 font-medium text-right">{championship.footballLeague.name} · {championship.footballLeague.country}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-sm text-white/35 shrink-0">Creado por</dt>
+                    <dd className="text-sm text-white/85 font-medium text-right">@{championship.admin.alias}</dd>
+                  </div>
+                  {standingsEdition && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-sm text-white/35 shrink-0">Jornada</dt>
+                      <dd className="text-sm text-white/85 font-medium text-right">
+                        {standingsEdition.startMatchday}
+                        {standingsEdition.endMatchday ? ` → ${standingsEdition.endMatchday}` : ''}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
 
-                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 flex items-center justify-between gap-3">
-                    <div>
+              {isAdmin && (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-4">
+                  <div className="text-xs font-medium text-red-400/70 uppercase tracking-wider mb-4">Zona de peligro</div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <div className="text-sm font-bold text-white/85">Eliminar campeonato</div>
                       <div className="text-xs text-white/35 mt-1">
                         Borra el campeonato y sus ediciones. Esta acción no se puede deshacer.
@@ -530,7 +567,7 @@ export default function ChampionshipDetailPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

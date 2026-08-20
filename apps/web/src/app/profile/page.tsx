@@ -11,7 +11,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[#06090f]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <div className="w-6 h-6 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin" />
       </div>
     );
@@ -25,39 +25,36 @@ export default function ProfilePage() {
   const initials = (user.alias || user.email || 'US').slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-[100dvh] bg-[#06090f] text-white">
+    <div className="min-h-[100dvh] bg-background text-foreground">
       <MobileTopHeader />
 
       <main className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+80px)]">
         <div className="max-w-xl mx-auto">
-          {/* Avatar e identidad */}
           <div className="flex flex-col items-center gap-3 py-8">
             <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
               <span className="text-2xl font-bold text-amber-400">{initials}</span>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-white/85">@{user.alias}</p>
-              <p className="text-sm text-white/35 mt-0.5">{user.email}</p>
+              <p className="text-lg font-bold text-foreground">@{user.alias}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>
             </div>
           </div>
 
-          {/* Datos */}
-          <div className="bg-[#0c1220] border border-white/[0.07] rounded-2xl overflow-hidden mb-3">
-            <div className="px-4 py-3.5 border-b border-white/[0.07] flex items-center justify-between">
-              <p className="text-xs font-medium text-white/35 uppercase tracking-wider">Alias</p>
-              <p className="text-sm font-medium text-white/85">@{user.alias}</p>
+          <div className="bg-card border border-border rounded-2xl overflow-hidden mb-3">
+            <div className="px-4 py-3.5 border-b border-border flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Alias</p>
+              <p className="text-sm font-medium text-foreground">@{user.alias}</p>
             </div>
-            <div className="px-4 py-3.5 border-b border-white/[0.07] flex items-center justify-between gap-4">
-              <p className="text-xs font-medium text-white/35 uppercase tracking-wider shrink-0">Email</p>
-              <p className="text-sm font-medium text-white/85 break-all text-right">{user.email}</p>
+            <div className="px-4 py-3.5 border-b border-border flex items-center justify-between gap-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider shrink-0">Email</p>
+              <p className="text-sm font-medium text-foreground break-all text-right">{user.email}</p>
             </div>
             <div className="px-4 py-3.5 flex items-center justify-between">
-              <p className="text-xs font-medium text-white/35 uppercase tracking-wider">Rol</p>
-              <p className="text-sm font-medium text-white/85">{user.role}</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rol</p>
+              <p className="text-sm font-medium text-foreground">{user.role}</p>
             </div>
           </div>
 
-          {/* Logout */}
           <button
             onClick={logout}
             className="w-full bg-red-500/10 border border-red-500/20 text-red-400 font-bold rounded-2xl py-3.5 text-sm transition-colors active:scale-[0.98]"

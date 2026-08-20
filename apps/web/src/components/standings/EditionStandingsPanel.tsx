@@ -285,28 +285,28 @@ export function EditionStandingsPanel({
 
   const statCardClass = isEmbedded
     ? 'rounded-xl border border-border bg-card/80 p-4 shadow-sm'
-    : 'rounded-xl border border-white/[0.07] bg-[#0c1220] p-3';
+    : 'rounded-xl border border-border bg-card p-3';
 
   const statLabelClass = isEmbedded
     ? 'text-xs text-muted-foreground font-semibold tracking-wide'
-    : 'text-[11px] text-white/55 font-semibold tracking-wide';
+    : 'text-[11px] text-muted-foreground font-semibold tracking-wide';
 
   /* ─── Vista página (rediseño) ─── */
   const innerPage = (
     <>
       <div className="mb-5">
-        <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+        <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
           Clasificación
         </h1>
         {metaLoading ? (
-          <p className="mt-1 text-sm text-white/50">…</p>
+          <p className="mt-1 text-sm text-muted-foreground">…</p>
         ) : championshipNameMeta ? (
           <p className="mt-1 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-sm font-semibold text-amber-300">
             <Trophy className="h-4 w-4 text-amber-400" />
             {championshipNameMeta}
           </p>
         ) : null}
-        <p className="mt-2 flex items-center gap-2 text-sm text-white/60">
+        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
           <span className="rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[11px] font-bold text-amber-400">
             J{deadline?.matchdayNumber ?? '—'}
           </span>
@@ -315,7 +315,7 @@ export function EditionStandingsPanel({
       </div>
 
       {loading ? (
-        <p className="text-white/60">Cargando clasificación…</p>
+        <p className="text-muted-foreground">Cargando clasificación…</p>
       ) : error ? (
         <p className="text-red-300">{error}</p>
       ) : (
@@ -335,29 +335,29 @@ export function EditionStandingsPanel({
             </div>
           </div>
 
-          <div className="mb-5 rounded-2xl border border-white/[0.07] bg-[#0c1220] p-3.5">
+          <div className="mb-5 rounded-2xl border border-border bg-card p-3.5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-1 items-start gap-3">
                 <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-2">
                   <Users className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-[15px] font-bold text-white/85">Tu pick cuenta esta jornada</p>
-                  <p className="mt-0.5 text-[13px] text-white/35">Un equipo por jugador y solo una vez por liga.</p>
+                  <p className="text-[15px] font-bold text-foreground">Tu pick cuenta esta jornada</p>
+                  <p className="mt-0.5 text-[13px] text-muted-foreground">Un equipo por jugador y solo una vez por liga.</p>
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-[13px] text-white/60">
+                <div className="rounded-xl border border-border bg-secondary/50 px-3 py-2 text-[13px] text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Clock3 className="h-4 w-4 shrink-0 text-amber-400" />
                     <span>
                       Cierre:{' '}
-                      <span className="font-semibold text-white/85">
+                      <span className="font-semibold text-foreground">
                         {deadlineLoading ? '…' : formatDeadline(deadline?.firstKickoff ?? null)}
                       </span>
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-white/35">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {deadlineLoading ? '' : formatCountdown(deadline?.firstKickoff ?? null)}
                   </p>
                 </div>
@@ -373,10 +373,10 @@ export function EditionStandingsPanel({
           </div>
 
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="flex flex-1 items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-white/55">
-              <span className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20 sm:max-w-[40%]" />
+            <h2 className="flex flex-1 items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="h-px flex-1 bg-gradient-to-r from-transparent to-border sm:max-w-[40%]" />
               Clasificación
-              <span className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20 sm:max-w-[40%]" />
+              <span className="h-px flex-1 bg-gradient-to-l from-transparent to-border sm:max-w-[40%]" />
             </h2>
             <Button
               size="sm"

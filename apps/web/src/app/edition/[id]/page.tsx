@@ -73,18 +73,18 @@ function PickBottomSheet({
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}
         onClick={onClose}
       />
-      <div className="fixed bottom-[56px] inset-x-0 z-[70] bg-[#0c1220] border-t border-white/[0.07] rounded-t-2xl">
+      <div className="fixed bottom-[56px] inset-x-0 z-[70] bg-card border-t border-border rounded-t-2xl">
         <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/15" />
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
             {team.logoUrl && (
               <img src={team.logoUrl} alt={team.name} className="w-9 h-9 object-contain" />
             )}
-            <span className="font-bold text-white/85 text-base">{team.name}</span>
+            <span className="font-bold text-foreground text-base">{team.name}</span>
           </div>
-          <button onClick={onClose} className="text-white/35 hover:text-white/70 transition-colors">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -162,7 +162,7 @@ function TeamButton({
       <div className="flex flex-col items-center min-w-0 w-full gap-0.5">
         <p className={cn(
           'text-[11px] font-semibold truncate leading-tight text-center w-full px-1',
-          isMyPick ? 'text-amber-300' : isUsed ? 'text-white/25' : 'text-white/85',
+          isMyPick ? 'text-amber-300' : isUsed ? 'text-muted-foreground/40' : 'text-foreground',
         )}>
           {team.name}
         </p>
@@ -170,9 +170,9 @@ function TeamButton({
           {isMyPick
             ? <span className="text-amber-400/70 font-medium">Tu pick</span>
             : isUsed
-            ? <span className="text-white/20">Usado</span>
+            ? <span className="text-muted-foreground/50">Usado</span>
             : canPick && !isOtherSelected
-            ? <span className="text-white/20">Toca</span>
+            ? <span className="text-muted-foreground/50">Toca</span>
             : null}
         </p>
       </div>
@@ -195,7 +195,7 @@ function ParticipantsList({ editionId }: { editionId: string }) {
   }, [editionId]);
 
   if (loading) {
-    return <p className="text-center py-12 text-white/25 text-sm">Cargando jugadores...</p>;
+    return <p className="text-center py-12 text-muted-foreground text-sm">Cargando jugadores...</p>;
   }
 
   const active = rows.filter((r) => r.status !== 'ELIMINATED');
@@ -209,11 +209,11 @@ function ParticipantsList({ editionId }: { editionId: string }) {
             Activos · {active.length}
           </p>
           {active.map((r) => (
-            <div key={r.alias} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
+            <div key={r.alias} className="flex items-center gap-3 py-2.5 border-b border-border/30 last:border-0">
               <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
                 <span className="text-xs font-black text-emerald-400 uppercase">{r.alias[0]}</span>
               </div>
-              <span className="text-sm text-white/80 flex-1 font-medium">{r.alias}</span>
+              <span className="text-sm text-foreground flex-1 font-medium">{r.alias}</span>
               {r.totalPoints != null && (
                 <span className="text-xs font-bold text-amber-400 tabular-nums">{r.totalPoints} pts</span>
               )}
@@ -228,11 +228,11 @@ function ParticipantsList({ editionId }: { editionId: string }) {
             Eliminados · {eliminated.length}
           </p>
           {eliminated.map((r) => (
-            <div key={r.alias} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0 opacity-40">
+            <div key={r.alias} className="flex items-center gap-3 py-2.5 border-b border-border/30 last:border-0 opacity-40">
               <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
                 <span className="text-xs font-black text-red-400 uppercase">{r.alias[0]}</span>
               </div>
-              <span className="text-sm text-white/50 flex-1 font-medium">{r.alias}</span>
+              <span className="text-sm text-muted-foreground flex-1 font-medium">{r.alias}</span>
               <XCircle className="w-4 h-4 text-red-400/40" />
             </div>
           ))}
@@ -240,7 +240,7 @@ function ParticipantsList({ editionId }: { editionId: string }) {
       )}
 
       {rows.length === 0 && (
-        <p className="text-center py-8 text-white/25 text-sm">Sin participantes</p>
+        <p className="text-center py-8 text-muted-foreground text-sm">Sin participantes</p>
       )}
     </div>
   );
@@ -445,10 +445,10 @@ export default function EditionPage() {
 
   if (authLoading || (loading && editionStartMatchday === null)) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#06090f]">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center space-y-4">
           <Shield className="w-14 h-14 mx-auto text-amber-500 animate-pulse drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]" />
-          <p className="text-xs font-bold tracking-widest uppercase text-white/20">Cargando…</p>
+          <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Cargando…</p>
         </div>
       </div>
     );
@@ -457,7 +457,7 @@ export default function EditionPage() {
   // ── Page ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#06090f] pb-[calc(env(safe-area-inset-bottom,0px)+80px)] lg:pb-0">
+    <div className="min-h-screen bg-background pb-[calc(env(safe-area-inset-bottom,0px)+80px)] lg:pb-0">
 
       {/* ══ BOTTOM SHEET ══════════════════════════════════════════════════ */}
       {selectedTeam && canPick && (
@@ -472,7 +472,7 @@ export default function EditionPage() {
       {/* ══ HERO HEADER ═══════════════════════════════════════════════════ */}
       <header className="relative overflow-hidden pt-[env(safe-area-inset-top,0px)]">
         {/* Layered backgrounds */}
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/30 via-[#06090f]/95 to-[#06090f]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/30 via-background/95 to-background" />
         <div
           className="absolute inset-0"
           style={{ background: 'radial-gradient(ellipse 70% 55% at 50% -10%, rgba(245,158,11,0.12) 0%, transparent 65%)' }}
@@ -544,7 +544,7 @@ export default function EditionPage() {
               >
                 ‹
               </button>
-              <span className="text-sm font-bold text-white/55 min-w-[90px] text-center">
+              <span className="text-sm font-bold text-muted-foreground min-w-[90px] text-center">
                 Jornada {currentMatchday}
               </span>
               <button
@@ -568,9 +568,9 @@ export default function EditionPage() {
                 <span className="text-xs font-bold text-red-400">Has sido eliminado</span>
               </div>
             ) : deadlinePassed ? (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.07]">
-                <Clock className="w-3.5 h-3.5 text-white/25" />
-                <span className="text-xs font-medium text-white/30">Picks cerrados</span>
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-secondary border border-border">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Picks cerrados</span>
               </div>
             ) : matchdayFirstKickoff ? (
               <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
@@ -582,7 +582,7 @@ export default function EditionPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="relative border-b border-white/8">
+        <div className="relative border-b border-border">
           <div className="max-w-4xl mx-auto px-4 flex">
             {(['picks', 'jugadores'] as const).map((tab) => (
               <button
@@ -590,7 +590,7 @@ export default function EditionPage() {
                 onClick={() => setActiveTab(tab)}
                 className={cn(
                   'px-5 py-3 text-sm font-bold transition-colors relative',
-                  activeTab === tab ? 'text-amber-400' : 'text-white/25 hover:text-white/50',
+                  activeTab === tab ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {tab === 'picks' ? '⚽ Picks' : '👥 Jugadores'}
@@ -628,9 +628,9 @@ export default function EditionPage() {
                   className="w-10 h-10 object-contain shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-white/90 text-sm truncate">{myPick.team.name}</p>
+                  <p className="font-bold text-foreground text-sm truncate">{myPick.team.name}</p>
                   {myPick.pickType && (
-                    <p className="text-[11px] text-white/35 mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       {myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Gana o Empata' : '🏆 Gana'}
                     </p>
                   )}
@@ -646,9 +646,9 @@ export default function EditionPage() {
 
             {/* Match list */}
             {loading ? (
-              <div className="text-center py-12 text-white/20 text-sm">Cargando jornada…</div>
+              <div className="text-center py-12 text-muted-foreground text-sm">Cargando jornada…</div>
             ) : matches.length === 0 ? (
-              <div className="text-center py-12 text-white/20 text-sm">No hay partidos disponibles</div>
+              <div className="text-center py-12 text-muted-foreground text-sm">No hay partidos disponibles</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {matches.map((match) => {
@@ -671,8 +671,8 @@ export default function EditionPage() {
                       className={cn(
                         'rounded-2xl border overflow-hidden transition-all',
                         isPickedMatch
-                          ? 'border-amber-500/30 bg-[#0c1220] shadow-[0_0_24px_rgba(245,158,11,0.06)]'
-                          : 'border-white/[0.07] bg-[#0c1220]',
+                          ? 'border-amber-500/30 bg-card shadow-[0_0_24px_rgba(245,158,11,0.06)]'
+                          : 'border-border bg-card',
                       )}
                     >
                       {/* Status bar */}
@@ -680,7 +680,7 @@ export default function EditionPage() {
                         'flex items-center justify-between px-3 py-1.5 border-b',
                         isLive
                           ? 'border-red-500/20 bg-red-500/[0.06]'
-                          : 'border-white/[0.04] bg-white/[0.015]',
+                          : 'border-border/40 bg-secondary/30',
                       )}>
                         <div className="flex items-center gap-1.5">
                           {isLive ? (
@@ -689,9 +689,9 @@ export default function EditionPage() {
                               <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">En vivo</span>
                             </>
                           ) : isFinished ? (
-                            <span className="text-[10px] font-bold text-white/25 uppercase tracking-widest">Finalizado</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Finalizado</span>
                           ) : (
-                            <span className="text-[10px] font-medium text-white/35">{formatKickoff(match.kickoffTime)}</span>
+                            <span className="text-[10px] font-medium text-muted-foreground">{formatKickoff(match.kickoffTime)}</span>
                           )}
                         </div>
                         {isPickedMatch && (
@@ -715,13 +715,13 @@ export default function EditionPage() {
                         {/* Score / VS */}
                         <div className="flex flex-col items-center justify-center shrink-0 w-14 gap-0.5">
                           {hasScore ? (
-                            <span className="text-xl font-black text-white/85 tabular-nums tracking-tight leading-none">
+                            <span className="text-xl font-black text-foreground tabular-nums tracking-tight leading-none">
                               {match.homeScore}
-                              <span className="text-white/30 mx-0.5">–</span>
+                              <span className="text-muted-foreground mx-0.5">–</span>
                               {match.awayScore}
                             </span>
                           ) : (
-                            <span className="text-[11px] font-black text-white/15 tracking-widest">VS</span>
+                            <span className="text-[11px] font-black text-muted-foreground/30 tracking-widest">VS</span>
                           )}
                         </div>
 

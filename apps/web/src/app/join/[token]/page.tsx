@@ -32,19 +32,19 @@ export default function JoinPage() {
 
   if (loading) {
     return (
-      <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center pt-[env(safe-area-inset-top,0px)]">
-        <p className="text-white/35">Cargando...</p>
+      <main className="min-h-[100dvh] bg-background flex items-center justify-center pt-[env(safe-area-inset-top,0px)]">
+        <p className="text-muted-foreground">Cargando...</p>
       </main>
     );
   }
 
   if (!user) {
     return (
-      <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-        <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5 text-center">
+      <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+        <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 flex flex-col gap-5 text-center">
           <div>
-            <h1 className="text-xl font-bold text-white/85">Únete al campeonato</h1>
-            <p className="text-sm text-white/35 mt-1.5 leading-relaxed">
+            <h1 className="text-xl font-bold text-foreground">Únete al campeonato</h1>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
               Debés iniciar sesión o registrarte para poder unirte a este campeonato.
             </p>
           </div>
@@ -56,7 +56,7 @@ export default function JoinPage() {
               Iniciar sesión
             </button>
             <button
-              className="bg-white/5 border border-white/[0.08] text-white/80 font-medium rounded-2xl py-3.5 w-full hover:bg-white/[0.08] transition-colors"
+              className="bg-secondary border border-border text-foreground font-medium rounded-2xl py-3.5 w-full hover:bg-secondary/80 transition-colors"
               onClick={() => router.push(`/register?redirect=/join/${token}`)}
             >
               Registrarse
@@ -68,11 +68,10 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[#06090f] flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
-      <div className="w-full max-w-sm bg-[#0c1220] border border-white/[0.07] rounded-2xl p-6 flex flex-col gap-5 text-center">
+    <main className="min-h-[100dvh] bg-background flex items-center justify-center p-4 pt-[env(safe-area-inset-top,0px)]">
+      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 flex flex-col gap-5 text-center">
         {status === 'success' ? (
           <>
-            {/* Success icon */}
             <div className="flex justify-center">
               <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-2xl flex items-center justify-center">
                 ✓
@@ -80,11 +79,11 @@ export default function JoinPage() {
             </div>
 
             <div>
-              <h1 className="text-xl font-bold text-white/85">Solicitud enviada</h1>
-              <p className="text-sm text-white/35 mt-1.5 leading-relaxed">{message}</p>
+              <h1 className="text-xl font-bold text-foreground">Solicitud enviada</h1>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{message}</p>
             </div>
 
-            <p className="text-xs text-white/35 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               El administrador del campeonato deberá aprobar tu solicitud. Te notificaremos por email.
             </p>
 
@@ -98,13 +97,13 @@ export default function JoinPage() {
         ) : (
           <>
             <div>
-              <h1 className="text-xl font-bold text-white/85">Únete al campeonato</h1>
-              <p className="text-sm text-white/35 mt-1.5">
+              <h1 className="text-xl font-bold text-foreground">Únete al campeonato</h1>
+              <p className="text-sm text-muted-foreground mt-1.5">
                 Hola, <strong className="text-amber-400 font-bold">@{user.alias}</strong>
               </p>
             </div>
 
-            <p className="text-sm text-white/35 leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               Al confirmar, se enviará una solicitud al administrador del campeonato. Tu participación
               quedará pendiente hasta que sea aprobada.
             </p>
@@ -124,7 +123,7 @@ export default function JoinPage() {
                 {status === 'loading' ? 'Enviando...' : 'Solicitar unirme'}
               </button>
               <button
-                className="text-sm font-medium text-white/35 hover:text-white/60 transition-colors"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => router.push('/dashboard')}
               >
                 Cancelar
