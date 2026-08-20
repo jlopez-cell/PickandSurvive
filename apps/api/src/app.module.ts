@@ -9,6 +9,7 @@ import { PicksModule } from './picks/picks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { WorldCupModule } from './world-cup/world-cup.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { WorldCupModule } from './world-cup/world-cup.module';
     NotificationsModule,
     AdminModule,
     WorldCupModule,
+    SocialModule,
   ],
   controllers: [],
   providers: [],

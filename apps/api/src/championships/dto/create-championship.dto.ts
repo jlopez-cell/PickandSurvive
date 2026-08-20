@@ -42,4 +42,19 @@ export class CreateChampionshipDto {
   @IsBoolean()
   @IsOptional()
   underdogBonusEnabled?: boolean;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  blockCount?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  vetoCount?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  challengeCount?: number;
 }

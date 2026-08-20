@@ -127,6 +127,16 @@ export class PicksService {
     });
     if (!teamPlaysMatch) throw new BadRequestException('El equipo no juega en esta jornada');
 
+    const veto = await this.prisma.veto.findFirst({
+      where: {
+        editionId,
+        vetoedParticipantId: participant.id,
+        teamId: dto.teamId,
+        matchdayNumber: dto.matchdayNumber,
+      },
+    });
+    if (veto) throw new ForbiddenException('Este equipo ha sido vetado para vos esta jornada');
+
     const half = await this.resolvePickHalf(editionId, matchday.number);
 
     const existingPick = await this.prisma.pick.findUnique({

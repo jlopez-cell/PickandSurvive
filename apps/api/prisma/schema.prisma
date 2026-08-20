@@ -103,6 +103,17 @@ enum PickType {
   WIN_OR_DRAW
 }
 
+enum ChallengeStatus {
+  ACTIVE
+  RESOLVED
+}
+
+enum ChallengeResult {
+  CHALLENGER_WINS
+  CHALLENGED_WINS
+  TIE
+}
+
 model User {
   id             String    @id @default(uuid())
   email          String    @unique
@@ -139,6 +150,9 @@ model Championship {
   socialPressureEnabled  Boolean          @default(false)
   doubleOrNothingEnabled Boolean          @default(false)
   underdogBonusEnabled   Boolean          @default(false)
+  blockCount             Int              @default(0)
+  vetoCount              Int              @default(0)
+  challengeCount         Int              @default(0)
   createdAt              DateTime         @default(now())
 
   creator        User           @relation("Creator", fields: [creatorId], references: [id])
@@ -166,6 +180,9 @@ model Edition {
   participants Participant[]
   potLedger    PotLedger[]
   winner       User?         @relation("EditionWinner", fields: [winnerUserId], references: [id])
+  blocks       Block[]
+  vetos        Veto[]
+  challenges   Challenge[]
 }
 
 model Participant {
@@ -179,11 +196,21 @@ model Participant {
   wildcardsRemaining   Int               @default(0)
   isGhost              Boolean           @default(false)
   joinedAt             DateTime          @default(now())
+  blocksRemaining      Int               @default(0)
+  vetosRemaining       Int               @default(0)
+  challengesRemaining  Int               @default(0)
 
   user      User        @relation(fields: [userId], references: [id])
   edition   Edition     @relation(fields: [editionId], references: [id])
   picks     Pick[]
   teamUsages TeamUsage[]
+
+  blocksGiven        Block[]     @relation("BlocksGiven")
+  blocksReceived     Block[]     @relation("BlocksReceived")
+  vetoesGiven        Veto[]      @relation("VetoesGiven")
+  vetoesReceived     Veto[]      @relation("VetoesReceived")
+  challengesGiven    Challenge[] @relation("ChallengesGiven")
+  challengesReceived Challenge[] @relation("ChallengesReceived")
 
   @@unique([userId, editionId])
   @@index([editionId, totalPoints])
@@ -242,6 +269,7 @@ model FootballTeam {
   picks           Pick[]
   teamUsages      TeamUsage[]
   wcGroupStandings WcGroupStanding[]
+  vetos           Veto[]
 }
 
 model Matchday {
@@ -390,4 +418,54 @@ model UserNotificationPrefs {
   pushSubscriptionJson String?
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model Block {
+  id                   String      @id @default(cuid())
+  editionId            String
+  blockerParticipantId String
+  blockedParticipantId String
+  matchdayNumber       Int
+  createdAt            DateTime    @default(now())
+
+  edition  Edition     @relation(fields: [editionId], references: [id])
+  blocker  Participant @relation("BlocksGiven", fields: [blockerParticipantId], references: [id])
+  blocked  Participant @relation("BlocksReceived", fields: [blockedParticipantId], references: [id])
+
+  @@unique([editionId, blockedParticipantId, matchdayNumber])
+}
+
+model Veto {
+  id                  String       @id @default(cuid())
+  editionId           String
+  vetoerParticipantId String
+  vetoedParticipantId String
+  teamId              String
+  matchdayNumber      Int
+  createdAt           DateTime     @default(now())
+
+  edition Edition      @relation(fields: [editionId], references: [id])
+  vetoer  Participant  @relation("VetoesGiven", fields: [vetoerParticipantId], references: [id])
+  vetoed  Participant  @relation("VetoesReceived", fields: [vetoedParticipantId], references: [id])
+  team    FootballTeam @relation(fields: [teamId], references: [id])
+
+  @@unique([editionId, vetoedParticipantId, teamId, matchdayNumber])
+}
+
+model Challenge {
+  id                      String          @id @default(cuid())
+  editionId               String
+  challengerParticipantId String
+  challengedParticipantId String
+  matchdayNumber          Int
+  status                  ChallengeStatus @default(ACTIVE)
+  result                  ChallengeResult?
+  createdAt               DateTime        @default(now())
+  resolvedAt              DateTime?
+
+  edition    Edition     @relation(fields: [editionId], references: [id])
+  challenger Participant @relation("ChallengesGiven", fields: [challengerParticipantId], references: [id])
+  challenged Participant @relation("ChallengesReceived", fields: [challengedParticipantId], references: [id])
+
+  @@unique([editionId, challengerParticipantId, matchdayNumber])
 }

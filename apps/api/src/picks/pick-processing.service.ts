@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ChampionshipMode,
+  ChallengeStatus,
   MatchStatus,
   MatchdayStatus,
   ParticipantStatus,
@@ -9,6 +10,7 @@ import {
   PickType,
 } from '@prisma/client';
 import { EditionResolutionService } from './edition-resolution.service';
+import { SocialService } from '../social/social.service';
 
 @Injectable()
 export class PickProcessingService {
@@ -17,6 +19,7 @@ export class PickProcessingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly editionResolution: EditionResolutionService,
+    private readonly social: SocialService,
   ) {}
 
   /**
@@ -202,8 +205,8 @@ export class PickProcessingService {
 
         const totalIncrement = basePoints + streakBonus + (underdogBonusFlag ? 1 : 0);
 
-        await this.prisma.$transaction([
-          this.prisma.pick.update({
+        await this.prisma.$transaction(async (tx) => {
+          await tx.pick.update({
             where: { id: pick.id },
             data: {
               status: PickStatus.SURVIVED,
@@ -211,18 +214,71 @@ export class PickProcessingService {
               streakBonusPoints: streakBonus,
               underdogBonus: underdogBonusFlag,
             },
-          }),
-          this.prisma.participant.update({
+          });
+          await tx.participant.update({
             where: { id: pick.participantId },
             data: { totalPoints: { increment: totalIncrement } },
-          }),
-        ]);
+          });
+
+          const block = await tx.block.findFirst({
+            where: {
+              editionId: participant.editionId,
+              blockedParticipantId: participant.id,
+              matchdayNumber: match.matchday.number,
+            },
+          });
+          if (block) {
+            await tx.participant.update({
+              where: { id: participant.id },
+              data: { totalPoints: { decrement: totalIncrement } },
+            });
+            await tx.pick.update({
+              where: { id: pick.id },
+              data: { pointsAwarded: 0, streakBonusPoints: 0, underdogBonus: false },
+            });
+          }
+        });
       }
     }
 
-    // After processing picks, check if any editions should end
-    const affectedEditions = new Set(pendingPicks.map((p) => p.participant.editionId));
-    for (const editionId of affectedEditions) {
+    // Resolve active challenges where both picks are now processed
+    const matchdayNumber = match.matchday.number;
+    const affectedEditionIds = [...new Set(pendingPicks.map((p) => p.participant.editionId))];
+    for (const editionId of affectedEditionIds) {
+      await this.prisma.$transaction(async (tx) => {
+        const challenges = await tx.challenge.findMany({
+          where: { editionId, matchdayNumber, status: ChallengeStatus.ACTIVE },
+        });
+
+        for (const ch of challenges) {
+          const [challengerPick, challengedPick] = await Promise.all([
+            tx.pick.findFirst({
+              where: {
+                participantId: ch.challengerParticipantId,
+                matchday: { number: ch.matchdayNumber },
+              },
+            }),
+            tx.pick.findFirst({
+              where: {
+                participantId: ch.challengedParticipantId,
+                matchday: { number: ch.matchdayNumber },
+              },
+            }),
+          ]);
+
+          if (
+            challengerPick &&
+            challengedPick &&
+            challengerPick.status !== PickStatus.PENDING &&
+            challengedPick.status !== PickStatus.PENDING
+          ) {
+            await this.social.resolveChallenge(ch.id, tx);
+          }
+        }
+      });
+    }
+
+    for (const editionId of affectedEditionIds) {
       await this.editionResolution.checkEditionEnd(editionId);
     }
   }

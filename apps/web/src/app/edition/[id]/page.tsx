@@ -37,6 +37,9 @@ type StandingRow = {
   totalPoints?: number;
   eliminatedAtMatchday?: number | null;
   wildcardsRemaining?: number;
+  blocksRemaining?: number;
+  vetosRemaining?: number;
+  challengesRemaining?: number;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -301,6 +304,13 @@ export default function EditionPage() {
   const [hasUsedDoubleOrNothing, setHasUsedDoubleOrNothing] = useState(false);
   const [doubleOrNothingActive, setDoubleOrNothingActive] = useState(false);
 
+  const [blockCount, setBlockCount] = useState(0);
+  const [vetoCount, setVetoCount] = useState(0);
+  const [challengeCount, setChallengeCount] = useState(0);
+  const [blocksRemaining, setBlocksRemaining] = useState<number | null>(null);
+  const [vetosRemaining, setVetosRemaining] = useState<number | null>(null);
+  const [challengesRemaining, setChallengesRemaining] = useState<number | null>(null);
+
   // 1-second countdown + deadline check
   useEffect(() => {
     if (!matchdayFirstKickoff) {
@@ -380,6 +390,9 @@ export default function EditionPage() {
         setChampionshipMode(meta.mode ?? meta.championshipMode ?? '');
         setDoubleOrNothingEnabled(meta.doubleOrNothingEnabled ?? false);
         setWildcardCount(meta.wildcardCount ?? 0);
+        setBlockCount(meta.blockCount ?? 0);
+        setVetoCount(meta.vetoCount ?? 0);
+        setChallengeCount(meta.challengeCount ?? 0);
 
         let initialMd = start;
         try {
@@ -418,6 +431,9 @@ export default function EditionPage() {
         if (typeof me?.wildcardsRemaining === 'number') {
           setWildcardsRemaining(me.wildcardsRemaining);
         }
+        if (typeof me?.blocksRemaining === 'number') setBlocksRemaining(me.blocksRemaining);
+        if (typeof me?.vetosRemaining === 'number') setVetosRemaining(me.vetosRemaining);
+        if (typeof me?.challengesRemaining === 'number') setChallengesRemaining(me.challengesRemaining);
       })
       .catch(() => setParticipantEliminated(false));
   }, [editionId, user?.alias, authLoading]);
@@ -695,6 +711,33 @@ export default function EditionPage() {
                     <p className="text-sm font-semibold text-amber-300">Vidas extra disponibles</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Social tokens */}
+            {(blockCount > 0 || vetoCount > 0 || challengeCount > 0) && !participantEliminated && (
+              <div className="mb-4 flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border">
+                {blockCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <span>🔒</span>
+                    <span className="text-muted-foreground">Bloqueos:</span>
+                    <span className="font-bold text-foreground tabular-nums">{blocksRemaining ?? '—'}</span>
+                  </span>
+                )}
+                {vetoCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <span>🚫</span>
+                    <span className="text-muted-foreground">Vetos:</span>
+                    <span className="font-bold text-foreground tabular-nums">{vetosRemaining ?? '—'}</span>
+                  </span>
+                )}
+                {challengeCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <span>⚔️</span>
+                    <span className="text-muted-foreground">Retos:</span>
+                    <span className="font-bold text-foreground tabular-nums">{challengesRemaining ?? '—'}</span>
+                  </span>
+                )}
               </div>
             )}
 

@@ -83,6 +83,9 @@ export class ChampionshipsService {
         socialPressureEnabled: dto.socialPressureEnabled ?? false,
         doubleOrNothingEnabled: dto.doubleOrNothingEnabled ?? false,
         underdogBonusEnabled: dto.underdogBonusEnabled ?? false,
+        blockCount: dto.blockCount ?? 0,
+        vetoCount: dto.vetoCount ?? 0,
+        challengeCount: dto.challengeCount ?? 0,
         creatorId: userId,
         adminId: userId,
       },
@@ -244,6 +247,24 @@ export class ChampionshipsService {
         await tx.participant.updateMany({
           where: { editionId },
           data: { wildcardsRemaining: edition.championship.wildcardCount },
+        });
+      }
+      if (edition.championship.blockCount > 0) {
+        await tx.participant.updateMany({
+          where: { editionId },
+          data: { blocksRemaining: edition.championship.blockCount },
+        });
+      }
+      if (edition.championship.vetoCount > 0) {
+        await tx.participant.updateMany({
+          where: { editionId },
+          data: { vetosRemaining: edition.championship.vetoCount },
+        });
+      }
+      if (edition.championship.challengeCount > 0) {
+        await tx.participant.updateMany({
+          where: { editionId },
+          data: { challengesRemaining: edition.championship.challengeCount },
         });
       }
     });
@@ -685,7 +706,7 @@ export class ChampionshipsService {
   private async getEditionOrThrow(championshipId: string, editionId: string) {
     const edition = await this.prisma.edition.findFirst({
       where: { id: editionId, championshipId },
-      include: { championship: { select: { adminId: true, wildcardCount: true } } },
+      include: { championship: { select: { adminId: true, wildcardCount: true, blockCount: true, vetoCount: true, challengeCount: true } } },
     });
     if (!edition) throw new NotFoundException('Edición no encontrada');
     return edition;

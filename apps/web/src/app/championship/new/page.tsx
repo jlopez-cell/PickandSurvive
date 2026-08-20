@@ -19,6 +19,9 @@ export default function NewChampionshipPage() {
     wildcardCount: 0 as 0 | 1 | 2,
     ghostModeEnabled: false,
     doubleOrNothingEnabled: false,
+    blockCount: 0 as 0 | 1 | 2 | 3,
+    vetoCount: 0 as 0 | 1 | 2 | 3,
+    challengeCount: 0 as 0 | 1 | 2 | 3,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -252,6 +255,87 @@ export default function NewChampionshipPage() {
                     </div>
                   </label>
                 )}
+
+                <div className="border-t border-border/50 pt-3 flex flex-col gap-3 mt-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Mecánicas sociales
+                  </p>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground">Bloqueos por jugador</span>
+                      <span className="text-xs text-muted-foreground">
+                        Cada jugador puede bloquear a un rival una jornada (no suma puntos aunque gane)
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {([0, 1, 2, 3] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setForm({ ...form, blockCount: n })}
+                          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+                            form.blockCount === n
+                              ? 'bg-amber-500 text-black border-amber-500'
+                              : 'bg-secondary text-muted-foreground border-border hover:border-amber-500/40'
+                          }`}
+                        >
+                          {n === 0 ? 'Ninguno' : `${n}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground">Vetos por jugador</span>
+                      <span className="text-xs text-muted-foreground">
+                        Cada jugador puede vetar el equipo de un rival esa semana (máx. 48h antes del partido)
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {([0, 1, 2, 3] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setForm({ ...form, vetoCount: n })}
+                          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+                            form.vetoCount === n
+                              ? 'bg-amber-500 text-black border-amber-500'
+                              : 'bg-secondary text-muted-foreground border-border hover:border-amber-500/40'
+                          }`}
+                        >
+                          {n === 0 ? 'Ninguno' : `${n}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground">Retos por jugador</span>
+                      <span className="text-xs text-muted-foreground">
+                        Podés retar a un rival — el que peor resultado tenga pierde 1 punto
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {([0, 1, 2, 3] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setForm({ ...form, challengeCount: n })}
+                          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+                            form.challengeCount === n
+                              ? 'bg-amber-500 text-black border-amber-500'
+                              : 'bg-secondary text-muted-foreground border-border hover:border-amber-500/40'
+                          }`}
+                        >
+                          {n === 0 ? 'Ninguno' : `${n}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

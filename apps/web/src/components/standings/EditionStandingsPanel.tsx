@@ -1,14 +1,16 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MobileTopHeader } from '@/components/mobile/MobileTopHeader';
 import { Trophy, Clock3, Users, ChevronRight, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { SocialActions } from '@/components/social/SocialActions';
 
 export type StandingEntry = {
   participantId: string;
@@ -20,6 +22,9 @@ export type StandingEntry = {
   survivalStreak?: number;
   isGhost?: boolean;
   latestPick?: { team: { name: string; logoUrl: string } | null; status: string } | null;
+  blocksRemaining?: number;
+  vetosRemaining?: number;
+  challengesRemaining?: number;
 };
 
 export type EditionStandingsPanelProps = {
@@ -27,6 +32,12 @@ export type EditionStandingsPanelProps = {
   championshipName?: string | null;
   variant: 'page' | 'embedded';
   showFullPageLink?: boolean;
+  myParticipantId?: string;
+  blockCount?: number;
+  vetoCount?: number;
+  challengeCount?: number;
+  currentMatchdayNumber?: number;
+  availableTeams?: { id: string; name: string; logoUrl?: string | null }[];
 };
 
 function streakBadge(streak: number | undefined | null): ReactNode {
@@ -73,10 +84,12 @@ function PageLeaderRow({
   entry,
   rank,
   ptsCell,
+  socialActions,
 }: {
   entry: StandingEntry;
   rank: number;
   ptsCell: ReactNode;
+  socialActions?: ReactNode;
 }) {
   const initial = (entry.alias?.[0] ?? '?').toUpperCase();
   const pickUi = standingsPickDisplay(entry);
@@ -107,6 +120,7 @@ function PageLeaderRow({
               <p className="truncate font-semibold text-foreground text-sm">@{entry.alias}</p>
               {streakBadge(entry.survivalStreak)}
               {entry.isGhost && entry.status === 'ELIMINATED' && <span className="text-sm shrink-0">👻</span>}
+              {socialActions}
             </div>
             <div className="mt-0 flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:hidden">
               {pickUi && (
@@ -167,13 +181,25 @@ export function EditionStandingsPanel({
   championshipName,
   variant,
   showFullPageLink = false,
+  myParticipantId: myParticipantIdProp,
+  blockCount: blockCountProp,
+  vetoCount: vetoCountProp,
+  challengeCount: challengeCountProp,
+  currentMatchdayNumber: currentMatchdayNumberProp,
+  availableTeams: availableTeamsProp,
 }: EditionStandingsPanelProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [standings, setStandings] = useState<StandingEntry[]>([]);
+  const [standingsVersion, setStandingsVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [metaLoading, setMetaLoading] = useState(false);
   const [championshipNameMeta, setChampionshipNameMeta] = useState<string | null>(championshipName ?? null);
+  const [blockCountMeta, setBlockCountMeta] = useState(0);
+  const [vetoCountMeta, setVetoCountMeta] = useState(0);
+  const [challengeCountMeta, setChallengeCountMeta] = useState(0);
+  const [internalTeams, setInternalTeams] = useState<{ id: string; name: string; logoUrl?: string | null }[]>([]);
 
   const [deadline, setDeadline] = useState<{ matchdayNumber: number | null; firstKickoff: string | null } | null>(
     null,
@@ -182,6 +208,26 @@ export function EditionStandingsPanel({
   const [nowTs, setNowTs] = useState(() => Date.now());
 
   const isEmbedded = variant === 'embedded';
+
+  const effectiveBlockCount = blockCountProp ?? blockCountMeta;
+  const effectiveVetoCount = vetoCountProp ?? vetoCountMeta;
+  const effectiveChallengeCount = challengeCountProp ?? challengeCountMeta;
+  const hasSocial = !isEmbedded && (effectiveBlockCount > 0 || effectiveVetoCount > 0 || effectiveChallengeCount > 0);
+  const effectiveMatchdayNumber = currentMatchdayNumberProp ?? deadline?.matchdayNumber ?? 1;
+  const effectiveAvailableTeams = availableTeamsProp ?? internalTeams;
+
+  const myParticipantEntry = useMemo(() => {
+    if (!hasSocial) return null;
+    if (myParticipantIdProp) {
+      return standings.find((e) => e.participantId === myParticipantIdProp) ?? null;
+    }
+    if (user?.alias) {
+      return standings.find((e) => e.alias === user.alias) ?? null;
+    }
+    return null;
+  }, [hasSocial, standings, myParticipantIdProp, user?.alias]);
+
+  const refreshStandings = useCallback(() => setStandingsVersion((v) => v + 1), []);
 
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 1000);
@@ -206,7 +252,7 @@ export function EditionStandingsPanel({
       .then(setStandings)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [editionId]);
+  }, [editionId, standingsVersion]);
 
   useEffect(() => {
     if (championshipName !== undefined && championshipName !== null) {
@@ -219,6 +265,9 @@ export function EditionStandingsPanel({
         const res = await fetch(`/api/editions/${editionId}/meta`);
         const data = await res.json();
         setChampionshipNameMeta(typeof data?.championshipName === 'string' ? data.championshipName : null);
+        setBlockCountMeta(data?.blockCount ?? 0);
+        setVetoCountMeta(data?.vetoCount ?? 0);
+        setChallengeCountMeta(data?.challengeCount ?? 0);
       } catch {
         setChampionshipNameMeta(null);
       } finally {
@@ -304,6 +353,15 @@ export function EditionStandingsPanel({
       </div>
     );
   };
+
+  useEffect(() => {
+    if (!hasSocial || availableTeamsProp !== undefined) return;
+    const matchday = effectiveMatchdayNumber;
+    fetch(`/api/editions/${editionId}/teams?matchday=${matchday}`)
+      .then((r) => r.json())
+      .then((data) => setInternalTeams(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [editionId, hasSocial, availableTeamsProp, effectiveMatchdayNumber]);
 
   const statCardClass = isEmbedded
     ? 'rounded-xl border border-border bg-card/80 p-4 shadow-sm'
@@ -427,6 +485,23 @@ export function EditionStandingsPanel({
                     {standings.map((entry, idx) => {
                             const initial = (entry.alias?.[0] ?? '?').toUpperCase();
                             const pickUi = standingsPickDisplay(entry);
+                            const isMe = myParticipantEntry != null && entry.participantId === myParticipantEntry.participantId;
+                            const socialNode = hasSocial && !isMe && myParticipantEntry ? (
+                              <SocialActions
+                                editionId={editionId}
+                                targetParticipantId={entry.participantId}
+                                targetAlias={entry.alias}
+                                matchdayNumber={effectiveMatchdayNumber}
+                                myParticipant={{
+                                  id: myParticipantEntry.participantId,
+                                  blocksRemaining: myParticipantEntry.blocksRemaining ?? 0,
+                                  vetosRemaining: myParticipantEntry.vetosRemaining ?? 0,
+                                  challengesRemaining: myParticipantEntry.challengesRemaining ?? 0,
+                                }}
+                                availableTeams={effectiveAvailableTeams}
+                                onSuccess={refreshStandings}
+                              />
+                            ) : null;
                             return (
                               <TableRow
                                 key={entry.participantId}
@@ -448,6 +523,7 @@ export function EditionStandingsPanel({
                                         <span className="truncate font-semibold text-foreground">@{entry.alias}</span>
                                         {streakBadge(entry.survivalStreak)}
                                         {entry.isGhost && entry.status === 'ELIMINATED' && <span className="text-sm shrink-0">👻</span>}
+                                        {socialNode}
                                       </div>
                                     </div>
                                   </div>
@@ -488,15 +564,35 @@ export function EditionStandingsPanel({
           </div>
 
           <div className="flex flex-col gap-2 pb-4 lg:hidden">
-            {standings.map((entry, idx) => (
-              <div key={entry.participantId} className={cn(entry.status === 'ELIMINATED' && 'opacity-45')}>
-                <PageLeaderRow
-                  entry={entry}
-                  rank={idx + 1}
-                  ptsCell={ptsEstadoCell(entry)}
+            {standings.map((entry, idx) => {
+              const isMe = myParticipantEntry != null && entry.participantId === myParticipantEntry.participantId;
+              const socialNode = hasSocial && !isMe && myParticipantEntry ? (
+                <SocialActions
+                  editionId={editionId}
+                  targetParticipantId={entry.participantId}
+                  targetAlias={entry.alias}
+                  matchdayNumber={effectiveMatchdayNumber}
+                  myParticipant={{
+                    id: myParticipantEntry.participantId,
+                    blocksRemaining: myParticipantEntry.blocksRemaining ?? 0,
+                    vetosRemaining: myParticipantEntry.vetosRemaining ?? 0,
+                    challengesRemaining: myParticipantEntry.challengesRemaining ?? 0,
+                  }}
+                  availableTeams={effectiveAvailableTeams}
+                  onSuccess={refreshStandings}
                 />
-              </div>
-            ))}
+              ) : null;
+              return (
+                <div key={entry.participantId} className={cn(entry.status === 'ELIMINATED' && 'opacity-45')}>
+                  <PageLeaderRow
+                    entry={entry}
+                    rank={idx + 1}
+                    ptsCell={ptsEstadoCell(entry)}
+                    socialActions={socialNode}
+                  />
+                </div>
+              );
+            })}
           </div>
         </>
       )}
