@@ -191,8 +191,8 @@ export class PicksService {
 
     // Si no existe pick previo, crear pick y TeamUsage.
     if (!existingPick) {
-      const ops: Parameters<typeof this.prisma.$transaction>[0] = [
-        this.prisma.pick.create({
+      await this.prisma.$transaction(async (tx) => {
+        await tx.pick.create({
           data: {
             participantId: participant.id,
             matchdayId: matchday.id,
@@ -201,25 +201,22 @@ export class PicksService {
             pickType: dto.pickType ?? 'WIN',
             isDoubleOrNothing: dto.isDoubleOrNothing ?? false,
           },
-        }),
-        this.prisma.teamUsage.create({
+        });
+        await tx.teamUsage.create({
           data: {
             participantId: participant.id,
             teamId: dto.teamId,
             editionId,
             half,
           },
-        }),
-      ];
-      if (dto.isDoubleOrNothing && participant.doubleOrNadaRemaining > 0) {
-        ops.push(
-          this.prisma.participant.update({
+        });
+        if (dto.isDoubleOrNothing && participant.doubleOrNadaRemaining > 0) {
+          await tx.participant.update({
             where: { id: participant.id },
             data: { doubleOrNadaRemaining: { decrement: 1 } },
-          }),
-        );
-      }
-      await this.prisma.$transaction(ops);
+          });
+        }
+      });
       return { message: 'Pick registrado correctamente.' };
     }
 
