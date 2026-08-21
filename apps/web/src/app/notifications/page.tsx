@@ -36,7 +36,7 @@ function notificationMessage(type: string, payload: NotificationPayload): string
     case 'EDITION_FINISHED':
       return `🏆 La edición "${payload.editionName ?? 'desconocida'}" ha finalizado.`;
     case 'INVITATION':
-      return '📩 Tienes una invitación para unirte a un campeonato.';
+      return `📩 Tienes una invitación para unirte a "${payload.championshipName ?? 'un campeonato'}". Pulsá para aceptar.`;
     default:
       return 'Nueva notificación.';
   }
@@ -55,9 +55,12 @@ function NotificationsContent() {
       .finally(() => setLoading(false));
   }, []);
 
-  const markRead = async (id: string) => {
+  const markRead = async (id: string, n?: Notification) => {
     await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' }).catch(() => {});
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+    setNotifications((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));
+    if (n?.type === 'INVITATION' && n.payload.inviteToken) {
+      router.push(`/join/${n.payload.inviteToken}`);
+    }
   };
 
   const deleteNotification = async (id: string) => {
@@ -116,7 +119,7 @@ function NotificationsContent() {
                 }`}
               >
                 <button
-                  onClick={() => markRead(n.id)}
+                  onClick={() => markRead(n.id, n)}
                   className="flex items-start gap-3 flex-1 min-w-0 text-left"
                   aria-label="Marcar como leída"
                 >

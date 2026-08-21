@@ -22,6 +22,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { findNextOpenMatchdayByCalendar } from '../matchdays/find-next-open-matchday-by-calendar';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ChampionshipsService {
@@ -30,6 +31,7 @@ export class ChampionshipsService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private notifications: NotificationsService,
   ) {
     this.resend = new Resend(this.configService.get<string>('RESEND_API_KEY'));
   }
@@ -414,26 +416,40 @@ export class ChampionshipsService {
       };
     };
 
+    let result: object;
     if (emailProvider === 'gmail') {
-      return sendViaGmail();
-    }
-
-    if (emailProvider === 'resend') {
-      return sendViaResend();
-    }
-
-    // fallback
-    try {
-      return await sendViaResend();
-    } catch (err) {
-      console.warn('Resend falló, pasando a Gmail:', (err as Error)?.message);
+      result = await sendViaGmail();
+    } else if (emailProvider === 'resend') {
+      result = await sendViaResend();
+    } else {
+      // fallback
       try {
-        return await sendViaGmail();
-      } catch (gmailErr) {
-        const msg = (gmailErr as any)?.message ?? 'Error al enviar el email (fallback Gmail)';
-        throw new BadRequestException(msg);
+        result = await sendViaResend();
+      } catch (err) {
+        console.warn('Resend falló, pasando a Gmail:', (err as Error)?.message);
+        try {
+          result = await sendViaGmail();
+        } catch (gmailErr) {
+          const msg = (gmailErr as any)?.message ?? 'Error al enviar el email (fallback Gmail)';
+          throw new BadRequestException(msg);
+        }
       }
     }
+
+    // In-app notification if the invited email belongs to an existing user
+    const invitedUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true },
+    });
+    if (invitedUser) {
+      await this.notifications.send(
+        invitedUser.id,
+        'INVITATION',
+        { championshipId, championshipName: championship.name, inviteToken: link.token },
+      );
+    }
+
+    return result;
   }
 
   // ─── Unirse con token ─────────────────────────────────────────────────────

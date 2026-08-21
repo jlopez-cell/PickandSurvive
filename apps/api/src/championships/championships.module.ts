@@ -4,9 +4,10 @@ import { ChampionshipsService } from './championships.service';
 import { ChampionshipAdminGuard } from './championship-admin.guard';
 import { EditionsScheduler } from './editions.scheduler';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificationsModule],
   controllers: [LeaguesController, ChampionshipsController],
   providers: [ChampionshipsService, ChampionshipAdminGuard, EditionsScheduler],
   exports: [ChampionshipsService],
