@@ -174,6 +174,7 @@ export class StandingsService {
             blocksRemaining: p.blocksRemaining ?? 0,
             vetosRemaining: p.vetosRemaining ?? 0,
             challengesRemaining: p.challengesRemaining ?? 0,
+            doubleOrNadaRemaining: p.doubleOrNadaRemaining ?? 0,
             latestPick:
               canRevealPicks || (viewerParticipantId && p.id === viewerParticipantId)
                 ? resolvePickActual(p.picks)
@@ -205,6 +206,7 @@ export class StandingsService {
             blocksRemaining: p.blocksRemaining ?? 0,
             vetosRemaining: p.vetosRemaining ?? 0,
             challengesRemaining: p.challengesRemaining ?? 0,
+            doubleOrNadaRemaining: p.doubleOrNadaRemaining ?? 0,
             latestPick:
               canRevealPicks || (viewerParticipantId && p.id === viewerParticipantId)
                 ? resolvePickActual(p.picks)

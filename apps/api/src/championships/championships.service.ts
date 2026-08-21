@@ -88,6 +88,7 @@ export class ChampionshipsService {
         blockCount: dto.blockCount ?? 0,
         vetoCount: dto.vetoCount ?? 0,
         challengeCount: dto.challengeCount ?? 0,
+        doubleOrNadaCount: dto.doubleOrNadaCount ?? 0,
         creatorId: userId,
         adminId: userId,
       },
@@ -267,6 +268,12 @@ export class ChampionshipsService {
         await tx.participant.updateMany({
           where: { editionId },
           data: { challengesRemaining: edition.championship.challengeCount },
+        });
+      }
+      if (edition.championship.doubleOrNadaCount > 0) {
+        await tx.participant.updateMany({
+          where: { editionId },
+          data: { doubleOrNadaRemaining: edition.championship.doubleOrNadaCount },
         });
       }
     });
@@ -562,6 +569,7 @@ export class ChampionshipsService {
           blockCount: true,
           vetoCount: true,
           challengeCount: true,
+          doubleOrNadaCount: true,
         },
       });
       if (champ) {
@@ -576,6 +584,7 @@ export class ChampionshipsService {
               ...(champ.blockCount > 0 ? { blocksRemaining: champ.blockCount } : {}),
               ...(champ.vetoCount > 0 ? { vetosRemaining: champ.vetoCount } : {}),
               ...(champ.challengeCount > 0 ? { challengesRemaining: champ.challengeCount } : {}),
+              ...(champ.doubleOrNadaCount > 0 ? { doubleOrNadaRemaining: champ.doubleOrNadaCount } : {}),
             },
           });
         }
@@ -749,7 +758,7 @@ export class ChampionshipsService {
   private async getEditionOrThrow(championshipId: string, editionId: string) {
     const edition = await this.prisma.edition.findFirst({
       where: { id: editionId, championshipId },
-      include: { championship: { select: { adminId: true, wildcardCount: true, blockCount: true, vetoCount: true, challengeCount: true } } },
+      include: { championship: { select: { adminId: true, wildcardCount: true, blockCount: true, vetoCount: true, challengeCount: true, doubleOrNadaCount: true } } },
     });
     if (!edition) throw new NotFoundException('Edición no encontrada');
     return edition;

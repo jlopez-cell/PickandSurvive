@@ -57,4 +57,9 @@ export class CreateChampionshipDto {
   @Min(0)
   @IsOptional()
   challengeCount?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  doubleOrNadaCount?: number;
 }

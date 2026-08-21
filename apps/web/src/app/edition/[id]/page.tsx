@@ -41,6 +41,7 @@ type StandingRow = {
   blocksRemaining?: number;
   vetosRemaining?: number;
   challengesRemaining?: number;
+  doubleOrNadaRemaining?: number;
 };
 
 type SocialAction = 'BLOCK' | 'VETO' | 'CHALLENGE';
@@ -291,79 +292,77 @@ function SocialBottomSheet({
 
   return (
     <>
-      <div
-        className="fixed inset-x-0 top-0 bg-black/60 z-[60]"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }}
-        onClick={onClose}
-      />
-      <div className="fixed bottom-[56px] inset-x-0 z-[70] bg-card border-t border-border rounded-t-2xl max-h-[70vh] flex flex-col">
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
-        </div>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onClose} />
 
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
-          {flow.step === 'team' && (
-            <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors">
-              <X className="w-4 h-4 rotate-180" style={{ transform: 'scaleX(-1)' }} />
+      {/* Centered modal */}
+      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm bg-card border border-border rounded-2xl flex flex-col max-h-[70vh] shadow-2xl">
+
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border shrink-0">
+            {flow.step === 'team' && (
+              <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
+            <p className="flex-1 font-bold text-foreground text-sm">
+              {flow.step === 'rival'
+                ? ACTION_LABEL[flow.action]
+                : `¿Qué equipo vetás a @${flow.rivalAlias}?`}
+            </p>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+              <X className="w-5 h-5" />
             </button>
-          )}
-          <p className="flex-1 font-bold text-foreground text-sm">
-            {flow.step === 'rival'
-              ? ACTION_LABEL[flow.action]
-              : `¿Qué equipo vetás a @${flow.rivalAlias}?`}
-          </p>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          </div>
 
-        {error && (
-          <p className="text-xs text-red-400 px-4 py-2 shrink-0">{error}</p>
-        )}
-
-        {/* List */}
-        <div className="overflow-y-auto flex-1 px-3 py-2">
-          {flow.step === 'rival' ? (
-            rivals.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin rivales activos</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {rivals.map((r) => (
-                  <button
-                    key={r.participantId}
-                    disabled={loading}
-                    onClick={() => onSelectRival(r.participantId, r.alias)}
-                    className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary active:scale-[0.98] transition-all text-left w-full disabled:opacity-50"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-black text-foreground/80 shrink-0">
-                      {r.alias[0]?.toUpperCase()}
-                    </div>
-                    <span className="font-semibold text-foreground text-sm">@{r.alias}</span>
-                  </button>
-                ))}
-              </div>
-            )
-          ) : (
-            teams.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin equipos disponibles</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {teams.map((t) => (
-                  <button
-                    key={t.id}
-                    disabled={loading}
-                    onClick={() => onSelectTeam(t.id)}
-                    className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary active:scale-[0.98] transition-all text-left w-full disabled:opacity-50"
-                  >
-                    {t.logoUrl && <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
-                    <span className="font-semibold text-foreground text-sm">{t.name}</span>
-                    {loading && <span className="ml-auto text-xs text-muted-foreground">Guardando…</span>}
-                  </button>
-                ))}
-              </div>
-            )
+          {error && (
+            <p className="text-xs text-red-400 px-4 py-2 shrink-0">{error}</p>
           )}
+
+          {/* List */}
+          <div className="overflow-y-auto flex-1 px-3 py-2">
+            {flow.step === 'rival' ? (
+              rivals.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin rivales activos</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {rivals.map((r) => (
+                    <button
+                      key={r.participantId}
+                      disabled={loading}
+                      onClick={() => onSelectRival(r.participantId, r.alias)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary active:scale-[0.98] transition-all text-left w-full disabled:opacity-50"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-black text-foreground/80 shrink-0">
+                        {r.alias[0]?.toUpperCase()}
+                      </div>
+                      <span className="font-semibold text-foreground text-sm">@{r.alias}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              teams.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin equipos disponibles</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {teams.map((t) => (
+                    <button
+                      key={t.id}
+                      disabled={loading}
+                      onClick={() => onSelectTeam(t.id)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary active:scale-[0.98] transition-all text-left w-full disabled:opacity-50"
+                    >
+                      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
+                      <span className="font-semibold text-foreground text-sm">{t.name}</span>
+                      {loading && <span className="ml-auto text-xs text-muted-foreground">Guardando…</span>}
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
         </div>
       </div>
     </>
@@ -522,9 +521,11 @@ export default function EditionPage() {
   const [blockCount, setBlockCount] = useState(0);
   const [vetoCount, setVetoCount] = useState(0);
   const [challengeCount, setChallengeCount] = useState(0);
+  const [doubleOrNadaCount, setDoubleOrNadaCount] = useState(0);
   const [blocksRemaining, setBlocksRemaining] = useState<number | null>(null);
   const [vetosRemaining, setVetosRemaining] = useState<number | null>(null);
   const [challengesRemaining, setChallengesRemaining] = useState<number | null>(null);
+  const [doubleOrNadaRemaining, setDoubleOrNadaRemaining] = useState<number | null>(null);
 
   const [rivals, setRivals] = useState<{ participantId: string; alias: string }[]>([]);
   const [socialFlow, setSocialFlow] = useState<SocialFlow>(null);
@@ -614,6 +615,7 @@ export default function EditionPage() {
         setBlockCount(meta.blockCount ?? 0);
         setVetoCount(meta.vetoCount ?? 0);
         setChallengeCount(meta.challengeCount ?? 0);
+        setDoubleOrNadaCount(meta.doubleOrNadaCount ?? 0);
 
         let initialMd = start;
         try {
@@ -653,6 +655,7 @@ export default function EditionPage() {
         if (typeof me?.blocksRemaining === 'number') setBlocksRemaining(me.blocksRemaining);
         if (typeof me?.vetosRemaining === 'number') setVetosRemaining(me.vetosRemaining);
         if (typeof me?.challengesRemaining === 'number') setChallengesRemaining(me.challengesRemaining);
+        if (typeof me?.doubleOrNadaRemaining === 'number') setDoubleOrNadaRemaining(me.doubleOrNadaRemaining);
         const activeRivals = rows.filter((r) => r.alias !== user.alias && r.status === 'ACTIVE');
         setRivals(activeRivals.map((r) => ({ participantId: r.participantId, alias: r.alias })));
       })
@@ -1065,8 +1068,27 @@ export default function EditionPage() {
               </div>
             )}
 
-            {/* Double or nothing */}
-            {doubleOrNothingEnabled && championshipMode === 'LEAGUE' && (
+            {/* Double or nada — token mode */}
+            {doubleOrNadaCount > 0 && !participantEliminated && (
+              <button
+                disabled={(doubleOrNadaRemaining ?? 0) <= 0 || !!myPick}
+                onClick={() => setDoubleOrNothingActive((v) => !v)}
+                className={cn(
+                  'mb-4 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-semibold transition-all active:scale-95',
+                  doubleOrNothingActive
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                    : 'bg-card border-border text-foreground hover:border-amber-500/30 disabled:opacity-40',
+                )}
+              >
+                <span>🎲</span>
+                <span className={doubleOrNothingActive ? 'text-amber-400' : 'text-muted-foreground'}>Doble o nada:</span>
+                <span className="font-bold tabular-nums">{doubleOrNadaRemaining ?? '—'}</span>
+                {doubleOrNothingActive && <span className="ml-1 text-[10px] text-amber-400/80">ACTIVO</span>}
+              </button>
+            )}
+
+            {/* Double or nothing — legacy boolean mode */}
+            {doubleOrNothingEnabled && doubleOrNadaCount === 0 && championshipMode === 'LEAGUE' && (
               hasUsedDoubleOrNothing ? (
                 <div className="mb-4 flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-secondary border border-border">
                   <span className="text-base shrink-0">🎲</span>

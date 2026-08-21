@@ -22,6 +22,7 @@ export default function NewChampionshipPage() {
     blockCount: 0 as 0 | 1 | 2 | 3,
     vetoCount: 0 as 0 | 1 | 2 | 3,
     challengeCount: 0 as 0 | 1 | 2 | 3,
+    doubleOrNadaCount: 0 as 0 | 1 | 2 | 3,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -326,6 +327,31 @@ export default function NewChampionshipPage() {
                           onClick={() => setForm({ ...form, challengeCount: n })}
                           className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
                             form.challengeCount === n
+                              ? 'bg-amber-500 text-black border-amber-500'
+                              : 'bg-secondary text-muted-foreground border-border hover:border-amber-500/40'
+                          }`}
+                        >
+                          {n === 0 ? 'Ninguno' : `${n}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground">Doble o nada 🎲</span>
+                      <span className="text-xs text-muted-foreground">
+                        Ganar da +6 pts, empatar +1, perder -3 pts. El token se consume siempre.
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {([0, 1, 2, 3] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setForm({ ...form, doubleOrNadaCount: n })}
+                          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+                            form.doubleOrNadaCount === n
                               ? 'bg-amber-500 text-black border-amber-500'
                               : 'bg-secondary text-muted-foreground border-border hover:border-amber-500/40'
                           }`}
