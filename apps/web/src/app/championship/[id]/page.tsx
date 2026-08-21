@@ -251,7 +251,7 @@ export default function ChampionshipDetailPage() {
         <div className="max-w-3xl mx-auto">
           <button
             className="mb-6 -ml-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => pickEdition ? router.push(`/edition/${pickEdition.id}`) : router.push('/dashboard')}
           >
             ← Volver
           </button>
