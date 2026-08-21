@@ -63,14 +63,17 @@ function formatKickoff(iso: string | null | undefined) {
 function PickBottomSheet({
   team,
   submitting,
+  mode,
   onPick,
   onClose,
 }: {
   team: Team;
   submitting: boolean;
+  mode?: string;
   onPick: (pickType: 'WIN' | 'WIN_OR_DRAW') => void;
   onClose: () => void;
 }) {
+  const isTournament = mode === 'TOURNAMENT';
   return (
     <>
       <div
@@ -101,13 +104,15 @@ function PickBottomSheet({
           >
             🏆 Gana
           </button>
-          <button
-            disabled={submitting}
-            onClick={() => onPick('WIN_OR_DRAW')}
-            className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl bg-white/[0.06] hover:bg-white/10 active:bg-white/[0.04] border border-white/[0.07] disabled:opacity-50 font-bold text-white/85 text-base transition-colors"
-          >
-            🤝 Gana o Empata
-          </button>
+          {isTournament && (
+            <button
+              disabled={submitting}
+              onClick={() => onPick('WIN_OR_DRAW')}
+              className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl bg-secondary hover:bg-secondary/80 border border-border disabled:opacity-50 font-bold text-foreground text-base transition-colors"
+            >
+              🤝 Empata
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -514,6 +519,7 @@ export default function EditionPage() {
         <PickBottomSheet
           team={selectedTeam}
           submitting={submitting}
+          mode={championshipMode}
           onPick={handlePick}
           onClose={() => setSelectedTeamId(null)}
         />
@@ -590,7 +596,7 @@ export default function EditionPage() {
                   }
                 }}
                 disabled={currentMatchday <= (editionStartMatchday ?? 1)}
-                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/12 disabled:opacity-20 transition-colors text-lg"
+                className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors text-lg"
               >
                 ‹
               </button>
@@ -605,7 +611,7 @@ export default function EditionPage() {
                   }
                 }}
                 disabled={editionEndMatchday != null && currentMatchday >= editionEndMatchday}
-                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/12 disabled:opacity-20 transition-colors text-lg"
+                className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors text-lg"
               >
                 ›
               </button>
@@ -623,9 +629,16 @@ export default function EditionPage() {
                 <span className="text-xs font-medium text-muted-foreground">Picks cerrados</span>
               </div>
             ) : matchdayFirstKickoff ? (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-xs font-bold text-amber-400">Cierra en {countdown}</span>
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-400">Cierra en {countdown}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground/70">
+                  {new Date(matchdayFirstKickoff).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {new Date(matchdayFirstKickoff).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             ) : null}
           </div>
@@ -681,7 +694,7 @@ export default function EditionPage() {
                   <p className="font-bold text-foreground text-sm truncate">{myPick.team.name}</p>
                   {myPick.pickType && (
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Gana o Empata' : '🏆 Gana'}
+                      {myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
                     </p>
                   )}
                 </div>

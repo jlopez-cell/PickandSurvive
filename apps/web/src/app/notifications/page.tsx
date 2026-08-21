@@ -128,7 +128,7 @@ function NotificationsContent() {
                 </button>
                 <button
                   onClick={() => deleteNotification(n.id)}
-                  className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors mt-0.5"
+                  className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors mt-0.5"
                   aria-label="Borrar notificación"
                 >
                   <X className="w-3.5 h-3.5" />
