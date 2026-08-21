@@ -59,9 +59,13 @@ function NotificationsContent() {
     await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' }).catch(() => {});
     setNotifications((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));
     if (n?.type === 'INVITATION' && n.payload.inviteToken) {
+      setNotifications((prev) => prev.filter((x) => x.id !== id));
+      fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
       router.push(`/join/${n.payload.inviteToken}`);
     }
     if (n?.type === 'NEW_JOIN_REQUEST' && n.payload.championshipId) {
+      setNotifications((prev) => prev.filter((x) => x.id !== id));
+      fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
       router.push(`/championship/${n.payload.championshipId}/invite`);
     }
   };
