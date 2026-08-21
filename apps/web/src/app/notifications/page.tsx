@@ -13,13 +13,34 @@ export default function NotificationsPage() {
   );
 }
 
+type NotificationPayload = Record<string, unknown>;
+
 type Notification = {
   id: string;
   type: string;
-  message: string;
+  payload: NotificationPayload;
   read: boolean;
   createdAt: string;
 };
+
+function notificationMessage(type: string, payload: NotificationPayload): string {
+  switch (type) {
+    case 'PICK_REMINDER':
+      return `⏰ Tienes ${payload.minutesLeft ?? '?'} minutos para hacer tu pick — Jornada ${payload.matchdayNumber ?? '?'}`;
+    case 'JOIN_APPROVED':
+      return '✅ Tu solicitud fue aprobada. ¡Ya eres parte del campeonato!';
+    case 'JOIN_REJECTED':
+      return '❌ Tu solicitud para unirte al campeonato fue rechazada.';
+    case 'NEW_JOIN_REQUEST':
+      return '👋 Nuevo participante quiere unirse a tu campeonato. Revisa las solicitudes.';
+    case 'EDITION_FINISHED':
+      return `🏆 La edición "${payload.editionName ?? 'desconocida'}" ha finalizado.`;
+    case 'INVITATION':
+      return '📩 Tienes una invitación para unirte a un campeonato.';
+    default:
+      return 'Nueva notificación.';
+  }
+}
 
 function NotificationsContent() {
   const router = useRouter();
@@ -29,7 +50,7 @@ function NotificationsContent() {
   useEffect(() => {
     fetch('/api/notifications')
       .then((r) => r.json())
-      .then((data) => setNotifications(Array.isArray(data) ? data : []))
+      .then((data) => setNotifications(Array.isArray(data?.notifications) ? data.notifications : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -94,7 +115,7 @@ function NotificationsContent() {
                   {!n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
                   {n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-muted-foreground/30 shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground leading-snug">{n.message}</p>
+                    <p className="text-sm text-foreground leading-snug">{notificationMessage(n.type, n.payload)}</p>
                     <p className="text-[11px] text-muted-foreground mt-1">{timeAgo(n.createdAt)}</p>
                   </div>
                 </div>
