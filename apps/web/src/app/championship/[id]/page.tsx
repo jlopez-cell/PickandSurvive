@@ -277,31 +277,6 @@ export default function ChampionshipDetailPage() {
               <p className="text-xs text-muted-foreground mt-1">Admin: @{championship.admin.alias}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {pickEdition && (
-                <button
-                  className={`w-full sm:w-auto rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
-                    isWcMode
-                      ? 'bg-amber-500/20 border border-amber-500/50 text-amber-500 hover:bg-amber-500/30'
-                      : 'bg-emerald-500 text-white hover:bg-emerald-600'
-                  }`}
-                  onClick={() => router.push(
-                    isWcMode
-                      ? `/world-cup/${pickEdition.id}`
-                      : `/edition/${pickEdition.id}`
-                  )}
-                >
-                  {isWcMode ? '⚽ Elegir pick' : 'Elegir pick'}
-                </button>
-              )}
-              {standingsEdition && (
-                <button
-                  className="gap-1.5 w-full sm:w-auto md:hidden bg-secondary border border-border text-muted-foreground rounded-xl px-4 py-2 text-sm flex items-center justify-center"
-                  onClick={() => router.push(`/edition/${standingsEdition.id}/standings`)}
-                >
-                  <Trophy className="h-4 w-4" />
-                  Clasificación
-                </button>
-              )}
               {isAdmin && (
                 <>
                   <button
