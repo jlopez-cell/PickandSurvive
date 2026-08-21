@@ -176,7 +176,11 @@ export default function DashboardPage() {
                   <button
                     key={c.id}
                     className="w-full text-left rounded-2xl border border-border bg-card p-4 transition-all active:scale-[0.99] hover:border-border/60"
-                    onClick={() => router.push(`/championship/${c.id}`)}
+                    onClick={() => {
+                      const ed = getRelevantEdition(c.editions);
+                      if (ed) router.push(`/edition/${ed.id}`);
+                      else router.push(`/championship/${c.id}`);
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       {/* Icon */}

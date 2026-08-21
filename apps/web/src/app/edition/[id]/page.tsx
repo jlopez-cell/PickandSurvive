@@ -370,6 +370,101 @@ function SocialBottomSheet({
   );
 }
 
+// ── StandingsTab ───────────────────────────────────────────────────────────
+
+function StandingsTab({ editionId, championshipMode }: { editionId: string; championshipMode: string }) {
+  const [rows, setRows] = useState<StandingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isLeague = championshipMode === 'LEAGUE';
+
+  useEffect(() => {
+    fetch(`/api/editions/${editionId}/standings`)
+      .then((r) => r.json())
+      .then((data) => setRows(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [editionId]);
+
+  if (loading) {
+    return <p className="text-center py-12 text-muted-foreground text-sm">Cargando clasificación…</p>;
+  }
+
+  const active = rows.filter((r) => r.status !== 'ELIMINATED');
+  const eliminated = rows.filter((r) => r.status === 'ELIMINATED');
+
+  return (
+    <div className="py-2">
+      {active.length > 0 && (
+        <div className="mb-6">
+          <p className="text-[10px] font-black tracking-widest uppercase text-emerald-400/60 mb-2 px-1">
+            Activos · {active.length}
+          </p>
+          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+            {active.map((r, i) => (
+              <div
+                key={r.alias}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3',
+                  i < active.length - 1 && 'border-b border-border/40',
+                )}
+              >
+                <span className="w-5 text-[11px] font-black text-muted-foreground/40 tabular-nums text-center shrink-0">
+                  {i + 1}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-emerald-400 uppercase">{r.alias[0]}</span>
+                </div>
+                <span className="flex-1 text-sm font-semibold text-foreground truncate">{r.alias}</span>
+                {isLeague && r.totalPoints != null && (
+                  <span className="text-sm font-black text-amber-400 tabular-nums">{r.totalPoints} pts</span>
+                )}
+                {r.wildcardsRemaining != null && r.wildcardsRemaining > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">🛡️ {r.wildcardsRemaining}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {eliminated.length > 0 && (
+        <div>
+          <p className="text-[10px] font-black tracking-widest uppercase text-red-400/40 mb-2 px-1">
+            Eliminados · {eliminated.length}
+          </p>
+          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+            {eliminated.map((r, i) => (
+              <div
+                key={r.alias}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 opacity-45',
+                  i < eliminated.length - 1 && 'border-b border-border/40',
+                )}
+              >
+                <span className="w-5 text-[11px] font-black text-muted-foreground/40 tabular-nums text-center shrink-0">
+                  {active.length + i + 1}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-red-400 uppercase">{r.alias[0]}</span>
+                </div>
+                <span className="flex-1 text-sm font-semibold text-muted-foreground truncate">{r.alias}</span>
+                {r.eliminatedAtMatchday != null && (
+                  <span className="text-[11px] text-muted-foreground/60">J{r.eliminatedAtMatchday}</span>
+                )}
+                <XCircle className="w-3.5 h-3.5 text-red-400/50 shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 && (
+        <p className="text-center py-8 text-muted-foreground text-sm">Sin participantes</p>
+      )}
+    </div>
+  );
+}
+
 // ── LogoImage ──────────────────────────────────────────────────────────────
 
 function LaLigaLogo() {
@@ -414,8 +509,9 @@ export default function EditionPage() {
   const [deadlinePassed, setDeadlinePassed] = useState(false);
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores'>('picks');
+  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores' | 'clasificacion'>('picks');
 
+  const [championshipId, setChampionshipId] = useState('');
   const [championshipMode, setChampionshipMode] = useState('');
   const [doubleOrNothingEnabled, setDoubleOrNothingEnabled] = useState(false);
   const [wildcardCount, setWildcardCount] = useState(0);
@@ -510,6 +606,7 @@ export default function EditionPage() {
         setEditionStartMatchday(start);
         setEditionEndMatchday(Number.isFinite(end) ? end : null);
         setLeagueSeason(meta.season ?? null);
+        setChampionshipId(meta.championshipId ?? '');
         setChampionshipName(meta.championshipName ?? meta.name ?? '');
         setChampionshipMode(meta.mode ?? meta.championshipMode ?? '');
         setDoubleOrNothingEnabled(meta.doubleOrNothingEnabled ?? false);
@@ -835,23 +932,35 @@ export default function EditionPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="relative border-b border-border">
-          <div className="max-w-4xl mx-auto px-4 flex">
-            {(['picks', 'jugadores'] as const).map((tab) => (
+        <div className="relative border-b border-border overflow-x-auto">
+          <div className="max-w-4xl mx-auto px-4 flex min-w-max">
+            {([
+              { key: 'picks', label: '⚽ Picks' },
+              { key: 'jugadores', label: '👥 Jugadores' },
+              { key: 'clasificacion', label: '🏆 Clasificación' },
+            ] as const).map(({ key, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={key}
+                onClick={() => setActiveTab(key)}
                 className={cn(
-                  'px-5 py-3 text-sm font-bold transition-colors relative',
-                  activeTab === tab ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground',
+                  'px-4 py-3 text-sm font-bold transition-colors relative whitespace-nowrap',
+                  activeTab === key ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {tab === 'picks' ? '⚽ Picks' : '👥 Jugadores'}
-                {activeTab === tab && (
-                  <span className="absolute bottom-0 inset-x-3 h-0.5 bg-amber-500 rounded-t-full" />
+                {label}
+                {activeTab === key && (
+                  <span className="absolute bottom-0 inset-x-2 h-0.5 bg-amber-500 rounded-t-full" />
                 )}
               </button>
             ))}
+            {championshipId && (
+              <button
+                onClick={() => router.push(`/championship/${championshipId}`)}
+                className="px-4 py-3 text-sm font-bold transition-colors relative whitespace-nowrap text-muted-foreground hover:text-foreground ml-auto"
+              >
+                ⚙️ Ajustes
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -1087,6 +1196,11 @@ export default function EditionPage() {
         {/* ── Jugadores tab ──────────────────────────────────────────────── */}
         {activeTab === 'jugadores' && (
           <ParticipantsList editionId={editionId} />
+        )}
+
+        {/* ── Clasificación tab ──────────────────────────────────────────── */}
+        {activeTab === 'clasificacion' && (
+          <StandingsTab editionId={editionId} championshipMode={championshipMode} />
         )}
       </main>
 
