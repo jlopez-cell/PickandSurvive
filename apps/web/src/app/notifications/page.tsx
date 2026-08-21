@@ -61,6 +61,9 @@ function NotificationsContent() {
     if (n?.type === 'INVITATION' && n.payload.inviteToken) {
       router.push(`/join/${n.payload.inviteToken}`);
     }
+    if (n?.type === 'NEW_JOIN_REQUEST' && n.payload.championshipId) {
+      router.push(`/championship/${n.payload.championshipId}/invite`);
+    }
   };
 
   const deleteNotification = async (id: string) => {
