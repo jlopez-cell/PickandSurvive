@@ -539,7 +539,7 @@ export class ChampionshipsService {
     const joinableEditions = await this.prisma.edition.findMany({
       where: { championshipId, status: { in: [EditionStatus.OPEN, EditionStatus.ACTIVE] } },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (joinableEditions.length === 0) {
       throw new ForbiddenException('No hay edición abierta o activa. No se puede aprobar la solicitud.');
@@ -552,6 +552,33 @@ export class ChampionshipsService {
       });
       for (const ed of joinableEditions) {
         await syncMembersToEditionTx(tx, ed.id);
+      }
+
+      // Initialize social tokens for the new participant in any ACTIVE edition
+      const champ = await tx.championship.findUnique({
+        where: { id: championshipId },
+        select: {
+          wildcardCount: true,
+          blockCount: true,
+          vetoCount: true,
+          challengeCount: true,
+        },
+      });
+      if (champ) {
+        const activeEditionIds = joinableEditions
+          .filter((e) => e.status === EditionStatus.ACTIVE)
+          .map((e) => e.id);
+        for (const edId of activeEditionIds) {
+          await tx.participant.updateMany({
+            where: { editionId: edId, userId: request.userId, blocksRemaining: 0, vetosRemaining: 0, challengesRemaining: 0 },
+            data: {
+              ...(champ.wildcardCount > 0 ? { wildcardsRemaining: champ.wildcardCount } : {}),
+              ...(champ.blockCount > 0 ? { blocksRemaining: champ.blockCount } : {}),
+              ...(champ.vetoCount > 0 ? { vetosRemaining: champ.vetoCount } : {}),
+              ...(champ.challengeCount > 0 ? { challengesRemaining: champ.challengeCount } : {}),
+            },
+          });
+        }
       }
     });
 
