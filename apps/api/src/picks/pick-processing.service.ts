@@ -236,6 +236,27 @@ export class PickProcessingService {
               where: { id: pick.id },
               data: { pointsAwarded: 0, streakBonusPoints: 0, underdogBonus: false },
             });
+
+            const [blockerParticipant, blockedUser] = await Promise.all([
+              tx.participant.findUnique({
+                where: { id: block.blockerParticipantId },
+                include: { user: { select: { alias: true } } },
+              }),
+              tx.participant.findUnique({
+                where: { id: participant.id },
+                select: { userId: true },
+              }),
+            ]);
+
+            if (blockerParticipant && blockedUser) {
+              await tx.notification.create({
+                data: {
+                  userId: blockedUser.userId,
+                  type: 'BLOCK_RECEIVED',
+                  payload: { from: blockerParticipant.user.alias, matchdayNumber: match.matchday.number },
+                },
+              });
+            }
           }
         });
       }

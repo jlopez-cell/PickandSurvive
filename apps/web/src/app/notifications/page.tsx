@@ -37,6 +37,12 @@ function notificationMessage(type: string, payload: NotificationPayload): string
       return `🏆 La edición "${payload.editionName ?? 'desconocida'}" ha finalizado.`;
     case 'INVITATION':
       return `📩 Tienes una invitación para unirte a "${payload.championshipName ?? 'un campeonato'}". Pulsá para aceptar.`;
+    case 'VETO_RECEIVED':
+      return `🚫 ${payload.from ?? 'Alguien'} te vetó al ${payload.teamName ?? 'equipo'} esta jornada. Cambiá tu pick.`;
+    case 'CHALLENGE_RECEIVED':
+      return `⚔️ ${payload.from ?? 'Alguien'} te retó en la jornada ${payload.matchdayNumber ?? '?'}. El que peor resultado tenga pierde 1 punto.`;
+    case 'BLOCK_RECEIVED':
+      return `🔒 ${payload.from ?? 'Alguien'} te bloqueó en la jornada ${payload.matchdayNumber ?? '?'}. Tu pick no sumó puntos.`;
     default:
       return 'Nueva notificación.';
   }

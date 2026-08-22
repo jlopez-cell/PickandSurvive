@@ -82,6 +82,7 @@ export class SocialService {
   ) {
     const vetoer = await this.prisma.participant.findUnique({
       where: { userId_editionId: { userId, editionId } },
+      include: { user: { select: { alias: true } } },
     });
     if (!vetoer) throw new ForbiddenException('No eres participante de esta edición');
     if (vetoer.vetosRemaining <= 0) throw new ForbiddenException('No tienes vetos disponibles');
@@ -147,12 +148,21 @@ export class SocialService {
         },
       });
 
-      const existingPick = await tx.pick.findFirst({
-        where: {
-          participantId: targetParticipantId,
-          matchdayId: matchday.id,
-          teamId,
+      const [team, targetParticipant] = await Promise.all([
+        tx.footballTeam.findUnique({ where: { id: teamId }, select: { name: true } }),
+        tx.participant.findUnique({ where: { id: targetParticipantId }, select: { userId: true } }),
+      ]);
+
+      await tx.notification.create({
+        data: {
+          userId: targetParticipant!.userId,
+          type: 'VETO_RECEIVED',
+          payload: { from: vetoer.user.alias, teamName: team?.name, matchdayNumber },
         },
+      });
+
+      const existingPick = await tx.pick.findFirst({
+        where: { participantId: targetParticipantId, matchdayId: matchday.id, teamId },
       });
 
       if (existingPick) {
@@ -168,11 +178,6 @@ export class SocialService {
         await tx.teamUsage.deleteMany({
           where: { participantId: targetParticipantId, teamId, editionId, half },
         });
-
-        const [team, targetParticipant] = await Promise.all([
-          tx.footballTeam.findUnique({ where: { id: teamId }, select: { name: true } }),
-          tx.participant.findUnique({ where: { id: targetParticipantId }, select: { userId: true } }),
-        ]);
 
         await tx.notification.create({
           data: {
@@ -195,6 +200,7 @@ export class SocialService {
   ) {
     const challenger = await this.prisma.participant.findUnique({
       where: { userId_editionId: { userId, editionId } },
+      include: { user: { select: { alias: true } } },
     });
     if (!challenger) throw new ForbiddenException('No eres participante de esta edición');
     if (challenger.challengesRemaining <= 0) throw new ForbiddenException('No tienes retos disponibles');
@@ -263,8 +269,8 @@ export class SocialService {
       await tx.notification.create({
         data: {
           userId: targetParticipant!.userId,
-          type: 'PICK_REMINDER',
-          payload: { reason: 'CHALLENGE', matchdayNumber },
+          type: 'CHALLENGE_RECEIVED',
+          payload: { from: challenger.user.alias, matchdayNumber },
         },
       });
     });

@@ -42,6 +42,12 @@ type StandingRow = {
   vetosRemaining?: number;
   challengesRemaining?: number;
   doubleOrNadaRemaining?: number;
+  // Active tokens this matchday
+  activeVeto?: { teamName: string; from: string } | null;
+  activeChallenge?: { with: string } | null;
+  isBlocked?: boolean;
+  blockFrom?: string | null;
+  doubleOrNadaActive?: boolean;
 };
 
 type SocialAction = 'BLOCK' | 'VETO' | 'CHALLENGE';
@@ -413,12 +419,47 @@ function StandingsTab({ editionId, championshipMode }: { editionId: string; cham
                 <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
                   <span className="text-xs font-black text-emerald-400 uppercase">{r.alias[0]}</span>
                 </div>
-                <span className="flex-1 text-sm font-semibold text-foreground truncate">{r.alias}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold text-foreground truncate block">{r.alias}</span>
+                  {(r.activeVeto || r.activeChallenge || r.isBlocked || r.doubleOrNadaActive) && (
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {r.activeVeto && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                          title={`${r.activeVeto.from} vetó ${r.activeVeto.teamName}`}
+                        >
+                          🚫 {r.activeVeto.teamName}
+                        </span>
+                      )}
+                      {r.activeChallenge && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-400 border border-orange-500/30"
+                          title={`Reto con ${r.activeChallenge.with}`}
+                        >
+                          ⚔️ {r.activeChallenge.with}
+                        </span>
+                      )}
+                      {r.isBlocked && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 border border-red-500/30"
+                          title={`Bloqueado por ${r.blockFrom}`}
+                        >
+                          🔒 {r.blockFrom}
+                        </span>
+                      )}
+                      {r.doubleOrNadaActive && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          🎲 doble o nada
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {isLeague && r.totalPoints != null && (
-                  <span className="text-sm font-black text-amber-400 tabular-nums">{r.totalPoints} pts</span>
+                  <span className="text-sm font-black text-amber-400 tabular-nums shrink-0">{r.totalPoints} pts</span>
                 )}
                 {r.wildcardsRemaining != null && r.wildcardsRemaining > 0 && (
-                  <span className="text-xs text-muted-foreground tabular-nums">🛡️ {r.wildcardsRemaining}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">🛡️ {r.wildcardsRemaining}</span>
                 )}
               </div>
             ))}
