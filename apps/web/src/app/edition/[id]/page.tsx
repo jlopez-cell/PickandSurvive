@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Shield, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users, X } from 'lucide-react';
+import { Shield, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users, X, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
@@ -885,12 +885,22 @@ export default function EditionPage() {
                 </span>
               )}
             </div>
-            <button
-              onClick={() => setActiveTab('jugadores')}
-              className="text-amber-400/50 hover:text-amber-400 transition-colors"
-            >
-              <Users className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/guide')}
+                className="text-amber-400/50 hover:text-amber-400 transition-colors"
+                aria-label="Guía del juego"
+              >
+                <Lightbulb className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setActiveTab('jugadores')}
+                className="text-amber-400/50 hover:text-amber-400 transition-colors"
+                aria-label="Jugadores"
+              >
+                <Users className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Hero content */}
