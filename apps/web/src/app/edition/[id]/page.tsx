@@ -697,7 +697,7 @@ export default function EditionPage() {
         if (typeof me?.vetosRemaining === 'number') setVetosRemaining(me.vetosRemaining);
         if (typeof me?.challengesRemaining === 'number') setChallengesRemaining(me.challengesRemaining);
         if (typeof me?.doubleOrNadaRemaining === 'number') setDoubleOrNadaRemaining(me.doubleOrNadaRemaining);
-        const activeRivals = rows.filter((r) => r.alias !== user.alias && r.status === 'ACTIVE');
+        const activeRivals = rows.filter((r) => r.alias !== user.alias && r.status !== 'ELIMINATED');
         setRivals(activeRivals.map((r) => ({ participantId: r.participantId, alias: r.alias })));
       })
       .catch(() => setParticipantEliminated(false));

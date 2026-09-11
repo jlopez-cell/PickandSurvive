@@ -262,6 +262,7 @@ export class StandingsService {
           return {
             participantId: p.id,
             alias: p.user.alias,
+            status: p.status,
             totalPoints: p.totalPoints,
             survivedPickCount,
             survivalStreak,
