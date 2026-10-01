@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { BookOpen, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import { MobileTopHeader } from '@/components/mobile/MobileTopHeader';
@@ -53,6 +54,17 @@ export default function ProfilePage() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rol</p>
               <p className="text-sm font-medium text-foreground">{user.role}</p>
             </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl overflow-hidden mb-3">
+            <button
+              onClick={() => router.push('/guide')}
+              className="w-full px-4 py-3.5 flex items-center gap-3 text-left"
+            >
+              <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-sm font-medium text-foreground flex-1">Cómo jugar</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
           </div>
 
           <button

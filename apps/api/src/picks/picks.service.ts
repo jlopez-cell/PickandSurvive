@@ -161,26 +161,38 @@ export class PicksService {
     }
 
     if (dto.isDoubleOrNothing) {
-      if (!edition.championship.doubleOrNothingEnabled) {
-        throw new BadRequestException('Este campeonato no tiene activado el modo Double or Nothing');
-      }
-      const existingDoubleOrNothing = await this.prisma.pick.findFirst({
-        where: {
-          participantId: participant.id,
-          isDoubleOrNothing: true,
-          ...(existingPick ? { NOT: { id: existingPick.id } } : {}),
-        },
-        select: { id: true },
+      // New token-based system: doubleOrNadaRemaining
+      const champ = await this.prisma.championship.findUnique({
+        where: { id: edition.championshipId },
+        select: { doubleOrNadaCount: true, doubleOrNothingEnabled: true },
       });
-      if (existingDoubleOrNothing) {
-        throw new ConflictException('Ya usaste el Double or Nothing en esta edición');
+      if (champ && champ.doubleOrNadaCount > 0) {
+        if (participant.doubleOrNadaRemaining <= 0) {
+          throw new ConflictException('No te quedan tokens de Doble o Nada');
+        }
+      } else {
+        // Legacy boolean mode
+        if (!edition.championship.doubleOrNothingEnabled) {
+          throw new BadRequestException('Este campeonato no tiene activado el modo Double or Nothing');
+        }
+        const existingDoubleOrNothing = await this.prisma.pick.findFirst({
+          where: {
+            participantId: participant.id,
+            isDoubleOrNothing: true,
+            ...(existingPick ? { NOT: { id: existingPick.id } } : {}),
+          },
+          select: { id: true },
+        });
+        if (existingDoubleOrNothing) {
+          throw new ConflictException('Ya usaste el Double or Nothing en esta edición');
+        }
       }
     }
 
     // Si no existe pick previo, crear pick y TeamUsage.
     if (!existingPick) {
-      await this.prisma.$transaction([
-        this.prisma.pick.create({
+      await this.prisma.$transaction(async (tx) => {
+        await tx.pick.create({
           data: {
             participantId: participant.id,
             matchdayId: matchday.id,
@@ -189,17 +201,22 @@ export class PicksService {
             pickType: dto.pickType ?? 'WIN',
             isDoubleOrNothing: dto.isDoubleOrNothing ?? false,
           },
-        }),
-        this.prisma.teamUsage.create({
+        });
+        await tx.teamUsage.create({
           data: {
             participantId: participant.id,
             teamId: dto.teamId,
             editionId,
             half,
           },
-        }),
-      ]);
-
+        });
+        if (dto.isDoubleOrNothing && participant.doubleOrNadaRemaining > 0) {
+          await tx.participant.update({
+            where: { id: participant.id },
+            data: { doubleOrNadaRemaining: { decrement: 1 } },
+          });
+        }
+      });
       return { message: 'Pick registrado correctamente.' };
     }
 
@@ -430,8 +447,15 @@ export class PicksService {
       startMatchday: edition.startMatchday,
       endMatchday: edition.endMatchday,
       status: edition.status,
+      championshipId: edition.championship.id,
       championshipName: edition.championship.name,
+      mode: edition.championship.mode,
       season: edition.championship.footballLeague.currentSeason,
+      blockCount: edition.championship.blockCount ?? 0,
+      vetoCount: edition.championship.vetoCount ?? 0,
+      challengeCount: edition.championship.challengeCount ?? 0,
+      doubleOrNadaCount: edition.championship.doubleOrNadaCount ?? 0,
+      doubleOrNothingEnabled: edition.championship.doubleOrNothingEnabled,
     };
   }
 

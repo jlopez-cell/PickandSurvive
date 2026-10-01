@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Shield, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users, X } from 'lucide-react';
+import { Shield, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Users, X, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
@@ -32,6 +32,7 @@ type MyPick = {
 };
 
 type StandingRow = {
+  participantId: string;
   alias: string;
   status: string;
   totalPoints?: number;
@@ -40,7 +41,17 @@ type StandingRow = {
   blocksRemaining?: number;
   vetosRemaining?: number;
   challengesRemaining?: number;
+  doubleOrNadaRemaining?: number;
+  // Active tokens this matchday
+  activeVeto?: { teamName: string; from: string } | null;
+  activeChallenge?: { with: string } | null;
+  isBlocked?: boolean;
+  blockFrom?: string | null;
+  doubleOrNadaActive?: boolean;
 };
+
+type SocialAction = 'BLOCK' | 'VETO' | 'CHALLENGE';
+type SocialFlow = { action: SocialAction; step: 'rival' | 'team'; rivalId: string; rivalAlias: string } | null;
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -63,14 +74,17 @@ function formatKickoff(iso: string | null | undefined) {
 function PickBottomSheet({
   team,
   submitting,
+  mode,
   onPick,
   onClose,
 }: {
   team: Team;
   submitting: boolean;
+  mode?: string;
   onPick: (pickType: 'WIN' | 'WIN_OR_DRAW') => void;
   onClose: () => void;
 }) {
+  const isTournament = mode === 'TOURNAMENT';
   return (
     <>
       <div
@@ -101,13 +115,15 @@ function PickBottomSheet({
           >
             🏆 Gana
           </button>
-          <button
-            disabled={submitting}
-            onClick={() => onPick('WIN_OR_DRAW')}
-            className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl bg-white/[0.06] hover:bg-white/10 active:bg-white/[0.04] border border-white/[0.07] disabled:opacity-50 font-bold text-white/85 text-base transition-colors"
-          >
-            🤝 Gana o Empata
-          </button>
+          {isTournament && (
+            <button
+              disabled={submitting}
+              onClick={() => onPick('WIN_OR_DRAW')}
+              className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl bg-secondary hover:bg-secondary/80 border border-border disabled:opacity-50 font-bold text-foreground text-base transition-colors"
+            >
+              🤝 Empata
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -251,6 +267,244 @@ function ParticipantsList({ editionId }: { editionId: string }) {
   );
 }
 
+// ── SocialBottomSheet ──────────────────────────────────────────────────────
+
+function SocialBottomSheet({
+  flow,
+  rivals,
+  teams,
+  loading,
+  error,
+  onSelectRival,
+  onSelectTeam,
+  onBack,
+  onClose,
+}: {
+  flow: NonNullable<SocialFlow>;
+  rivals: { participantId: string; alias: string }[];
+  teams: Team[];
+  loading: boolean;
+  error: string;
+  onSelectRival: (id: string, alias: string) => void;
+  onSelectTeam: (teamId: string) => void;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const ACTION_LABEL: Record<SocialAction, string> = {
+    BLOCK: '🔒 Bloquear a…',
+    VETO: '🚫 Vetar equipo a…',
+    CHALLENGE: '⚔️ Retar a…',
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onClose} />
+
+      {/* Centered modal */}
+      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm bg-card border border-border rounded-2xl flex flex-col max-h-[70vh] shadow-2xl">
+
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border shrink-0">
+            {flow.step === 'team' && (
+              <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
+            <p className="flex-1 font-bold text-foreground text-sm">
+              {flow.step === 'rival'
+                ? ACTION_LABEL[flow.action]
+                : `¿Qué equipo vetás a @${flow.rivalAlias}?`}
+            </p>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-400 px-4 py-2 shrink-0">{error}</p>
+          )}
+
+          {/* List */}
+          <div className="overflow-y-auto flex-1 px-3 py-2">
+            {flow.step === 'rival' ? (
+              rivals.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin rivales activos</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {rivals.map((r) => (
+                    <button
+                      key={r.participantId}
+                      disabled={loading}
+                      onClick={() => onSelectRival(r.participantId, r.alias)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary active:scale-[0.98] transition-all text-left w-full disabled:opacity-50"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-black text-foreground/80 shrink-0">
+                        {r.alias[0]?.toUpperCase()}
+                      </div>
+                      <span className="font-semibold text-foreground text-sm">@{r.alias}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              teams.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin equipos disponibles</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {teams.map((t) => (
+                    <button
+                      key={t.id}
+                      disabled={loading}
+                      onClick={() => onSelectTeam(t.id)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary active:scale-[0.98] transition-all text-left w-full disabled:opacity-50"
+                    >
+                      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
+                      <span className="font-semibold text-foreground text-sm">{t.name}</span>
+                      {loading && <span className="ml-auto text-xs text-muted-foreground">Guardando…</span>}
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── StandingsTab ───────────────────────────────────────────────────────────
+
+function StandingsTab({ editionId, championshipMode }: { editionId: string; championshipMode: string }) {
+  const [rows, setRows] = useState<StandingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isLeague = championshipMode === 'LEAGUE';
+
+  useEffect(() => {
+    fetch(`/api/editions/${editionId}/standings`)
+      .then((r) => r.json())
+      .then((data) => setRows(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [editionId]);
+
+  if (loading) {
+    return <p className="text-center py-12 text-muted-foreground text-sm">Cargando clasificación…</p>;
+  }
+
+  const active = rows.filter((r) => r.status !== 'ELIMINATED');
+  const eliminated = rows.filter((r) => r.status === 'ELIMINATED');
+
+  return (
+    <div className="py-2">
+      {active.length > 0 && (
+        <div className="mb-6">
+          <p className="text-[10px] font-black tracking-widest uppercase text-emerald-400/60 mb-2 px-1">
+            Activos · {active.length}
+          </p>
+          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+            {active.map((r, i) => (
+              <div
+                key={r.alias}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3',
+                  i < active.length - 1 && 'border-b border-border/40',
+                )}
+              >
+                <span className="w-5 text-[11px] font-black text-muted-foreground/40 tabular-nums text-center shrink-0">
+                  {i + 1}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-emerald-400 uppercase">{r.alias[0]}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold text-foreground truncate block">{r.alias}</span>
+                  {(r.activeVeto || r.activeChallenge || r.isBlocked || r.doubleOrNadaActive) && (
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {r.activeVeto && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                          title={`${r.activeVeto.from} vetó ${r.activeVeto.teamName}`}
+                        >
+                          🚫 {r.activeVeto.teamName}
+                        </span>
+                      )}
+                      {r.activeChallenge && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-400 border border-orange-500/30"
+                          title={`Reto con ${r.activeChallenge.with}`}
+                        >
+                          ⚔️ {r.activeChallenge.with}
+                        </span>
+                      )}
+                      {r.isBlocked && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 border border-red-500/30"
+                          title={`Bloqueado por ${r.blockFrom}`}
+                        >
+                          🔒 {r.blockFrom}
+                        </span>
+                      )}
+                      {r.doubleOrNadaActive && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          🎲 doble o nada
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {isLeague && r.totalPoints != null && (
+                  <span className="text-sm font-black text-amber-400 tabular-nums shrink-0">{r.totalPoints} pts</span>
+                )}
+                {r.wildcardsRemaining != null && r.wildcardsRemaining > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">🛡️ {r.wildcardsRemaining}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {eliminated.length > 0 && (
+        <div>
+          <p className="text-[10px] font-black tracking-widest uppercase text-red-400/40 mb-2 px-1">
+            Eliminados · {eliminated.length}
+          </p>
+          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+            {eliminated.map((r, i) => (
+              <div
+                key={r.alias}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 opacity-45',
+                  i < eliminated.length - 1 && 'border-b border-border/40',
+                )}
+              >
+                <span className="w-5 text-[11px] font-black text-muted-foreground/40 tabular-nums text-center shrink-0">
+                  {active.length + i + 1}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-red-400 uppercase">{r.alias[0]}</span>
+                </div>
+                <span className="flex-1 text-sm font-semibold text-muted-foreground truncate">{r.alias}</span>
+                {r.eliminatedAtMatchday != null && (
+                  <span className="text-[11px] text-muted-foreground/60">J{r.eliminatedAtMatchday}</span>
+                )}
+                <XCircle className="w-3.5 h-3.5 text-red-400/50 shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 && (
+        <p className="text-center py-8 text-muted-foreground text-sm">Sin participantes</p>
+      )}
+    </div>
+  );
+}
+
 // ── LogoImage ──────────────────────────────────────────────────────────────
 
 function LaLigaLogo() {
@@ -295,8 +549,9 @@ export default function EditionPage() {
   const [deadlinePassed, setDeadlinePassed] = useState(false);
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores'>('picks');
+  const [activeTab, setActiveTab] = useState<'picks' | 'jugadores' | 'clasificacion'>('picks');
 
+  const [championshipId, setChampionshipId] = useState('');
   const [championshipMode, setChampionshipMode] = useState('');
   const [doubleOrNothingEnabled, setDoubleOrNothingEnabled] = useState(false);
   const [wildcardCount, setWildcardCount] = useState(0);
@@ -307,9 +562,16 @@ export default function EditionPage() {
   const [blockCount, setBlockCount] = useState(0);
   const [vetoCount, setVetoCount] = useState(0);
   const [challengeCount, setChallengeCount] = useState(0);
+  const [doubleOrNadaCount, setDoubleOrNadaCount] = useState(0);
   const [blocksRemaining, setBlocksRemaining] = useState<number | null>(null);
   const [vetosRemaining, setVetosRemaining] = useState<number | null>(null);
   const [challengesRemaining, setChallengesRemaining] = useState<number | null>(null);
+  const [doubleOrNadaRemaining, setDoubleOrNadaRemaining] = useState<number | null>(null);
+
+  const [rivals, setRivals] = useState<{ participantId: string; alias: string }[]>([]);
+  const [socialFlow, setSocialFlow] = useState<SocialFlow>(null);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialError, setSocialError] = useState('');
 
   // 1-second countdown + deadline check
   useEffect(() => {
@@ -386,6 +648,7 @@ export default function EditionPage() {
         setEditionStartMatchday(start);
         setEditionEndMatchday(Number.isFinite(end) ? end : null);
         setLeagueSeason(meta.season ?? null);
+        setChampionshipId(meta.championshipId ?? '');
         setChampionshipName(meta.championshipName ?? meta.name ?? '');
         setChampionshipMode(meta.mode ?? meta.championshipMode ?? '');
         setDoubleOrNothingEnabled(meta.doubleOrNothingEnabled ?? false);
@@ -393,6 +656,7 @@ export default function EditionPage() {
         setBlockCount(meta.blockCount ?? 0);
         setVetoCount(meta.vetoCount ?? 0);
         setChallengeCount(meta.challengeCount ?? 0);
+        setDoubleOrNadaCount(meta.doubleOrNadaCount ?? 0);
 
         let initialMd = start;
         try {
@@ -419,21 +683,22 @@ export default function EditionPage() {
     loadData(currentMatchday);
   }, [authLoading, editionStartMatchday, currentMatchday, loadData]);
 
-  // Fetch elimination status + wildcardsRemaining
+  // Fetch elimination status + wildcardsRemaining + rivals for social actions
   useEffect(() => {
     if (authLoading || !user?.alias) { setParticipantEliminated(false); return; }
     fetch(`/api/editions/${editionId}/standings`)
       .then((r) => r.json())
       .then((data) => {
-        const rows = Array.isArray(data) ? data : [];
-        const me = rows.find((r: StandingRow) => r.alias === user.alias);
+        const rows: StandingRow[] = Array.isArray(data) ? data : [];
+        const me = rows.find((r) => r.alias === user.alias);
         setParticipantEliminated(me?.status === 'ELIMINATED');
-        if (typeof me?.wildcardsRemaining === 'number') {
-          setWildcardsRemaining(me.wildcardsRemaining);
-        }
+        if (typeof me?.wildcardsRemaining === 'number') setWildcardsRemaining(me.wildcardsRemaining);
         if (typeof me?.blocksRemaining === 'number') setBlocksRemaining(me.blocksRemaining);
         if (typeof me?.vetosRemaining === 'number') setVetosRemaining(me.vetosRemaining);
         if (typeof me?.challengesRemaining === 'number') setChallengesRemaining(me.challengesRemaining);
+        if (typeof me?.doubleOrNadaRemaining === 'number') setDoubleOrNadaRemaining(me.doubleOrNadaRemaining);
+        const activeRivals = rows.filter((r) => r.alias !== user.alias && r.status !== 'ELIMINATED');
+        setRivals(activeRivals.map((r) => ({ participantId: r.participantId, alias: r.alias })));
       })
       .catch(() => setParticipantEliminated(false));
   }, [editionId, user?.alias, authLoading]);
@@ -489,6 +754,61 @@ export default function EditionPage() {
     ? matches.flatMap((m) => [m.homeTeam, m.awayTeam]).find((t) => t.id === selectedTeamId) ?? null
     : null;
 
+  const matchdayTeams: Team[] = matches.length > 0
+    ? Array.from(
+        new Map(
+          matches.flatMap((m) => [m.homeTeam, m.awayTeam]).map((t) => [t.id, t]),
+        ).values(),
+      )
+    : [];
+
+  function openSocialFlow(action: SocialAction) {
+    setSocialError('');
+    setSocialFlow({ action, step: 'rival', rivalId: '', rivalAlias: '' });
+  }
+
+  function handleSocialRival(rivalId: string, rivalAlias: string) {
+    if (!socialFlow) return;
+    if (socialFlow.action === 'VETO') {
+      setSocialFlow({ ...socialFlow, step: 'team', rivalId, rivalAlias });
+    } else {
+      executeSocialAction(socialFlow.action, rivalId, rivalAlias, null);
+    }
+  }
+
+  async function executeSocialAction(action: SocialAction, rivalId: string, rivalAlias: string, teamId: string | null) {
+    setSocialLoading(true);
+    setSocialError('');
+    try {
+      const body: Record<string, unknown> = { targetParticipantId: rivalId, matchdayNumber: currentMatchday };
+      if (action === 'VETO' && teamId) body.teamId = teamId;
+      const endpoint = action === 'BLOCK' ? 'blocks' : action === 'VETO' ? 'vetos' : 'challenges';
+      const res = await fetch(`/api/editions/${editionId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setSocialFlow(null);
+        // refresh tokens
+        const d = await fetch(`/api/editions/${editionId}/standings`).then((r) => r.json()).catch(() => []);
+        const rows: StandingRow[] = Array.isArray(d) ? d : [];
+        const me = rows.find((r) => r.alias === user?.alias);
+        if (typeof me?.blocksRemaining === 'number') setBlocksRemaining(me.blocksRemaining);
+        if (typeof me?.vetosRemaining === 'number') setVetosRemaining(me.vetosRemaining);
+        if (typeof me?.challengesRemaining === 'number') setChallengesRemaining(me.challengesRemaining);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const msg = Array.isArray(data.message) ? data.message[0] : (data.message ?? 'Error al ejecutar la acción');
+        setSocialError(msg);
+      }
+    } catch {
+      setSocialError('Error de red');
+    } finally {
+      setSocialLoading(false);
+    }
+  }
+
   const pickStatus = myPick?.status ? (PICK_STATUS_CONFIG[myPick.status] ?? null) : null;
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -514,8 +834,25 @@ export default function EditionPage() {
         <PickBottomSheet
           team={selectedTeam}
           submitting={submitting}
+          mode={championshipMode}
           onPick={handlePick}
           onClose={() => setSelectedTeamId(null)}
+        />
+      )}
+
+      {socialFlow && (
+        <SocialBottomSheet
+          flow={socialFlow}
+          rivals={rivals}
+          teams={matchdayTeams}
+          loading={socialLoading}
+          error={socialError}
+          onSelectRival={handleSocialRival}
+          onSelectTeam={(teamId) => {
+            if (socialFlow) executeSocialAction('VETO', socialFlow.rivalId, socialFlow.rivalAlias, teamId);
+          }}
+          onBack={() => setSocialFlow((f) => f ? { ...f, step: 'rival', rivalId: '', rivalAlias: '' } : null)}
+          onClose={() => { setSocialFlow(null); setSocialError(''); }}
         />
       )}
 
@@ -548,12 +885,22 @@ export default function EditionPage() {
                 </span>
               )}
             </div>
-            <button
-              onClick={() => setActiveTab('jugadores')}
-              className="text-amber-400/50 hover:text-amber-400 transition-colors"
-            >
-              <Users className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/guide')}
+                className="text-amber-400/50 hover:text-amber-400 transition-colors"
+                aria-label="Guía del juego"
+              >
+                <Lightbulb className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setActiveTab('jugadores')}
+                className="text-amber-400/50 hover:text-amber-400 transition-colors"
+                aria-label="Jugadores"
+              >
+                <Users className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Hero content */}
@@ -590,7 +937,7 @@ export default function EditionPage() {
                   }
                 }}
                 disabled={currentMatchday <= (editionStartMatchday ?? 1)}
-                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/12 disabled:opacity-20 transition-colors text-lg"
+                className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors text-lg"
               >
                 ‹
               </button>
@@ -605,7 +952,7 @@ export default function EditionPage() {
                   }
                 }}
                 disabled={editionEndMatchday != null && currentMatchday >= editionEndMatchday}
-                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/12 disabled:opacity-20 transition-colors text-lg"
+                className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors text-lg"
               >
                 ›
               </button>
@@ -623,32 +970,51 @@ export default function EditionPage() {
                 <span className="text-xs font-medium text-muted-foreground">Picks cerrados</span>
               </div>
             ) : matchdayFirstKickoff ? (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-xs font-bold text-amber-400">Cierra en {countdown}</span>
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-400">Cierra en {countdown}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground/70">
+                  {new Date(matchdayFirstKickoff).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {new Date(matchdayFirstKickoff).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             ) : null}
           </div>
         </div>
 
         {/* Tab bar */}
-        <div className="relative border-b border-border">
-          <div className="max-w-4xl mx-auto px-4 flex">
-            {(['picks', 'jugadores'] as const).map((tab) => (
+        <div className="relative border-b border-border overflow-x-auto">
+          <div className="max-w-4xl mx-auto px-4 flex min-w-max">
+            {([
+              { key: 'picks', label: '⚽ Picks' },
+              { key: 'jugadores', label: '👥 Jugadores' },
+              { key: 'clasificacion', label: '🏆 Clasificación' },
+            ] as const).map(({ key, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={key}
+                onClick={() => setActiveTab(key)}
                 className={cn(
-                  'px-5 py-3 text-sm font-bold transition-colors relative',
-                  activeTab === tab ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground',
+                  'px-4 py-3 text-sm font-bold transition-colors relative whitespace-nowrap',
+                  activeTab === key ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {tab === 'picks' ? '⚽ Picks' : '👥 Jugadores'}
-                {activeTab === tab && (
-                  <span className="absolute bottom-0 inset-x-3 h-0.5 bg-amber-500 rounded-t-full" />
+                {label}
+                {activeTab === key && (
+                  <span className="absolute bottom-0 inset-x-2 h-0.5 bg-amber-500 rounded-t-full" />
                 )}
               </button>
             ))}
+            {championshipId && (
+              <button
+                onClick={() => router.push(`/championship/${championshipId}`)}
+                className="px-4 py-3 text-sm font-bold transition-colors relative whitespace-nowrap text-muted-foreground hover:text-foreground ml-auto"
+              >
+                ⚙️ Ajustes
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -681,7 +1047,7 @@ export default function EditionPage() {
                   <p className="font-bold text-foreground text-sm truncate">{myPick.team.name}</p>
                   {myPick.pickType && (
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Gana o Empata' : '🏆 Gana'}
+                      {myPick.pickType === 'WIN_OR_DRAW' ? '🤝 Empata' : '🏆 Gana'}
                     </p>
                   )}
                 </div>
@@ -714,35 +1080,66 @@ export default function EditionPage() {
               </div>
             )}
 
-            {/* Social tokens */}
+            {/* Social tokens — clickable buttons */}
             {(blockCount > 0 || vetoCount > 0 || challengeCount > 0) && !participantEliminated && (
-              <div className="mb-4 flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border">
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
                 {blockCount > 0 && (
-                  <span className="flex items-center gap-1.5 text-sm">
+                  <button
+                    disabled={(blocksRemaining ?? 0) <= 0}
+                    onClick={() => openSocialFlow('BLOCK')}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-sm font-semibold disabled:opacity-40 hover:border-amber-500/30 active:scale-95 transition-all"
+                  >
                     <span>🔒</span>
                     <span className="text-muted-foreground">Bloqueos:</span>
                     <span className="font-bold text-foreground tabular-nums">{blocksRemaining ?? '—'}</span>
-                  </span>
+                  </button>
                 )}
                 {vetoCount > 0 && (
-                  <span className="flex items-center gap-1.5 text-sm">
+                  <button
+                    disabled={(vetosRemaining ?? 0) <= 0}
+                    onClick={() => openSocialFlow('VETO')}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-sm font-semibold disabled:opacity-40 hover:border-amber-500/30 active:scale-95 transition-all"
+                  >
                     <span>🚫</span>
                     <span className="text-muted-foreground">Vetos:</span>
                     <span className="font-bold text-foreground tabular-nums">{vetosRemaining ?? '—'}</span>
-                  </span>
+                  </button>
                 )}
                 {challengeCount > 0 && (
-                  <span className="flex items-center gap-1.5 text-sm">
+                  <button
+                    disabled={(challengesRemaining ?? 0) <= 0}
+                    onClick={() => openSocialFlow('CHALLENGE')}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-sm font-semibold disabled:opacity-40 hover:border-amber-500/30 active:scale-95 transition-all"
+                  >
                     <span>⚔️</span>
                     <span className="text-muted-foreground">Retos:</span>
                     <span className="font-bold text-foreground tabular-nums">{challengesRemaining ?? '—'}</span>
-                  </span>
+                  </button>
                 )}
               </div>
             )}
 
-            {/* Double or nothing */}
-            {doubleOrNothingEnabled && championshipMode === 'LEAGUE' && (
+            {/* Double or nada — token mode */}
+            {doubleOrNadaCount > 0 && !participantEliminated && (
+              <button
+                disabled={(doubleOrNadaRemaining ?? 0) <= 0 || !!myPick}
+                onClick={() => setDoubleOrNothingActive((v) => !v)}
+                className={cn(
+                  'mb-4 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-semibold transition-all active:scale-95',
+                  doubleOrNothingActive
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                    : 'bg-card border-border text-foreground hover:border-amber-500/30 disabled:opacity-40',
+                )}
+              >
+                <span>🎲</span>
+                <span className={doubleOrNothingActive ? 'text-amber-400' : 'text-muted-foreground'}>Doble o nada:</span>
+                <span className="font-bold tabular-nums">{doubleOrNadaRemaining ?? '—'}</span>
+                {doubleOrNothingActive && <span className="ml-1 text-[10px] text-amber-400/80">ACTIVO</span>}
+              </button>
+            )}
+
+            {/* Double or nothing — legacy boolean mode */}
+            {doubleOrNothingEnabled && doubleOrNadaCount === 0 && championshipMode === 'LEAGUE' && (
               hasUsedDoubleOrNothing ? (
                 <div className="mb-4 flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-secondary border border-border">
                   <span className="text-base shrink-0">🎲</span>
@@ -872,6 +1269,11 @@ export default function EditionPage() {
         {/* ── Jugadores tab ──────────────────────────────────────────────── */}
         {activeTab === 'jugadores' && (
           <ParticipantsList editionId={editionId} />
+        )}
+
+        {/* ── Clasificación tab ──────────────────────────────────────────── */}
+        {activeTab === 'clasificacion' && (
+          <StandingsTab editionId={editionId} championshipMode={championshipMode} />
         )}
       </main>
 

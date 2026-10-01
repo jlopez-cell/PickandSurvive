@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, ChevronLeft } from 'lucide-react';
+import { Bell, ChevronLeft, X } from 'lucide-react';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 export default function NotificationsPage() {
@@ -13,13 +13,40 @@ export default function NotificationsPage() {
   );
 }
 
+type NotificationPayload = Record<string, unknown>;
+
 type Notification = {
   id: string;
   type: string;
-  message: string;
+  payload: NotificationPayload;
   read: boolean;
   createdAt: string;
 };
+
+function notificationMessage(type: string, payload: NotificationPayload): string {
+  switch (type) {
+    case 'PICK_REMINDER':
+      return `⏰ Tienes ${payload.minutesLeft ?? '?'} minutos para hacer tu pick — Jornada ${payload.matchdayNumber ?? '?'}`;
+    case 'JOIN_APPROVED':
+      return '✅ Tu solicitud fue aprobada. ¡Ya eres parte del campeonato!';
+    case 'JOIN_REJECTED':
+      return '❌ Tu solicitud para unirte al campeonato fue rechazada.';
+    case 'NEW_JOIN_REQUEST':
+      return '👋 Nuevo participante quiere unirse a tu campeonato. Revisa las solicitudes.';
+    case 'EDITION_FINISHED':
+      return `🏆 La edición "${payload.editionName ?? 'desconocida'}" ha finalizado.`;
+    case 'INVITATION':
+      return `📩 Tienes una invitación para unirte a "${payload.championshipName ?? 'un campeonato'}". Pulsá para aceptar.`;
+    case 'VETO_RECEIVED':
+      return `🚫 ${payload.from ?? 'Alguien'} te vetó al ${payload.teamName ?? 'equipo'} esta jornada. Cambiá tu pick.`;
+    case 'CHALLENGE_RECEIVED':
+      return `⚔️ ${payload.from ?? 'Alguien'} te retó en la jornada ${payload.matchdayNumber ?? '?'}. El que peor resultado tenga pierde 1 punto.`;
+    case 'BLOCK_RECEIVED':
+      return `🔒 ${payload.from ?? 'Alguien'} te bloqueó en la jornada ${payload.matchdayNumber ?? '?'}. Tu pick no sumó puntos.`;
+    default:
+      return 'Nueva notificación.';
+  }
+}
 
 function NotificationsContent() {
   const router = useRouter();
@@ -29,14 +56,29 @@ function NotificationsContent() {
   useEffect(() => {
     fetch('/api/notifications')
       .then((r) => r.json())
-      .then((data) => setNotifications(Array.isArray(data) ? data : []))
+      .then((data) => setNotifications(Array.isArray(data?.notifications) ? data.notifications : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const markRead = async (id: string) => {
+  const markRead = async (id: string, n?: Notification) => {
     await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' }).catch(() => {});
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+    setNotifications((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));
+    if (n?.type === 'INVITATION' && n.payload.inviteToken) {
+      setNotifications((prev) => prev.filter((x) => x.id !== id));
+      fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
+      router.push(`/join/${n.payload.inviteToken}`);
+    }
+    if (n?.type === 'NEW_JOIN_REQUEST' && n.payload.championshipId) {
+      setNotifications((prev) => prev.filter((x) => x.id !== id));
+      fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
+      router.push(`/championship/${n.payload.championshipId}/invite`);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    await fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
   const timeAgo = (iso: string) => {
@@ -81,24 +123,33 @@ function NotificationsContent() {
         {!loading && notifications.length > 0 && (
           <div className="px-4 py-2 space-y-2">
             {notifications.map((n) => (
-              <button
+              <div
                 key={n.id}
-                onClick={() => markRead(n.id)}
-                className={`w-full text-left px-4 py-4 rounded-2xl border transition-all active:scale-[0.98] ${
+                className={`flex items-start gap-3 px-4 py-4 rounded-2xl border transition-all ${
                   n.read
                     ? 'bg-secondary/50 border-border opacity-60'
                     : 'bg-secondary border-border'
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  {!n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
-                  {n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-muted-foreground/30 shrink-0" />}
+                <button
+                  onClick={() => markRead(n.id, n)}
+                  className="flex items-start gap-3 flex-1 min-w-0 text-left"
+                  aria-label="Marcar como leída"
+                >
+                  <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${n.read ? 'bg-muted-foreground/30' : 'bg-amber-400'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground leading-snug">{n.message}</p>
+                    <p className="text-sm text-foreground leading-snug">{notificationMessage(n.type, n.payload)}</p>
                     <p className="text-[11px] text-muted-foreground mt-1">{timeAgo(n.createdAt)}</p>
                   </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={() => deleteNotification(n.id)}
+                  className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors mt-0.5"
+                  aria-label="Borrar notificación"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         )}

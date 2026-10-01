@@ -22,6 +22,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { findNextOpenMatchdayByCalendar } from '../matchdays/find-next-open-matchday-by-calendar';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ChampionshipsService {
@@ -30,6 +31,7 @@ export class ChampionshipsService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private notifications: NotificationsService,
   ) {
     this.resend = new Resend(this.configService.get<string>('RESEND_API_KEY'));
   }
@@ -86,6 +88,7 @@ export class ChampionshipsService {
         blockCount: dto.blockCount ?? 0,
         vetoCount: dto.vetoCount ?? 0,
         challengeCount: dto.challengeCount ?? 0,
+        doubleOrNadaCount: dto.doubleOrNadaCount ?? 0,
         creatorId: userId,
         adminId: userId,
       },
@@ -267,6 +270,12 @@ export class ChampionshipsService {
           data: { challengesRemaining: edition.championship.challengeCount },
         });
       }
+      if (edition.championship.doubleOrNadaCount > 0) {
+        await tx.participant.updateMany({
+          where: { editionId },
+          data: { doubleOrNadaRemaining: edition.championship.doubleOrNadaCount },
+        });
+      }
     });
 
     return { message: 'Edición activada correctamente.' };
@@ -414,26 +423,40 @@ export class ChampionshipsService {
       };
     };
 
+    let result: object;
     if (emailProvider === 'gmail') {
-      return sendViaGmail();
-    }
-
-    if (emailProvider === 'resend') {
-      return sendViaResend();
-    }
-
-    // fallback
-    try {
-      return await sendViaResend();
-    } catch (err) {
-      console.warn('Resend falló, pasando a Gmail:', (err as Error)?.message);
+      result = await sendViaGmail();
+    } else if (emailProvider === 'resend') {
+      result = await sendViaResend();
+    } else {
+      // fallback
       try {
-        return await sendViaGmail();
-      } catch (gmailErr) {
-        const msg = (gmailErr as any)?.message ?? 'Error al enviar el email (fallback Gmail)';
-        throw new BadRequestException(msg);
+        result = await sendViaResend();
+      } catch (err) {
+        console.warn('Resend falló, pasando a Gmail:', (err as Error)?.message);
+        try {
+          result = await sendViaGmail();
+        } catch (gmailErr) {
+          const msg = (gmailErr as any)?.message ?? 'Error al enviar el email (fallback Gmail)';
+          throw new BadRequestException(msg);
+        }
       }
     }
+
+    // In-app notification if the invited email belongs to an existing user
+    const invitedUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true },
+    });
+    if (invitedUser) {
+      await this.notifications.send(
+        invitedUser.id,
+        'INVITATION',
+        { championshipId, championshipName: championship.name, inviteToken: link.token },
+      );
+    }
+
+    return result;
   }
 
   // ─── Unirse con token ─────────────────────────────────────────────────────
@@ -523,7 +546,7 @@ export class ChampionshipsService {
     const joinableEditions = await this.prisma.edition.findMany({
       where: { championshipId, status: { in: [EditionStatus.OPEN, EditionStatus.ACTIVE] } },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (joinableEditions.length === 0) {
       throw new ForbiddenException('No hay edición abierta o activa. No se puede aprobar la solicitud.');
@@ -536,6 +559,35 @@ export class ChampionshipsService {
       });
       for (const ed of joinableEditions) {
         await syncMembersToEditionTx(tx, ed.id);
+      }
+
+      // Initialize social tokens for the new participant in any ACTIVE edition
+      const champ = await tx.championship.findUnique({
+        where: { id: championshipId },
+        select: {
+          wildcardCount: true,
+          blockCount: true,
+          vetoCount: true,
+          challengeCount: true,
+          doubleOrNadaCount: true,
+        },
+      });
+      if (champ) {
+        const activeEditionIds = joinableEditions
+          .filter((e) => e.status === EditionStatus.ACTIVE)
+          .map((e) => e.id);
+        for (const edId of activeEditionIds) {
+          await tx.participant.updateMany({
+            where: { editionId: edId, userId: request.userId, blocksRemaining: 0, vetosRemaining: 0, challengesRemaining: 0 },
+            data: {
+              ...(champ.wildcardCount > 0 ? { wildcardsRemaining: champ.wildcardCount } : {}),
+              ...(champ.blockCount > 0 ? { blocksRemaining: champ.blockCount } : {}),
+              ...(champ.vetoCount > 0 ? { vetosRemaining: champ.vetoCount } : {}),
+              ...(champ.challengeCount > 0 ? { challengesRemaining: champ.challengeCount } : {}),
+              ...(champ.doubleOrNadaCount > 0 ? { doubleOrNadaRemaining: champ.doubleOrNadaCount } : {}),
+            },
+          });
+        }
       }
     });
 
@@ -706,7 +758,7 @@ export class ChampionshipsService {
   private async getEditionOrThrow(championshipId: string, editionId: string) {
     const edition = await this.prisma.edition.findFirst({
       where: { id: editionId, championshipId },
-      include: { championship: { select: { adminId: true, wildcardCount: true, blockCount: true, vetoCount: true, challengeCount: true } } },
+      include: { championship: { select: { adminId: true, wildcardCount: true, blockCount: true, vetoCount: true, challengeCount: true, doubleOrNadaCount: true } } },
     });
     if (!edition) throw new NotFoundException('Edición no encontrada');
     return edition;

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ChampionshipMode, MatchdayStatus, ParticipantStatus, PickStatus } from '@prisma/client';
+import { ChallengeStatus, ChampionshipMode, MatchdayStatus, ParticipantStatus, PickStatus } from '@prisma/client';
 import { findNextOpenMatchdayByCalendar } from '../matchdays/find-next-open-matchday-by-calendar';
 
 /** Torneo: racha de victorias (SURVIVED). Ignora PENDING/POSTPONED sin romper la racha previa. */
@@ -121,6 +121,39 @@ export class StandingsService {
 
     const viewerParticipantId = participant?.id ?? null;
 
+    // Active tokens for current matchday
+    let activeBlocks: Array<{ blockedParticipantId: string; blocker: { user: { alias: string } } }> = [];
+    let activeVetos: Array<{ vetoedParticipantId: string; team: { name: string }; vetoer: { user: { alias: string } } }> = [];
+    let activeChallenges: Array<{
+      challengerParticipantId: string;
+      challengedParticipantId: string;
+      challenger: { user: { alias: string } };
+      challenged: { user: { alias: string } };
+    }> = [];
+
+    if (pickDisplayMatchdayNumber !== null) {
+      [activeBlocks, activeVetos, activeChallenges] = await Promise.all([
+        this.prisma.block.findMany({
+          where: { editionId, matchdayNumber: pickDisplayMatchdayNumber },
+          include: { blocker: { include: { user: { select: { alias: true } } } } },
+        }),
+        this.prisma.veto.findMany({
+          where: { editionId, matchdayNumber: pickDisplayMatchdayNumber },
+          include: {
+            team: { select: { name: true } },
+            vetoer: { include: { user: { select: { alias: true } } } },
+          },
+        }),
+        this.prisma.challenge.findMany({
+          where: { editionId, matchdayNumber: pickDisplayMatchdayNumber, status: ChallengeStatus.ACTIVE },
+          include: {
+            challenger: { include: { user: { select: { alias: true } } } },
+            challenged: { include: { user: { select: { alias: true } } } },
+          },
+        }),
+      ]);
+    }
+
     const resolvePickActual = (
       picks: {
         status: PickStatus;
@@ -148,6 +181,7 @@ export class StandingsService {
           select: {
             status: true,
             pointsAwarded: true,
+            isDoubleOrNothing: true,
             team: { select: { id: true, name: true, logoUrl: true } },
             matchday: { select: { number: true, status: true } },
           },
@@ -163,6 +197,14 @@ export class StandingsService {
         .map((p) => {
           const survivedPickCount = p.picks.filter((pk) => pk.status === PickStatus.SURVIVED).length;
           const survivalStreak = computeSurvivalStreak(p.picks);
+          const currentPick = pickDisplayMatchdayNumber !== null
+            ? p.picks.find((pk) => pk.matchday.number === pickDisplayMatchdayNumber) ?? null
+            : null;
+          const myBlock = activeBlocks.find((b) => b.blockedParticipantId === p.id);
+          const myVeto = activeVetos.find((v) => v.vetoedParticipantId === p.id);
+          const myChallenge = activeChallenges.find(
+            (c) => c.challengerParticipantId === p.id || c.challengedParticipantId === p.id,
+          );
           return {
             participantId: p.id,
             alias: p.user.alias,
@@ -170,10 +212,28 @@ export class StandingsService {
             eliminatedAtMatchday: p.eliminatedAtMatchday,
             survivedPickCount,
             survivalStreak,
+            isGhost: p.isGhost ?? false,
+            blocksRemaining: p.blocksRemaining ?? 0,
+            vetosRemaining: p.vetosRemaining ?? 0,
+            challengesRemaining: p.challengesRemaining ?? 0,
+            doubleOrNadaRemaining: p.doubleOrNadaRemaining ?? 0,
             latestPick:
               canRevealPicks || (viewerParticipantId && p.id === viewerParticipantId)
                 ? resolvePickActual(p.picks)
                 : null,
+            // Active tokens — veto/challenge visible always; block/doubleOrNada only post-kickoff
+            activeVeto: myVeto ? { teamName: myVeto.team.name, from: myVeto.vetoer.user.alias } : null,
+            activeChallenge: myChallenge
+              ? {
+                  with:
+                    myChallenge.challengerParticipantId === p.id
+                      ? myChallenge.challenged.user.alias
+                      : myChallenge.challenger.user.alias,
+                }
+              : null,
+            isBlocked: canRevealPicks ? !!myBlock : false,
+            blockFrom: canRevealPicks ? (myBlock?.blocker.user.alias ?? null) : null,
+            doubleOrNadaActive: canRevealPicks ? (currentPick?.isDoubleOrNothing ?? false) : false,
           };
         })
         .sort((a, b) => {
@@ -191,16 +251,43 @@ export class StandingsService {
         .map((p) => {
           const survivedPickCount = p.picks.filter((pk) => pk.pointsAwarded === 3).length;
           const survivalStreak = computeLeagueWinStreak(p.picks);
+          const currentPick = pickDisplayMatchdayNumber !== null
+            ? p.picks.find((pk) => pk.matchday.number === pickDisplayMatchdayNumber) ?? null
+            : null;
+          const myBlock = activeBlocks.find((b) => b.blockedParticipantId === p.id);
+          const myVeto = activeVetos.find((v) => v.vetoedParticipantId === p.id);
+          const myChallenge = activeChallenges.find(
+            (c) => c.challengerParticipantId === p.id || c.challengedParticipantId === p.id,
+          );
           return {
             participantId: p.id,
             alias: p.user.alias,
+            status: p.status,
             totalPoints: p.totalPoints,
             survivedPickCount,
             survivalStreak,
+            isGhost: p.isGhost ?? false,
+            blocksRemaining: p.blocksRemaining ?? 0,
+            vetosRemaining: p.vetosRemaining ?? 0,
+            challengesRemaining: p.challengesRemaining ?? 0,
+            doubleOrNadaRemaining: p.doubleOrNadaRemaining ?? 0,
             latestPick:
               canRevealPicks || (viewerParticipantId && p.id === viewerParticipantId)
                 ? resolvePickActual(p.picks)
                 : null,
+            // Active tokens — veto/challenge visible always; block/doubleOrNada only post-kickoff
+            activeVeto: myVeto ? { teamName: myVeto.team.name, from: myVeto.vetoer.user.alias } : null,
+            activeChallenge: myChallenge
+              ? {
+                  with:
+                    myChallenge.challengerParticipantId === p.id
+                      ? myChallenge.challenged.user.alias
+                      : myChallenge.challenger.user.alias,
+                }
+              : null,
+            isBlocked: canRevealPicks ? !!myBlock : false,
+            blockFrom: canRevealPicks ? (myBlock?.blocker.user.alias ?? null) : null,
+            doubleOrNadaActive: canRevealPicks ? (currentPick?.isDoubleOrNothing ?? false) : false,
           };
         })
         .sort((a, b) => b.totalPoints - a.totalPoints);
